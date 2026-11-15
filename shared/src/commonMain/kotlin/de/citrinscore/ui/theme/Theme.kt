@@ -1,11 +1,14 @@
 package de.citrinscore.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF8A5100),
@@ -55,7 +58,9 @@ private val DarkColors = darkColorScheme(
     outlineVariant = Color(0xFF49454F),
 )
 
+private val CitrinShapes = Shapes(extraLarge = RoundedCornerShape(20.dp))
+
 @Composable
 fun CitrinTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors, content = content)
+    MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors, shapes = CitrinShapes, content = content)
 }

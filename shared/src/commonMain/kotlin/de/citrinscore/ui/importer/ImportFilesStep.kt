@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +37,6 @@ import io.github.vinceglb.filekit.name
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
-private val RowShape = RoundedCornerShape(20.dp)
 private val RowPadding = PaddingValues(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
 private val CompactRowWidth = 440.dp
 
@@ -94,7 +92,7 @@ private fun FileRow(position: Int, name: String, onMoveUp: (() -> Unit)?, onMove
         RowAction(Res.drawable.ic_close, strings.remove, onRemove)
     }
 
-    Tile(Modifier.fillMaxWidth(), shape = RowShape, contentPadding = RowPadding) {
+    Tile(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, contentPadding = RowPadding) {
         BoxWithConstraints {
             if (maxWidth < CompactRowWidth) {
                 Column {

@@ -2,13 +2,18 @@ package de.citrinscore.score
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 @Serializable
 data class ScoreManifest(
     val metadata: ScoreMetadata,
     val content: ScoreContent,
+    val createdAt: Instant,
+    val lastOpenedAt: Instant? = null,
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
 ) {
+    val lastActivity get() = lastOpenedAt ?: createdAt
+
     companion object {
         const val CURRENT_FORMAT_VERSION = 1
     }

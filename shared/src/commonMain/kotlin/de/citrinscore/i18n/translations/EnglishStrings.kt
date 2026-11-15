@@ -31,6 +31,7 @@ object EnglishStrings : Strings {
 
     override val libraryTitle = "Library"
     override val libraryEmptyTitle = "Your library is empty"
+    override val folderEmptyTitle = "This folder is empty"
     override val libraryEmptyText = "Scores you import will appear here."
 
     override val cancel = "Cancel"
@@ -42,6 +43,7 @@ object EnglishStrings : Strings {
     override val folderNameLabel = "Folder name"
     override val nameEmpty = "Please enter a name."
     override val nameInvalid = "The name must not contain any of these characters: \\ / : * ? \" < > |"
+    override val nameReservedExtension = "The name must not end with “.citscore”."
     override val nameExists = "This name is already taken in this folder."
 
     override val importTypeTitle = "What would you like to import?"

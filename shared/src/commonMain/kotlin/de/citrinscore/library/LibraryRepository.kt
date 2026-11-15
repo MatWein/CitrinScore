@@ -1,35 +1,46 @@
 package de.citrinscore.library
 
-import de.citrinscore.archive.ArchiveEntry
-import de.citrinscore.archive.writeZipArchive
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.serialization.AppJson
+import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.compressImage
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.isDirectory
-import io.github.vinceglb.filekit.isRegularFile
 import io.github.vinceglb.filekit.list
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.readString
+import io.github.vinceglb.filekit.write
+import io.github.vinceglb.filekit.writeString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
+import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 
-class LibraryRepository(private val json: Json = AppJson) {
+class LibraryRepository(
+    private val json: Json = AppJson,
+    private val clock: Clock = Clock.System,
+) {
 
     suspend fun content(folder: PlatformFile): FolderContent = withContext(Dispatchers.IO) {
-        val entries = folder.list().filterNot { it.name.startsWith(".") }.sortedBy { it.name.lowercase() }
-        val folders = entries.filter { it.isDirectory() }.map(LibraryItem::Folder)
-        val scores = entries
-            .filter { it.isRegularFile() && it.extension.equals(CitScore.EXTENSION, ignoreCase = true) }
-            .map(LibraryItem::Score)
+        val directories = folder.list().filter { !it.name.startsWith(".") && it.isDirectory() }
+        val (scoreDirectories, subfolders) = directories.partition { it.isScore() }
+        val folders = subfolders
+            .sortedBy { it.name.lowercase() }
+            .map(LibraryItem::Folder)
+        val scores = scoreDirectories
+            .map { LibraryItem.Score(it, manifest(it)?.lastActivity) }
+            .sortedWith(compareByDescending<LibraryItem.Score> { it.lastActivity }.thenBy { it.displayName.lowercase() })
         FolderContent(folders + scores)
     }
 
@@ -38,17 +49,42 @@ class LibraryRepository(private val json: Json = AppJson) {
     }
 
     suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>) {
-        val pages = images.mapIndexed { index, image -> CitScore.pageEntry(index, image.extension) to image }
-        val manifest = ScoreManifest(metadata, ScoreContent.Images(pages.map { (entry, _) -> entry }))
-        val entries = listOf(ArchiveEntry(CitScore.MANIFEST_ENTRY) { json.encodeToString(manifest).encodeToByteArray() }) +
-            pages.map { (entry, image) -> ArchiveEntry(entry) { image.readBytes() } }
+        val score = folder / CitScore.directoryName(metadata.title)
+        val pageNames = images.mapIndexed { index, image -> CitScore.pageFileName(index, image.extension) }
+        val manifest = ScoreManifest(
+            metadata = metadata,
+            content = ScoreContent.Images(pageNames.map { "${CitScore.PAGES_DIRECTORY}/$it" }),
+            createdAt = clock.now(),
+        )
 
-        val target = folder / CitScore.fileName(metadata.title)
         try {
-            target.writeZipArchive(entries)
+            val pages = score / CitScore.PAGES_DIRECTORY
+            pages.createDirectories()
+            images.zip(pageNames).forEach { (image, name) -> (pages / name) write image }
+            (score / CitScore.THUMBNAIL_FILE) write FileKit.compressImage(images.first(), maxWidth = CitScore.THUMBNAIL_WIDTH)
+            (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))
         } catch (e: Exception) {
-            target.delete(mustExist = false)
+            score.delete(mustExist = false, recursively = true)
             throw e
         }
     }
+
+    suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
+
+    private suspend fun manifest(score: PlatformFile): ScoreManifest? = read(score / CitScore.MANIFEST_FILE) { readString() }
+        ?.let { text ->
+            try {
+                json.decodeFromString<ScoreManifest>(text)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+
+    private suspend fun <T> read(file: PlatformFile, block: suspend PlatformFile.() -> T): T? = try {
+        if (file.exists()) file.block() else null
+    } catch (_: IOException) {
+        null
+    }
+
+    private fun PlatformFile.isScore() = CitScore.isScoreDirectoryName(name)
 }

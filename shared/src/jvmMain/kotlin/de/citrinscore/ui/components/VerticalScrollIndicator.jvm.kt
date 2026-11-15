@@ -3,18 +3,28 @@ package de.citrinscore.ui.components
 import androidx.compose.foundation.LocalScrollbarStyle
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-actual fun VerticalScrollIndicator(scrollState: ScrollState, modifier: Modifier) {
+actual fun VerticalScrollIndicator(scrollState: ScrollState, modifier: Modifier) =
+    ThemedScrollbar(rememberScrollbarAdapter(scrollState), modifier)
+
+@Composable
+actual fun VerticalScrollIndicator(gridState: LazyGridState, modifier: Modifier) =
+    ThemedScrollbar(rememberScrollbarAdapter(gridState), modifier)
+
+@Composable
+private fun ThemedScrollbar(adapter: ScrollbarAdapter, modifier: Modifier) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     VerticalScrollbar(
-        adapter = rememberScrollbarAdapter(scrollState),
+        adapter = adapter,
         modifier = modifier,
         style = LocalScrollbarStyle.current.copy(
             thickness = 8.dp,

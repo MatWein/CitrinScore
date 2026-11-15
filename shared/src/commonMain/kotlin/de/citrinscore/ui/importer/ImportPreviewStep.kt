@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +25,7 @@ fun ImportPreviewStep(pages: List<ImageBitmap>, isLoading: Boolean, failed: Bool
         when {
             isLoading -> CircularProgressIndicator()
             failed -> Text(strings.previewFailed, color = MaterialTheme.colorScheme.error)
-            else -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))) {
+            else -> Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)) {
                 pages.forEach { page ->
                     Image(page, contentDescription = null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
                 }

@@ -10,6 +10,7 @@ val NameError.text: String
         return when (this) {
             NameError.Empty -> strings.nameEmpty
             NameError.InvalidCharacters -> strings.nameInvalid
+            NameError.ReservedExtension -> strings.nameReservedExtension
             NameError.AlreadyExists -> strings.nameExists
         }
     }

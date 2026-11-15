@@ -28,6 +28,7 @@ interface Strings {
 
     val libraryTitle: String
     val libraryEmptyTitle: String
+    val folderEmptyTitle: String
     val libraryEmptyText: String
 
     val cancel: String
@@ -39,6 +40,7 @@ interface Strings {
     val folderNameLabel: String
     val nameEmpty: String
     val nameInvalid: String
+    val nameReservedExtension: String
     val nameExists: String
 
     val importTypeTitle: String

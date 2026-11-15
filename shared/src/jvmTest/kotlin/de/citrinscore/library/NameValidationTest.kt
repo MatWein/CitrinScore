@@ -19,6 +19,11 @@ class NameValidationTest {
     }
 
     @Test
+    fun `names with the score extension are rejected`() {
+        assertEquals(NameError.ReservedExtension, validateName("Etude.CitScore ", emptyList()))
+    }
+
+    @Test
     fun `taken names are rejected case insensitively`() {
         assertEquals(NameError.AlreadyExists, validateName(" Etude ", listOf("etude")))
     }

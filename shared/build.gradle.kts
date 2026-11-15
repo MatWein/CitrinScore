@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
@@ -25,16 +22,6 @@ kotlin {
     }
 
     jvm()
-
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    applyDefaultHierarchyTemplate {
-        common {
-            group("jvmAndAndroid") {
-                withJvm()
-                withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
-            }
-        }
-    }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {

@@ -31,6 +31,7 @@ object GermanStrings : Strings {
 
     override val libraryTitle = "Bibliothek"
     override val libraryEmptyTitle = "Deine Bibliothek ist noch leer"
+    override val folderEmptyTitle = "Dieser Ordner ist leer"
     override val libraryEmptyText = "Importierte Noten erscheinen hier."
 
     override val cancel = "Abbrechen"
@@ -42,6 +43,7 @@ object GermanStrings : Strings {
     override val folderNameLabel = "Ordnername"
     override val nameEmpty = "Bitte gib einen Namen ein."
     override val nameInvalid = "Der Name darf keines dieser Zeichen enthalten: \\ / : * ? \" < > |"
+    override val nameReservedExtension = "Der Name darf nicht auf „.citscore“ enden."
     override val nameExists = "Dieser Name ist in diesem Ordner bereits vergeben."
 
     override val importTypeTitle = "Was möchtest du importieren?"

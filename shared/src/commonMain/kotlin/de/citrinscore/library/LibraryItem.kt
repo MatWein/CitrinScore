@@ -1,8 +1,9 @@
 package de.citrinscore.library
 
+import de.citrinscore.score.CitScore
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.nameWithoutExtension
+import kotlin.time.Instant
 
 sealed interface LibraryItem {
     val file: PlatformFile
@@ -12,8 +13,8 @@ sealed interface LibraryItem {
         override val displayName get() = file.name
     }
 
-    data class Score(override val file: PlatformFile) : LibraryItem {
-        override val displayName get() = file.nameWithoutExtension
+    data class Score(override val file: PlatformFile, val lastActivity: Instant?) : LibraryItem {
+        override val displayName get() = CitScore.title(file.name)
     }
 }
 
