@@ -1,0 +1,29 @@
+# Gradle / Kotlin
+.gradle/
+build/
+.kotlin/
+local.properties
+
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.idea_modules/
+captures/
+.cxx/
+.externalNativeBuild/
+
+# Android-Build-Artefakte
+*.apk
+*.aab
+
+# Xcode
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
