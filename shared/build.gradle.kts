@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
+    kotlin("plugin.serialization")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
 }
@@ -8,12 +9,16 @@ plugins {
 val composeVersion: String by project
 val androidCompileSdk: String by project
 val androidMinSdk: String by project
+val lifecycleVersion = "2.11.0"
 
 kotlin {
     android {
         namespace = "de.citrinscore.shared"
         compileSdk = androidCompileSdk.toInt()
         minSdk = androidMinSdk.toInt()
+        androidResources {
+            enable = true
+        }
     }
 
     jvm()
@@ -31,6 +36,20 @@ kotlin {
             api("org.jetbrains.compose.foundation:foundation:$composeVersion")
             api("org.jetbrains.compose.ui:ui:$composeVersion")
             api("org.jetbrains.compose.material3:material3:1.9.0")
+            api("org.jetbrains.compose.components:components-resources:$composeVersion")
+            api("io.github.vinceglb:filekit-dialogs-compose:0.17.0")
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
     }
+}
+
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "de.citrinscore.resources"
 }

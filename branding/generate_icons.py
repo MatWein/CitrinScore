@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "branding" / "icon.svg"
 ANDROID_RES = ROOT / "androidApp" / "src" / "main" / "res"
-DESKTOP_RESOURCE = ROOT / "desktopApp" / "src" / "main" / "composeResources" / "drawable" / "app_icon.png"
+SHARED_RESOURCE = ROOT / "shared" / "src" / "commonMain" / "composeResources" / "drawable" / "app_icon.png"
 DESKTOP_PACKAGING = ROOT / "desktopApp" / "packaging"
 
 ANDROID_CANVAS_DP = 108
@@ -74,7 +74,9 @@ def main() -> None:
         size = round(ANDROID_CANVAS_DP * scale)
         write(ANDROID_RES / f"mipmap-{density}" / "ic_launcher_foreground.png", render(foreground, size))
 
-    write(DESKTOP_RESOURCE, render(svg, 512))
+    large = render(svg, 512)
+    write(SHARED_RESOURCE, large)
+    write(DESKTOP_PACKAGING / "icon.png", large)
     write(DESKTOP_PACKAGING / "icon.ico", ico({size: render(svg, size) for size in ICO_SIZES}))
     write(DESKTOP_PACKAGING / "icon.icns", icns({kind: render(svg, size) for kind, size in ICNS_ENTRIES}))
 

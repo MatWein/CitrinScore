@@ -6,8 +6,6 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val composeVersion: String by project
-
 kotlin {
     jvmToolchain(25)
 }
@@ -15,11 +13,7 @@ kotlin {
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.components:components-resources:$composeVersion")
-}
-
-compose.resources {
-    packageOfResClass = "de.citrinscore.desktop.resources"
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
 }
 
 compose.desktop {
@@ -31,8 +25,9 @@ compose.desktop {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "citrinScore"
             packageVersion = project.version.toString()
+            modules("jdk.security.auth")
 
-            linux.iconFile = file("src/main/composeResources/drawable/app_icon.png")
+            linux.iconFile = file("packaging/icon.png")
             windows.iconFile = file("packaging/icon.ico")
             macOS.iconFile = file("packaging/icon.icns")
         }

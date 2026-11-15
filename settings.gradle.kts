@@ -15,6 +15,7 @@ pluginManagement {
         kotlin("multiplatform") version kotlinVersion
         kotlin("jvm") version kotlinVersion
         kotlin("plugin.compose") version kotlinVersion
+        kotlin("plugin.serialization") version kotlinVersion
         id("org.jetbrains.compose") version composeVersion
         id("com.android.application") version agpVersion
         id("com.android.kotlin.multiplatform.library") version agpVersion
