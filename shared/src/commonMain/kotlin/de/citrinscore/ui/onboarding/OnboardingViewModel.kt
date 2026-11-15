@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.i18n.AppLanguage
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.LibraryReference
+import de.citrinscore.ui.components.isLastStep
+import de.citrinscore.ui.components.nextStep
+import de.citrinscore.ui.components.previousStep
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,13 +27,13 @@ class OnboardingViewModel : ViewModel() {
 
     fun reportLibraryError() = _state.update { it.copy(libraryError = true) }
 
-    fun back() = _state.update { it.copy(step = it.step.previous()) }
+    fun back() = _state.update { it.copy(step = it.step.previousStep()) }
 
     fun next(onFinished: (AppSettings) -> Unit) {
         val current = _state.value
         if (!current.canAdvance) return
-        if (!current.step.isLast) {
-            _state.update { it.copy(step = it.step.next()) }
+        if (!current.step.isLastStep()) {
+            _state.update { it.copy(step = it.step.nextStep()) }
             return
         }
         val library = current.library ?: return

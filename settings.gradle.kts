@@ -1,9 +1,9 @@
 rootProject.name = "citrinScore"
 
 pluginManagement {
-    val kotlinVersion: String by settings
-    val composeVersion: String by settings
-    val agpVersion: String by settings
+    val kotlinVersion = providers.gradleProperty("kotlinVersion").get()
+    val composeVersion = providers.gradleProperty("composeVersion").get()
+    val agpVersion = providers.gradleProperty("agpVersion").get()
 
     repositories {
         google()

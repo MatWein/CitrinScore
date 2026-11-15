@@ -1,19 +1,10 @@
 package de.citrinscore.ui.onboarding
 
 import de.citrinscore.i18n.AppLanguage
+import de.citrinscore.ui.components.isLastStep
 import io.github.vinceglb.filekit.PlatformFile
 
-enum class OnboardingStep {
-    Welcome,
-    Language,
-    Library;
-
-    val number get() = ordinal + 1
-    val isFirst get() = this == entries.first()
-    val isLast get() = this == entries.last()
-    fun next() = entries.getOrElse(ordinal + 1) { this }
-    fun previous() = entries.getOrElse(ordinal - 1) { this }
-}
+enum class OnboardingStep { Welcome, Language, Library }
 
 data class OnboardingState(
     val step: OnboardingStep = OnboardingStep.Welcome,
@@ -22,5 +13,5 @@ data class OnboardingState(
     val libraryError: Boolean = false,
     val isCompleting: Boolean = false,
 ) {
-    val canAdvance get() = !isCompleting && (!step.isLast || library != null)
+    val canAdvance get() = !isCompleting && (!step.isLastStep() || library != null)
 }

@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
@@ -6,9 +9,9 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val composeVersion: String by project
-val androidCompileSdk: String by project
-val androidMinSdk: String by project
+val composeVersion = providers.gradleProperty("composeVersion").get()
+val androidCompileSdk = providers.gradleProperty("androidCompileSdk").get()
+val androidMinSdk = providers.gradleProperty("androidMinSdk").get()
 val lifecycleVersion = "2.11.0"
 
 kotlin {
@@ -22,6 +25,16 @@ kotlin {
     }
 
     jvm()
+
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    applyDefaultHierarchyTemplate {
+        common {
+            group("jvmAndAndroid") {
+                withJvm()
+                withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+            }
+        }
+    }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {
@@ -40,6 +53,7 @@ kotlin {
             api("io.github.vinceglb:filekit-dialogs-compose:0.17.0")
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
         }
         commonTest.dependencies {

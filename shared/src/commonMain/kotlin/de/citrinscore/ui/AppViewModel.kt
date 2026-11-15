@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.SettingsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,14 +17,22 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
 
     init {
         viewModelScope.launch {
-            _state.value = settingsRepository.load()?.let(AppState::Ready) ?: AppState.Onboarding
+            _state.value = settingsRepository.load()?.let { readyState(it) } ?: AppState.Onboarding
         }
     }
 
     fun completeOnboarding(settings: AppSettings) {
         viewModelScope.launch {
             settingsRepository.save(settings)
-            _state.value = AppState.Ready(settings)
+            _state.value = readyState(settings) ?: AppState.Onboarding
         }
+    }
+
+    private suspend fun readyState(settings: AppSettings): AppState.Ready? = try {
+        AppState.Ready(settings, settings.library.resolve())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 }

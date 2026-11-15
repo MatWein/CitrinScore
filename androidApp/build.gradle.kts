@@ -3,9 +3,9 @@ plugins {
     kotlin("plugin.compose")
 }
 
-val androidCompileSdk: String by project
-val androidTargetSdk: String by project
-val androidMinSdk: String by project
+val androidCompileSdk = providers.gradleProperty("androidCompileSdk").get()
+val androidTargetSdk = providers.gradleProperty("androidTargetSdk").get()
+val androidMinSdk = providers.gradleProperty("androidMinSdk").get()
 
 android {
     namespace = "de.citrinscore.android"
@@ -17,6 +17,15 @@ android {
         targetSdk = androidTargetSdk.toInt()
         versionCode = 1
         versionName = project.version.toString()
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {

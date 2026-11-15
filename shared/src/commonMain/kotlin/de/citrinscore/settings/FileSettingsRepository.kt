@@ -1,5 +1,6 @@
 package de.citrinscore.settings
 
+import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.div
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.Json
 
 class FileSettingsRepository(
     private val directory: PlatformFile,
-    private val json: Json = Json { prettyPrint = true; ignoreUnknownKeys = true },
+    private val json: Json = AppJson,
 ) : SettingsRepository {
 
     private val file get() = directory / FILE_NAME

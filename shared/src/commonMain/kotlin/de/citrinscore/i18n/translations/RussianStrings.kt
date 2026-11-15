@@ -33,4 +33,45 @@ object RussianStrings : Strings {
     override val libraryTitle = "Библиотека"
     override val libraryEmptyTitle = "Ваша библиотека пуста"
     override val libraryEmptyText = "Импортированные ноты появятся здесь."
+
+    override val cancel = "Отмена"
+    override val create = "Создать"
+
+    override val newFolder = "Новая папка"
+    override val importScores = "Импортировать ноты"
+    override val newFolderTitle = "Создать новую папку"
+    override val folderNameLabel = "Имя папки"
+    override val nameEmpty = "Введите имя."
+    override val nameInvalid = "Имя не может содержать ни один из этих символов: \\ / : * ? \" < > |"
+    override val nameExists = "Это имя уже занято в этой папке."
+
+    override val importTypeTitle = "Что вы хотите импортировать?"
+    override val importTypeSubtitle = "Выберите формат своих нот."
+    override val importTypeImages = "Изображения"
+    override val importTypeImagesText =
+        "Одно или несколько изображений, напр. отсканированные страницы (PNG, JPG, WebP, BMP)."
+    override val importTypePdf = "PDF"
+    override val importTypePdfText = "Один документ PDF."
+    override val importTypeMusicXml = "MusicXML"
+    override val importTypeMusicXmlText = "Цифровые ноты, которые также можно воспроизводить."
+    override val comingSoon = "Скоро"
+
+    override val importFilesTitle = "Выберите изображения"
+    override val importFilesSubtitle = "Расположите страницы в правильном порядке."
+    override val addImages = "Добавить изображения"
+    override val moveUp = "Переместить вверх"
+    override val moveDown = "Переместить вниз"
+    override val remove = "Удалить"
+
+    override val importPreviewTitle = "Предпросмотр"
+    override val importPreviewSubtitle = "Так будут выглядеть ваши ноты."
+    override val previewFailed = "Не удалось загрузить изображения."
+
+    override val importMetadataTitle = "Подробности"
+    override val importMetadataSubtitle = "Дайте нотам название, чтобы потом легко их найти."
+    override val titleLabel = "Название"
+    override val composerLabel = "Композитор"
+    override val descriptionLabel = "Описание"
+    override val importAction = "Импортировать"
+    override val importFailed = "Не удалось сохранить ноты. Попробуйте ещё раз."
 }

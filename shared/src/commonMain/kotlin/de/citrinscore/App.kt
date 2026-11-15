@@ -16,7 +16,7 @@ import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.settings.FileSettingsRepository
 import de.citrinscore.ui.AppState
 import de.citrinscore.ui.AppViewModel
-import de.citrinscore.ui.library.LibraryScreen
+import de.citrinscore.ui.library.LibraryNavigation
 import de.citrinscore.ui.onboarding.OnboardingScreen
 import de.citrinscore.ui.theme.CitrinTheme
 import io.github.vinceglb.filekit.FileKit
@@ -38,7 +38,7 @@ fun App() {
                     AppState.Loading -> Unit
                     AppState.Onboarding -> OnboardingScreen(onFinished = viewModel::completeOnboarding)
                     is AppState.Ready -> CompositionLocalProvider(LocalStrings provides current.settings.language.strings) {
-                        LibraryScreen(current.settings)
+                        LibraryNavigation(current.library)
                     }
                 }
             }
