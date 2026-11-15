@@ -5,13 +5,15 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val composeVersion = "1.12.2"
+val composeVersion: String by project
+val androidCompileSdk: String by project
+val androidMinSdk: String by project
 
 kotlin {
     android {
-        namespace = "org.citrinscore.shared"
-        compileSdk = 37
-        minSdk = 26
+        namespace = "de.citrinscore.shared"
+        compileSdk = androidCompileSdk.toInt()
+        minSdk = androidMinSdk.toInt()
     }
 
     jvm()

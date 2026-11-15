@@ -3,16 +3,20 @@ plugins {
     kotlin("plugin.compose")
 }
 
+val androidCompileSdk: String by project
+val androidTargetSdk: String by project
+val androidMinSdk: String by project
+
 android {
-    namespace = "org.citrinscore.android"
-    compileSdk = 37
+    namespace = "de.citrinscore.android"
+    compileSdk = androidCompileSdk.toInt()
 
     defaultConfig {
-        applicationId = "org.citrinscore"
-        minSdk = 26
-        targetSdk = 37
+        applicationId = "de.citrinscore"
+        minSdk = androidMinSdk.toInt()
+        targetSdk = androidTargetSdk.toInt()
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = project.version.toString()
     }
 
     buildFeatures {

@@ -1,10 +1,10 @@
-package org.citrinscore.android
+package de.citrinscore.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import org.citrinscore.App
+import de.citrinscore.App
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

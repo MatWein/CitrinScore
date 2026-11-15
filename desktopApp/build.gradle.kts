@@ -17,14 +17,13 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "org.citrinscore.desktop.MainKt"
-        // Skiko (Compose-Renderer) lädt native Libraries – ab Java 24 sonst Warnung.
+        mainClass = "de.citrinscore.desktop.MainKt"
         jvmArgs += "--enable-native-access=ALL-UNNAMED"
 
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "citrinScore"
-            packageVersion = "0.1.0"
+            packageVersion = project.version.toString()
         }
     }
 }
