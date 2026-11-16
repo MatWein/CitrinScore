@@ -6,14 +6,17 @@ plugins {
     id("org.jetbrains.compose")
 }
 
+val javaVersion: String by project
+val coroutinesVersion: String by project
+
 kotlin {
-    jvmToolchain(25)
+    jvmToolchain(javaVersion.toInt())
 }
 
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
 }
 
 compose.desktop {

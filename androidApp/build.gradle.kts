@@ -3,9 +3,10 @@ plugins {
     kotlin("plugin.compose")
 }
 
-val androidCompileSdk = providers.gradleProperty("androidCompileSdk").get()
-val androidTargetSdk = providers.gradleProperty("androidTargetSdk").get()
-val androidMinSdk = providers.gradleProperty("androidMinSdk").get()
+val androidCompileSdk: String by project
+val androidTargetSdk: String by project
+val androidMinSdk: String by project
+val androidVersionCode: String by project
 
 android {
     namespace = "de.citrinscore.android"
@@ -15,7 +16,7 @@ android {
         applicationId = "de.citrinscore"
         minSdk = androidMinSdk.toInt()
         targetSdk = androidTargetSdk.toInt()
-        versionCode = 1
+        versionCode = androidVersionCode.toInt()
         versionName = project.version.toString()
     }
 
