@@ -18,6 +18,7 @@ data class ScoreManifest(
     val lastOpenedAt: Instant? = null,
     val view: ScoreViewState? = null,
     val systemBreaks: List<List<Float>>? = null,
+    val audio: List<AudioAttachment> = emptyList(),
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
 ) {
     val lastActivity get() = lastOpenedAt ?: createdAt
@@ -33,6 +34,9 @@ data class ScoreMetadata(
     val composer: String = "",
     val description: String = "",
 )
+
+@Serializable
+data class AudioAttachment(val path: String, val name: String)
 
 @Serializable
 data class ScoreViewState(val zoom: Float, val x: Float, val y: Float)

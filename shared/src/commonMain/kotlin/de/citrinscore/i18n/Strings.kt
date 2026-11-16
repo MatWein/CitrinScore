@@ -103,6 +103,27 @@ interface Strings {
     fun zoomPercent(percent: Int): String
     val previousPage: String
     val nextPage: String
+    val audio: String
+    val noAudio: String
+    val addAudioFile: String
+    val recordAudio: String
+    val recordingTitle: String
+    val saveRecording: String
+    val discardRecording: String
+    fun recordingName(number: Int): String
+    val renameTitle: String
+    val nameLabel: String
+    val rename: String
+    fun deleteAudioText(name: String): String
+    val play: String
+    val pause: String
+    val stop: String
+    val closePlayer: String
+    val audioFailedTitle: String
+    val audioPlaybackFailed: String
+    val audioRecordingFailed: String
+    val audioSaveFailed: String
+    val ok: String
     val scoreLoadFailed: String
 }
 

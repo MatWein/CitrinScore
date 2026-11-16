@@ -1,5 +1,6 @@
 package de.citrinscore.library
 
+import de.citrinscore.score.AudioAttachment
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
@@ -34,6 +35,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 class LibraryRepository(
     private val json: Json = AppJson,
@@ -73,6 +75,25 @@ class LibraryRepository(
 
     suspend fun saveSystemBreaks(score: PlatformFile, systemBreaks: List<List<Float>>) {
         updateManifest(score) { it.copy(systemBreaks = systemBreaks) }
+    }
+
+    suspend fun audio(score: PlatformFile): List<AudioAttachment> = manifest(score)?.audio.orEmpty()
+
+    suspend fun addAudio(score: PlatformFile, source: PlatformFile, name: String): AudioAttachment {
+        val attachment = AudioAttachment("${CitScore.AUDIO_DIRECTORY}/${Uuid.random()}.${CitScore.AUDIO_EXTENSION}", name)
+        (score / CitScore.AUDIO_DIRECTORY).createDirectories()
+        CitScore.resolve(score, attachment.path) write source
+        updateManifest(score) { it.copy(audio = it.audio + attachment) }
+        return attachment
+    }
+
+    suspend fun renameAudio(score: PlatformFile, attachment: AudioAttachment, name: String) {
+        updateManifest(score) { manifest -> manifest.copy(audio = manifest.audio.map { if (it.path == attachment.path) it.copy(name = name) else it }) }
+    }
+
+    suspend fun deleteAudio(score: PlatformFile, attachment: AudioAttachment) {
+        updateManifest(score) { manifest -> manifest.copy(audio = manifest.audio.filterNot { it.path == attachment.path }) }
+        CitScore.resolve(score, attachment.path).delete(mustExist = false)
     }
 
     suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) =

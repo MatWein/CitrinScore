@@ -35,5 +35,4 @@ android {
 
 dependencies {
     implementation(project(":shared"))
-    implementation("androidx.activity:activity-compose:1.13.0")
 }

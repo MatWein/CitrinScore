@@ -51,6 +51,9 @@ import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.score.ScoreMetadata
+import de.citrinscore.ui.viewer.audio.AudioMenu
+import de.citrinscore.ui.viewer.audio.AudioPlayerCard
+import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.jetbrains.compose.resources.DrawableResource
@@ -62,36 +65,49 @@ import kotlin.math.roundToInt
 private const val SAVE_DELAY_MILLIS = 1000L
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
+private val PlayerMargin = 16.dp
 
 @Composable
-fun ScoreViewerScreen(viewModel: ScoreViewModel, onClose: () -> Unit) {
+fun ScoreViewerScreen(viewModel: ScoreViewModel, audioViewModel: ScoreAudioViewModel, onClose: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
-    val toolbar = ToolbarState(ready?.metadata, viewport, onClose)
+    val toolbar = ToolbarState(ready?.metadata, viewport, audioViewModel, onClose)
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize()) {
                 SideToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Vertical)
-                ViewerContent(state, viewport, viewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
+                ViewerContent(state, viewport, viewModel, audioViewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
             }
         } else {
             Column(Modifier.fillMaxSize()) {
                 TopToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                ViewerContent(state, viewport, viewModel, Modifier.weight(1f).windowInsetsPadding(insets))
+                ViewerContent(state, viewport, viewModel, audioViewModel, Modifier.weight(1f).windowInsetsPadding(insets))
             }
         }
     }
 }
 
-private class ToolbarState(val metadata: ScoreMetadata?, val viewport: ScoreViewport?, val onClose: () -> Unit)
+private class ToolbarState(
+    val metadata: ScoreMetadata?,
+    val viewport: ScoreViewport?,
+    val audio: ScoreAudioViewModel,
+    val onClose: () -> Unit,
+)
 
 @Composable
-private fun ViewerContent(state: ScoreViewerState, viewport: ScoreViewport?, viewModel: ScoreViewModel, modifier: Modifier) {
+private fun ViewerContent(
+    state: ScoreViewerState,
+    viewport: ScoreViewport?,
+    viewModel: ScoreViewModel,
+    audioViewModel: ScoreAudioViewModel,
+    modifier: Modifier,
+) {
     val strings = LocalStrings.current
+    val audio by audioViewModel.state.collectAsStateWithLifecycle()
     Box(modifier, contentAlignment = Alignment.Center) {
         when (state) {
             ScoreViewerState.Loading -> CircularProgressIndicator()
@@ -102,6 +118,7 @@ private fun ViewerContent(state: ScoreViewerState, viewport: ScoreViewport?, vie
                 PersistView(viewport, viewModel)
             }
         }
+        audio.player?.let { AudioPlayerCard(it, audioViewModel, Modifier.align(Alignment.BottomEnd).padding(PlayerMargin)) }
     }
 }
 
@@ -137,6 +154,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
         },
         navigationIcon = { BackAction(toolbar) },
         actions = {
+            AudioMenu(toolbar.audio)
             PageActions(toolbar)
             ZoomAction(toolbar)
         },
@@ -155,6 +173,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             BackAction(toolbar)
+            AudioMenu(toolbar.audio)
             PageActions(toolbar)
             ZoomAction(toolbar)
         }

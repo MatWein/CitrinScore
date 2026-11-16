@@ -62,6 +62,7 @@ import de.citrinscore.resources.ic_refresh
 import de.citrinscore.resources.ic_settings
 import de.citrinscore.resources.ic_upload_file
 import de.citrinscore.score.CitScore
+import de.citrinscore.ui.components.ConfirmDeleteDialog
 import de.citrinscore.ui.components.IconBadge
 import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.VerticalScrollIndicator
@@ -169,8 +170,11 @@ fun LibraryScreen(
     }
 
     pendingDelete?.let { item ->
-        DeleteDialog(
-            item = item,
+        ConfirmDeleteDialog(
+            text = when (item) {
+                is LibraryItem.Folder -> strings.deleteFolderText(item.displayName)
+                is LibraryItem.Score -> strings.deleteScoreText(item.displayName)
+            },
             onConfirm = {
                 viewModel.delete(item.file)
                 pendingDelete = null

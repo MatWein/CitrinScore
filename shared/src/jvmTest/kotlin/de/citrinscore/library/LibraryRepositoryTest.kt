@@ -138,6 +138,26 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `audio attachments are copied, renamed and deleted`() = runTest {
+        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val source = File(root, "take.wav").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+
+        val attachment = repository.addAudio(score, PlatformFile(source), "Take")
+        repository.renameAudio(score, attachment, "Final take")
+
+        val renamed = attachment.copy(name = "Final take")
+        assertEquals(listOf(renamed), repository.audio(score))
+        val stored = File(File(root, "Etude.citscore"), attachment.path)
+        assertContentEquals(source.readBytes(), stored.readBytes())
+
+        repository.deleteAudio(score, renamed)
+
+        assertEquals(emptyList(), repository.audio(score))
+        assertFalse(stored.exists())
+    }
+
+    @Test
     fun `thumbnail stacks all pages with a shared scale`() = runTest {
         val firstLine = image("1.png", "png", width = 1200, height = 600, color = Color.RED)
         val secondLine = image("2.png", "png", width = 2400, height = 1200, color = Color.BLUE)

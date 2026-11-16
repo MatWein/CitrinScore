@@ -13,6 +13,7 @@ import de.citrinscore.ui.importer.ImportScreen
 import de.citrinscore.ui.settings.SettingsScreen
 import de.citrinscore.ui.viewer.ScoreViewModel
 import de.citrinscore.ui.viewer.ScoreViewerScreen
+import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 import kotlinx.serialization.Serializable
@@ -82,7 +83,8 @@ fun LibraryNavigation(
                 LaunchedEffect(Unit) { close() }
             } else {
                 val viewModel = viewModel(key = score.path) { ScoreViewModel(score, repository) }
-                ScoreViewerScreen(viewModel, onClose = { close() })
+                val audioViewModel = viewModel(key = "${score.path}/audio") { ScoreAudioViewModel(score, repository) }
+                ScoreViewerScreen(viewModel, audioViewModel, onClose = { close() })
             }
         }
     }
