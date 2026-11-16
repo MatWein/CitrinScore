@@ -57,14 +57,13 @@ object GermanStrings : Strings {
     override val comingSoon = "Bald verfügbar"
 
     override val importFilesTitle = "Wähle deine Bilder"
-    override val importFilesSubtitle = "Bring die Seiten in die richtige Reihenfolge."
+    override val importFilesSubtitle = "Bring die Seiten in die richtige Reihenfolge und prüfe die Vorschau."
     override val addImages = "Bilder hinzufügen"
     override val moveUp = "Nach oben"
     override val moveDown = "Nach unten"
     override val remove = "Entfernen"
 
-    override val importPreviewTitle = "Vorschau"
-    override val importPreviewSubtitle = "So werden deine Noten aussehen."
+    override val previewLabel = "Vorschau"
     override val previewFailed = "Die Bilder konnten nicht geladen werden."
 
     override val importMetadataTitle = "Details"

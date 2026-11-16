@@ -35,8 +35,11 @@ class ImportViewModel(
 
     fun selectType(type: ImportType) = _state.update { it.copy(type = type) }
 
-    fun addFiles(files: List<PlatformFile>) = _state.update { state ->
-        state.copy(files = (state.files + files).distinctBy { it.path })
+    fun addFiles(files: List<PlatformFile>) {
+        val known = _state.value.files.map { it.path }.toSet()
+        val added = files.distinctBy { it.path }.filter { it.path !in known }
+        _state.update { it.copy(files = it.files + added) }
+        added.forEach(::loadPreview)
     }
 
     fun moveFile(from: Int, to: Int) = _state.update { state ->
@@ -44,7 +47,12 @@ class ImportViewModel(
     }
 
     fun removeFile(index: Int) = _state.update { state ->
-        state.copy(files = state.files.filterIndexed { i, _ -> i != index })
+        val path = state.files[index].path
+        state.copy(
+            files = state.files.filterIndexed { i, _ -> i != index },
+            previews = state.previews - path,
+            failedPreviews = state.failedPreviews - path,
+        )
     }
 
     fun updateTitle(title: String) = _state.update { it.copy(title = title) }
@@ -60,27 +68,25 @@ class ImportViewModel(
         if (!current.canAdvance) return
         when (current.step) {
             ImportStep.Metadata -> save(current, onImported)
-            ImportStep.Files -> {
-                _state.update { it.copy(step = it.step.nextStep()) }
-                loadPreview(current.files)
-            }
             else -> _state.update { it.copy(step = it.step.nextStep()) }
         }
     }
 
-    private fun loadPreview(files: List<PlatformFile>) {
-        _state.update { it.copy(pages = emptyList(), isLoadingPreview = true, previewFailed = false) }
+    private fun loadPreview(file: PlatformFile) {
         viewModelScope.launch {
-            val pages = try {
-                withContext(Dispatchers.Default) { files.map { it.toImageBitmap() } }
+            val preview = try {
+                withContext(Dispatchers.Default) { file.toImageBitmap() }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 null
             }
-            _state.update {
-                if (it.files != files) it
-                else it.copy(pages = pages.orEmpty(), isLoadingPreview = false, previewFailed = pages == null)
+            _state.update { state ->
+                when {
+                    state.files.none { it.path == file.path } -> state
+                    preview == null -> state.copy(failedPreviews = state.failedPreviews + file.path)
+                    else -> state.copy(previews = state.previews + (file.path to preview))
+                }
             }
         }
     }

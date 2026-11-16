@@ -47,10 +47,17 @@ kotlin {
             implementation(kotlin("test"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
+        jvmTest.dependencies {
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
 
 compose.resources {
     publicResClass = true
     packageOfResClass = "de.citrinscore.resources"
+}
+
+tasks.named<Test>("jvmTest") {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 }

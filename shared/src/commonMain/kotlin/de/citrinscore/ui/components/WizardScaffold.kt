@@ -2,6 +2,7 @@ package de.citrinscore.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
@@ -46,6 +48,7 @@ import de.citrinscore.resources.ic_arrow_forward
 import org.jetbrains.compose.resources.painterResource
 
 val ContentMaxWidth = 880.dp
+val WideContentMaxWidth = 1440.dp
 private val PagePadding = 20.dp
 private val CompactWidth = 480.dp
 
@@ -58,9 +61,11 @@ fun <S : Enum<S>> WizardScaffold(
     nextLabel: String,
     nextEnabled: Boolean,
     onNext: () -> Unit,
+    contentMaxWidth: (S) -> Dp = { ContentMaxWidth },
     content: @Composable (S) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val navigationMaxWidth by animateDpAsState(contentMaxWidth(step))
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -79,7 +84,7 @@ fun <S : Enum<S>> WizardScaffold(
                     (slideOutHorizontally { -direction * it / 4 } + fadeOut())
             },
         ) { current ->
-            ScrollableStep { content(current) }
+            ScrollableStep(contentMaxWidth(current)) { content(current) }
         }
         NavigationBar(
             backLabel = backLabel,
@@ -87,13 +92,13 @@ fun <S : Enum<S>> WizardScaffold(
             nextLabel = nextLabel,
             nextEnabled = nextEnabled,
             onNext = onNext,
-            modifier = Modifier.padding(start = PagePadding, end = PagePadding, top = 16.dp),
+            modifier = Modifier.padding(start = PagePadding, end = PagePadding, top = 16.dp).widthIn(max = navigationMaxWidth),
         )
     }
 }
 
 @Composable
-private fun ScrollableStep(content: @Composable () -> Unit) {
+private fun ScrollableStep(maxWidth: Dp, content: @Composable () -> Unit) {
     val scrollState = rememberScrollState()
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -104,7 +109,7 @@ private fun ScrollableStep(content: @Composable () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Box(Modifier.widthIn(max = ContentMaxWidth)) {
+            Box(Modifier.widthIn(max = maxWidth)) {
                 content()
             }
         }
@@ -143,7 +148,7 @@ private fun NavigationBar(
     onNext: () -> Unit,
     modifier: Modifier,
 ) {
-    BoxWithConstraints(modifier.widthIn(max = ContentMaxWidth).fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
         val compact = maxWidth < CompactWidth
         Row(verticalAlignment = Alignment.CenterVertically) {
             BackButton(label = backLabel, compact = compact, onClick = onBack)

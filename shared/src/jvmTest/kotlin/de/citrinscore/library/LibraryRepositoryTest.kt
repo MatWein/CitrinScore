@@ -7,6 +7,7 @@ import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.test.runTest
+import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.file.Files
@@ -18,6 +19,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -76,15 +79,19 @@ class LibraryRepositoryTest {
     }
 
     @Test
-    fun `thumbnail is a downscaled first page`() = runTest {
-        val page = image("page.png", "png", width = 2400, height = 3400)
-        repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(page)))
+    fun `thumbnail is a page sized excerpt of all stacked pages`() = runTest {
+        val firstLine = image("1.png", "png", width = 1200, height = 600, color = Color.RED)
+        val secondLine = image("2.png", "png", width = 2400, height = 1200, color = Color.BLUE)
+        repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(firstLine), PlatformFile(secondLine)))
 
         val thumbnail = assertNotNull(repository.thumbnail(PlatformFile(File(root, "Etude.citscore"))))
 
         val decoded = ImageIO.read(thumbnail.inputStream())
         assertEquals(CitScore.THUMBNAIL_WIDTH, decoded.width)
-        assertEquals(850, decoded.height)
+        assertEquals(849, decoded.height)
+        assertColorNear(Color.RED, Color(decoded.getRGB(300, 150)))
+        assertColorNear(Color.BLUE, Color(decoded.getRGB(300, 450)))
+        assertColorNear(Color.WHITE, Color(decoded.getRGB(300, 750)))
     }
 
     @Test
@@ -120,6 +127,18 @@ class LibraryRepositoryTest {
         File(root, "$title.citscore").apply { mkdir() }.resolve(CitScore.MANIFEST_FILE).writeText(AppJson.encodeToString(manifest))
     }
 
-    private fun image(name: String, format: String, width: Int, height: Int): File =
-        File(root, name).also { ImageIO.write(BufferedImage(width, height, BufferedImage.TYPE_INT_RGB), format, it) }
+    private fun image(name: String, format: String, width: Int, height: Int, color: Color = Color.BLACK): File {
+        val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+        image.createGraphics().apply {
+            this.color = color
+            fillRect(0, 0, width, height)
+            dispose()
+        }
+        return File(root, name).also { ImageIO.write(image, format, it) }
+    }
+
+    private fun assertColorNear(expected: Color, actual: Color) {
+        val distance = maxOf(abs(expected.red - actual.red), abs(expected.green - actual.green), abs(expected.blue - actual.blue))
+        assertTrue(distance <= 16, "expected $expected but was $actual")
+    }
 }

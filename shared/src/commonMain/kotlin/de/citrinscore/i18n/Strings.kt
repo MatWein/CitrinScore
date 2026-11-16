@@ -60,8 +60,7 @@ interface Strings {
     val moveDown: String
     val remove: String
 
-    val importPreviewTitle: String
-    val importPreviewSubtitle: String
+    val previewLabel: String
     val previewFailed: String
 
     val importMetadataTitle: String

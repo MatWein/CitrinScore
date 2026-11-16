@@ -4,10 +4,9 @@ import de.citrinscore.score.CitScore
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
+import de.citrinscore.score.ScoreThumbnail
 import de.citrinscore.serialization.AppJson
-import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.compressImage
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
@@ -61,7 +60,7 @@ class LibraryRepository(
             val pages = score / CitScore.PAGES_DIRECTORY
             pages.createDirectories()
             images.zip(pageNames).forEach { (image, name) -> (pages / name) write image }
-            (score / CitScore.THUMBNAIL_FILE) write FileKit.compressImage(images.first(), maxWidth = CitScore.THUMBNAIL_WIDTH)
+            (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(images)
             (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))
         } catch (e: Exception) {
             score.delete(mustExist = false, recursively = true)
