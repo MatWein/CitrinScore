@@ -7,10 +7,10 @@ object CitScore {
     const val EXTENSION = "citscore"
     const val MANIFEST_FILE = "manifest.json"
     const val THUMBNAIL_FILE = "thumbnail.jpg"
+    const val ANNOTATIONS_FILE = "annotations.json"
     const val PAGES_DIRECTORY = "pages"
     const val PDF_FILE = "score.pdf"
     const val SCAN_EXTENSION = "png"
-    const val AUDIO_DIRECTORY = "audio"
     const val RECORDING_EXTENSION = "wav"
     val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")
     const val THUMBNAIL_WIDTH = 600

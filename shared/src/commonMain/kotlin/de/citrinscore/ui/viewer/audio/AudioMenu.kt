@@ -26,7 +26,7 @@ import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_headphones
 import de.citrinscore.resources.ic_mic
 import de.citrinscore.resources.ic_play
-import de.citrinscore.score.AudioAttachment
+import de.citrinscore.score.Attachment
 import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
 import de.citrinscore.ui.components.IconAction
@@ -42,8 +42,8 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
     val strings = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
-    var renaming by remember { mutableStateOf<AudioAttachment?>(null) }
-    var deleting by remember { mutableStateOf<AudioAttachment?>(null) }
+    var renaming by remember { mutableStateOf<Attachment?>(null) }
+    var deleting by remember { mutableStateOf<Attachment?>(null) }
     val picker = rememberFilePickerLauncher(FileKitType.File(CitScore.AUDIO_EXTENSIONS), FileKitMode.Multiple()) { files ->
         files?.let(viewModel::addFiles)
     }
@@ -123,7 +123,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
     }
     deleting?.let { attachment ->
         ConfirmDeleteDialog(
-            text = strings.deleteAudioText(attachment.name),
+            text = strings.deleteAttachmentText(attachment.name),
             onConfirm = {
                 viewModel.delete(attachment)
                 deleting = null

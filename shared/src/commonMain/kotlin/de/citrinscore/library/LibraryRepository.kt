@@ -1,10 +1,12 @@
 package de.citrinscore.library
 
-import de.citrinscore.score.AudioAttachment
+import de.citrinscore.score.Attachment
+import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
+import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
@@ -97,7 +99,16 @@ class LibraryRepository(
             )
         }
         removedImages(previous.content, content).forEach { CitScore.resolve(score, it.path).delete(mustExist = false) }
+        val newIndexByOldIndex = pages.withIndex().mapNotNull { (index, page) -> (page as? PageEdit.Keep)?.let { it.index to index } }.toMap()
+        if ((score / CitScore.ANNOTATIONS_FILE).exists()) saveAnnotations(score, annotations(score).remapPages(newIndexByOldIndex))
         return if (metadata.title == previous.metadata.title) score else score.renameDirectory(folder, CitScore.directoryName(metadata.title))
+    }
+
+    suspend fun annotations(score: PlatformFile): ScoreAnnotations =
+        read(score / CitScore.ANNOTATIONS_FILE) { readString() }?.let { decode<ScoreAnnotations>(it) } ?: ScoreAnnotations()
+
+    suspend fun saveAnnotations(score: PlatformFile, annotations: ScoreAnnotations) {
+        (score / CitScore.ANNOTATIONS_FILE).writeString(json.encodeToString(annotations))
     }
 
     suspend fun saveView(score: PlatformFile, view: ScoreViewState) {
@@ -108,23 +119,30 @@ class LibraryRepository(
         updateManifest(score) { it.copy(systemBreaks = systemBreaks) }
     }
 
-    suspend fun audio(score: PlatformFile): List<AudioAttachment> = manifest(score)?.audio.orEmpty()
+    suspend fun attachments(score: PlatformFile, kind: AttachmentKind): List<Attachment> = manifest(score)?.attachments(kind).orEmpty()
 
-    suspend fun addAudio(score: PlatformFile, source: PlatformFile, name: String): AudioAttachment {
-        val attachment = AudioAttachment("${CitScore.AUDIO_DIRECTORY}/${Uuid.random()}.${source.extension.lowercase()}", name)
-        (score / CitScore.AUDIO_DIRECTORY).createDirectories()
+    suspend fun addAttachment(score: PlatformFile, kind: AttachmentKind, source: PlatformFile, name: String): Attachment {
+        val suffix = source.extension.takeIf { it.isNotEmpty() }?.let { ".${it.lowercase()}" }.orEmpty()
+        val attachment = Attachment("${kind.directory}/${Uuid.random()}$suffix", name)
+        (score / kind.directory).createDirectories()
         CitScore.resolve(score, attachment.path) write source
-        updateManifest(score) { it.copy(audio = it.audio + attachment) }
+        updateManifest(score) { it.withAttachments(kind, it.attachments(kind) + attachment) }
         return attachment
     }
 
-    suspend fun renameAudio(score: PlatformFile, attachment: AudioAttachment, name: String) {
-        updateManifest(score) { manifest -> manifest.copy(audio = manifest.audio.map { if (it.path == attachment.path) it.copy(name = name) else it }) }
+    suspend fun renameAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment, name: String) {
+        updateManifest(score) { manifest ->
+            manifest.withAttachments(kind, manifest.attachments(kind).map { if (it.path == attachment.path) it.copy(name = name) else it })
+        }
     }
 
-    suspend fun deleteAudio(score: PlatformFile, attachment: AudioAttachment) {
-        updateManifest(score) { manifest -> manifest.copy(audio = manifest.audio.filterNot { it.path == attachment.path }) }
+    suspend fun deleteAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment) {
+        updateManifest(score) { manifest -> manifest.withAttachments(kind, manifest.attachments(kind).filterNot { it.path == attachment.path }) }
         CitScore.resolve(score, attachment.path).delete(mustExist = false)
+    }
+
+    suspend fun exportAttachment(score: PlatformFile, attachment: Attachment, target: PlatformFile) {
+        target write CitScore.resolve(score, attachment.path)
     }
 
     suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) =
@@ -172,6 +190,16 @@ class LibraryRepository(
         }
     }
 
+    private fun ScoreManifest.attachments(kind: AttachmentKind) = when (kind) {
+        AttachmentKind.Audio -> audio
+        AttachmentKind.File -> files
+    }
+
+    private fun ScoreManifest.withAttachments(kind: AttachmentKind, attachments: List<Attachment>) = when (kind) {
+        AttachmentKind.Audio -> copy(audio = attachments)
+        AttachmentKind.File -> copy(files = attachments)
+    }
+
     private suspend fun writeDerivedData(score: PlatformFile, content: ScoreContent): List<List<Float>> =
         ScoreRenderers.open(score, content).use { renderer ->
             (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
@@ -208,14 +236,14 @@ class LibraryRepository(
         (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))
     }
 
-    private suspend fun manifest(score: PlatformFile): ScoreManifest? = read(score / CitScore.MANIFEST_FILE) { readString() }
-        ?.let { text ->
-            try {
-                json.decodeFromString<ScoreManifest>(text)
-            } catch (_: IllegalArgumentException) {
-                null
-            }
-        }
+    private suspend fun manifest(score: PlatformFile): ScoreManifest? =
+        read(score / CitScore.MANIFEST_FILE) { readString() }?.let { decode<ScoreManifest>(it) }
+
+    private inline fun <reified T> decode(text: String): T? = try {
+        json.decodeFromString<T>(text)
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 
     private suspend fun <T> read(file: PlatformFile, block: suspend PlatformFile.() -> T): T? = try {
         if (file.exists()) file.block() else null

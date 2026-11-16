@@ -1,13 +1,17 @@
 package de.citrinscore.library
 
+import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
+import de.citrinscore.score.InkStroke
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
+import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.TextNote
 import de.citrinscore.score.render.PdfSourceTest
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.contentCrop
@@ -156,17 +160,17 @@ class LibraryRepositoryTest {
         val score = PlatformFile(File(root, "Etude.citscore"))
         val source = File(root, "take.wav").apply { writeBytes(byteArrayOf(1, 2, 3)) }
 
-        val attachment = repository.addAudio(score, PlatformFile(source), "Take")
-        repository.renameAudio(score, attachment, "Final take")
+        val attachment = repository.addAttachment(score, AttachmentKind.Audio, PlatformFile(source), "Take")
+        repository.renameAttachment(score, AttachmentKind.Audio, attachment, "Final take")
 
         val renamed = attachment.copy(name = "Final take")
-        assertEquals(listOf(renamed), repository.audio(score))
+        assertEquals(listOf(renamed), repository.attachments(score, AttachmentKind.Audio))
         val stored = File(File(root, "Etude.citscore"), attachment.path)
         assertContentEquals(source.readBytes(), stored.readBytes())
 
-        repository.deleteAudio(score, renamed)
+        repository.deleteAttachment(score, AttachmentKind.Audio, renamed)
 
-        assertEquals(emptyList(), repository.audio(score))
+        assertEquals(emptyList(), repository.attachments(score, AttachmentKind.Audio))
         assertFalse(stored.exists())
     }
 
@@ -177,7 +181,7 @@ class LibraryRepositoryTest {
         val third = image("c.png", "png", width = 300, height = 420)
         importImages(ScoreMetadata(title = "Etude"), first, second)
         val score = PlatformFile(File(root, "Etude.citscore"))
-        val audio = repository.addAudio(score, PlatformFile(first), "Take")
+        val audio = repository.addAttachment(score, AttachmentKind.Audio, PlatformFile(first), "Take")
         val before = repository.load(score).content as ScoreContent.Images
 
         val renamed = repository.updateScore(
@@ -213,6 +217,44 @@ class LibraryRepositoryTest {
         val manifest = repository.load(score)
         assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, listOf(PdfPage(1, crops[1]))), manifest.content)
         ScoreRenderers.open(score, manifest.content).use { renderer -> assertEquals(listOf(crops[1].size), renderer.pageSizes) }
+    }
+
+    @Test
+    fun `annotations are stored next to the manifest and follow edited pages`() = runTest {
+        importImages(ScoreMetadata(title = "Etude"), image("a.png", "png", 100, 140), image("b.png", "png", 100, 140))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val onFirst = InkStroke(page = 0, points = listOf(1f, 2f, 3f, 4f), width = 0.5f)
+        val onSecond = TextNote(page = 1, x = 10f, y = 20f, text = "p", size = 3f)
+
+        assertEquals(ScoreAnnotations(), repository.annotations(score))
+        repository.saveAnnotations(score, ScoreAnnotations(listOf(onFirst), listOf(onSecond)))
+        assertTrue(File(root, "Etude.citscore/${CitScore.ANNOTATIONS_FILE}").exists())
+
+        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Etude"), listOf(PageEdit.Keep(1)))
+
+        assertEquals(ScoreAnnotations(texts = listOf(onSecond.copy(page = 0))), repository.annotations(score))
+    }
+
+    @Test
+    fun `any file can be attached and exported again`() = runTest {
+        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val musescore = File(root, "Etude.mscz").apply { writeBytes(byteArrayOf(9, 8, 7)) }
+        val withoutExtension = File(root, "LIESMICH").apply { writeText("notes") }
+
+        val first = repository.addAttachment(score, AttachmentKind.File, PlatformFile(musescore), musescore.name)
+        val second = repository.addAttachment(score, AttachmentKind.File, PlatformFile(withoutExtension), withoutExtension.name)
+
+        assertEquals(listOf("Etude.mscz", "LIESMICH"), repository.attachments(score, AttachmentKind.File).map { it.name })
+        assertEquals(emptyList(), repository.attachments(score, AttachmentKind.Audio))
+        val exported = File(root, "export.mscz")
+        repository.exportAttachment(score, first, PlatformFile(exported))
+        assertContentEquals(musescore.readBytes(), exported.readBytes())
+
+        repository.deleteAttachment(score, AttachmentKind.File, second)
+
+        assertEquals(listOf(first), repository.attachments(score, AttachmentKind.File))
+        assertFalse(File(File(root, "Etude.citscore"), second.path).exists())
     }
 
     @Test

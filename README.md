@@ -22,9 +22,14 @@ The shared code base is prepared for iOS.
   - Sharp rendering at every zoom level: only the visible area is re-rendered at the current resolution.
   - Previous/next page buttons that page by staff systems, so a partly visible system moves to the top instead of being cut.
   - Keyboard and Bluetooth page turner support (Page Up/Down, arrow keys, space, +/-).
+  - Notes on the score: draw with finger, stylus or mouse and place text, with eraser and undo.
+  - Follows the app theme: in the dark theme the score is recoloured to the theme's paper and text colours.
+  - The screen stays on while a score is open.
   - Zoom level and position are remembered per score.
 - **Audio attachments** – attach WAV or MP3 files or record with the microphone and play them back in a small player
   while reading the score.
+- **File attachments** – keep any related file with a score, for example MuseScore or MusicXML files, and save it again
+  with "Save as".
 - **Settings** – language (English, German), light/dark/system theme, library location.
 
 ## Supported platforms
@@ -42,10 +47,12 @@ Every score is a directory with the suffix `.citscore`, so it can be copied, syn
 ```
 Etude.citscore/
 ├── manifest.json     metadata, page list with crop boxes, view state, staff system positions, audio attachments
+├── annotations.json  drawings and text notes, in page coordinates
 ├── thumbnail.jpg     preview used by the library
 ├── pages/001.png     original images (image and scan imports)
 ├── score.pdf         original document (PDF imports)
-└── audio/            audio attachments (WAV, MP3)
+├── audio/            audio attachments (WAV, MP3)
+└── files/            other attached files
 ```
 
 Unknown keys in `manifest.json` are ignored, missing optional values are recomputed when a score is opened.

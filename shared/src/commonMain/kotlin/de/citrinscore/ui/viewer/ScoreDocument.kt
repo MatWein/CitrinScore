@@ -25,6 +25,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -35,13 +38,21 @@ import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.roundToIntRect
+import androidx.compose.ui.unit.toOffset
+import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.render.PageLayout
+import de.citrinscore.ui.viewer.annotations.AnnotationGesture
+import de.citrinscore.ui.viewer.annotations.AnnotationInput
+import de.citrinscore.ui.viewer.annotations.annotationColor
+import de.citrinscore.ui.viewer.annotations.annotationInput
+import de.citrinscore.ui.viewer.annotations.drawAnnotations
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -57,12 +68,34 @@ typealias PageRenderer = suspend (page: Int, region: Rect, size: IntSize) -> Ima
 
 private class Tile(val image: ImageBitmap, val documentRect: Rect)
 
+private const val MAX_CHANNEL = 255f
+private const val RED_LUMINANCE = 0.299f
+private const val GREEN_LUMINANCE = 0.587f
+private const val BLUE_LUMINANCE = 0.114f
+
+class PaperColors(val paper: Color, val ink: Color) {
+    val filter = ColorFilter.colorMatrix(
+        ColorMatrix(
+            channel(ink.red, paper.red) + channel(ink.green, paper.green) + channel(ink.blue, paper.blue) +
+                floatArrayOf(0f, 0f, 0f, 1f, 0f),
+        ),
+    )
+
+    private fun channel(ink: Float, paper: Float): FloatArray {
+        val range = paper - ink
+        return floatArrayOf(range * RED_LUMINANCE, range * GREEN_LUMINANCE, range * BLUE_LUMINANCE, 0f, ink * MAX_CHANNEL)
+    }
+}
+
 @Composable
 fun ScoreDocument(
     pageSizes: List<Size>,
     systemBreaks: List<List<Float>>,
     viewport: ScoreViewport,
     render: PageRenderer,
+    paperColors: PaperColors?,
+    annotations: ScoreAnnotations,
+    annotationInput: AnnotationInput?,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().clipToBounds()) {
@@ -106,26 +139,36 @@ fun ScoreDocument(
 
         val scrollState = rememberScrollable2DState { delta -> -viewport.scrollBy(-delta) }
         val wheelStep = with(density) { WheelStep.toPx() }
+        val textMeasurer = rememberTextMeasurer()
+        val gesture = remember { AnnotationGesture() }
+        val colorFilter = paperColors?.filter
+        val inkColor = annotationColor(inverted = paperColors != null)
         Canvas(
             Modifier
                 .fillMaxSize()
                 .pinchToZoom(viewport)
                 .wheelScroll(viewport, wheelStep)
-                .mouseDrag(viewport)
-                .scrollable2D(scrollState),
+                .then(
+                    if (annotationInput == null) {
+                        Modifier.mouseDrag(viewport).scrollable2D(scrollState)
+                    } else {
+                        Modifier.annotationInput(annotationInput, layout, viewport, annotations, gesture, textMeasurer)
+                    },
+                ),
         ) {
             val zoom = viewport.zoom
             val offset = viewport.offset.round()
             layout.visiblePages(zoom, offset, size, preload = 0f).forEach { page ->
-                baseImages[page]?.let { drawAt(it, layout.pages[page].scale(zoom).roundToIntRect().translate(-offset)) }
+                baseImages[page]?.let { drawAt(it, layout.pages[page].scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
             }
-            tiles.forEach { tile -> drawAt(tile.image, tile.documentRect.scale(zoom).roundToIntRect().translate(-offset)) }
+            tiles.forEach { tile -> drawAt(tile.image, tile.documentRect.scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
+            drawAnnotations(annotations, gesture, layout, zoom, offset.toOffset(), inkColor, textMeasurer)
         }
     }
 }
 
-private fun DrawScope.drawAt(image: ImageBitmap, target: IntRect) =
-    drawImage(image, dstOffset = target.topLeft, dstSize = target.size)
+private fun DrawScope.drawAt(image: ImageBitmap, target: IntRect, colorFilter: ColorFilter?) =
+    drawImage(image, dstOffset = target.topLeft, dstSize = target.size, colorFilter = colorFilter)
 
 private fun PageLayout.visiblePages(zoom: Float, offset: IntOffset, viewport: Size, preload: Float): List<Int> {
     val top = (offset.y - preload) / zoom

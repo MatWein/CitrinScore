@@ -138,7 +138,7 @@ interface Strings {
     val renameTitle: String
     val nameLabel: String
     val rename: String
-    fun deleteAudioText(name: String): String
+    fun deleteAttachmentText(name: String): String
     val play: String
     val pause: String
     val stop: String
@@ -148,6 +148,21 @@ interface Strings {
     val audioRecordingFailed: String
     val audioSaveFailed: String
     val ok: String
+    val annotate: String
+    val attachments: String
+    val noAttachments: String
+    val attachFile: String
+    val saveAs: String
+    val attachmentFailed: String
+    val annotationPen: String
+    val annotationText: String
+    val annotationEraser: String
+    val undo: String
+    val done: String
+    val textNoteTitle: String
+    val textNoteLabel: String
+    val annotationsFailedTitle: String
+    val annotationsSaveFailed: String
     val scoreLoadFailed: String
 }
 

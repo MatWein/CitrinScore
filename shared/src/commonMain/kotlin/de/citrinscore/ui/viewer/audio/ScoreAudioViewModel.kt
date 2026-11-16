@@ -3,7 +3,8 @@ package de.citrinscore.ui.viewer.audio
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
-import de.citrinscore.score.AudioAttachment
+import de.citrinscore.score.Attachment
+import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.audio.AudioPlayer
 import de.citrinscore.score.audio.AudioRecording
@@ -44,11 +45,11 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
 
     init {
         viewModelScope.launch {
-            reporting(AudioError.Save) { _state.update { it.copy(attachments = repository.audio(score)) } }
+            reporting(AudioError.Save) { _state.update { it.copy(attachments = repository.attachments(score, AttachmentKind.Audio)) } }
         }
     }
 
-    fun load(attachment: AudioAttachment) {
+    fun load(attachment: Attachment) {
         releasePlayer()
         viewModelScope.launch {
             reporting(AudioError.Playback) {
@@ -102,7 +103,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
     fun addFiles(files: List<PlatformFile>) {
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                files.forEach { file -> append(repository.addAudio(score, file, file.nameWithoutExtension)) }
+                files.forEach { file -> append(repository.addAttachment(score, AttachmentKind.Audio, file, file.nameWithoutExtension)) }
             }
         }
     }
@@ -132,7 +133,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
         viewModelScope.launch {
             reporting(AudioError.Save) {
                 active.finish()
-                append(repository.addAudio(score, recordingFile, name))
+                append(repository.addAttachment(score, AttachmentKind.Audio, recordingFile, name))
             }
             recordingFile.delete(mustExist = false)
         }
@@ -144,10 +145,10 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
         _state.update { it.copy(recordingStart = null) }
     }
 
-    fun rename(attachment: AudioAttachment, name: String) {
+    fun rename(attachment: Attachment, name: String) {
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                repository.renameAudio(score, attachment, name)
+                repository.renameAttachment(score, AttachmentKind.Audio, attachment, name)
                 _state.update { state ->
                     val renamed = attachment.copy(name = name)
                     state.copy(
@@ -159,11 +160,11 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
         }
     }
 
-    fun delete(attachment: AudioAttachment) {
+    fun delete(attachment: Attachment) {
         if (_state.value.player?.attachment?.path == attachment.path) closePlayer()
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                repository.deleteAudio(score, attachment)
+                repository.deleteAttachment(score, AttachmentKind.Audio, attachment)
                 _state.update { state -> state.copy(attachments = state.attachments.filterNot { it.path == attachment.path }) }
             }
         }
@@ -171,7 +172,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
 
     fun dismissError() = _state.update { it.copy(error = null) }
 
-    private fun append(attachment: AudioAttachment) = _state.update { it.copy(attachments = it.attachments + attachment) }
+    private fun append(attachment: Attachment) = _state.update { it.copy(attachments = it.attachments + attachment) }
 
     private fun publishPosition(current: AudioPlayer) = _state.update { state ->
         state.copy(player = state.player?.copy(position = current.position, isPlaying = current.isPlaying))

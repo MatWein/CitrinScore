@@ -12,13 +12,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_mic
-import de.citrinscore.ui.components.CitrinTextField
+import de.citrinscore.ui.components.MessageDialog
+import de.citrinscore.ui.components.TextInputDialog
 import de.citrinscore.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -56,33 +56,26 @@ fun RecordingDialog(start: TimeSource.Monotonic.ValueTimeMark, onSave: () -> Uni
 @Composable
 fun RenameAudioDialog(initialName: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
     val strings = LocalStrings.current
-    var name by rememberSaveable { mutableStateOf(initialName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.renameTitle) },
-        text = { CitrinTextField(value = name, onValueChange = { name = it }, label = strings.nameLabel, singleLine = true) },
-        confirmButton = { TextButton(onClick = { onRename(name.trim()) }, enabled = name.isNotBlank()) { Text(strings.rename) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.cancel) } },
+    TextInputDialog(
+        title = strings.renameTitle,
+        label = strings.nameLabel,
+        initialText = initialName,
+        confirmLabel = strings.rename,
+        allowBlank = false,
+        onConfirm = onRename,
+        onDismiss = onDismiss,
     )
 }
 
 @Composable
 fun AudioErrorDialog(error: AudioError, onDismiss: () -> Unit) {
     val strings = LocalStrings.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.audioFailedTitle) },
-        text = {
-            Text(
-                when (error) {
-                    AudioError.Playback -> strings.audioPlaybackFailed
-                    AudioError.Recording -> strings.audioRecordingFailed
-                    AudioError.Save -> strings.audioSaveFailed
-                },
-            )
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.ok) } },
-    )
+    val message = when (error) {
+        AudioError.Playback -> strings.audioPlaybackFailed
+        AudioError.Recording -> strings.audioRecordingFailed
+        AudioError.Save -> strings.audioSaveFailed
+    }
+    MessageDialog(strings.audioFailedTitle, message, onDismiss)
 }
 
 internal fun Duration.clock(): String = toComponents { minutes, seconds, _ -> "$minutes:${seconds.toString().padStart(2, '0')}" }

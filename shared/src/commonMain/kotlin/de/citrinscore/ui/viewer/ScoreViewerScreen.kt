@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,14 +61,22 @@ import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
+import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.theme.LocalDarkTheme
 import de.citrinscore.ui.theme.Spacing
+import de.citrinscore.ui.viewer.annotations.AnnotationDialogs
+import de.citrinscore.ui.viewer.annotations.AnnotationInput
+import de.citrinscore.ui.viewer.annotations.AnnotationToolbar
+import de.citrinscore.ui.viewer.annotations.AnnotationViewModel
 import de.citrinscore.ui.viewer.audio.AudioMenu
 import de.citrinscore.ui.viewer.audio.AudioPlayerCard
 import de.citrinscore.ui.viewer.audio.OnAppBackground
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
+import de.citrinscore.ui.viewer.files.FilesMenu
+import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.exp
@@ -81,31 +90,38 @@ private val ZoomLabelWidth = 56.dp
 private val PlayerMargin = Spacing.Large
 
 @Composable
-fun ScoreViewerScreen(viewModel: ScoreViewModel, audioViewModel: ScoreAudioViewModel, onClose: () -> Unit) {
+fun ScoreViewerScreen(
+    viewModel: ScoreViewModel,
+    audioViewModel: ScoreAudioViewModel,
+    annotationViewModel: AnnotationViewModel,
+    filesViewModel: ScoreFilesViewModel,
+    onClose: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
-    val toolbar = ToolbarState(ready?.metadata, viewport, audioViewModel, onClose)
+    val toolbar = ToolbarState(ready?.metadata, viewport, audioViewModel, annotationViewModel, filesViewModel, onClose)
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(paperColors()?.paper ?: Color.White)
+            .keepScreenOn()
             .keyboardNavigation(viewport, focusRequester),
     ) {
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize()) {
                 SideToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Vertical)
-                ViewerContent(state, viewport, viewModel, audioViewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
+                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
             }
         } else {
             Column(Modifier.fillMaxSize()) {
                 TopToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                ViewerContent(state, viewport, viewModel, audioViewModel, Modifier.weight(1f).windowInsetsPadding(insets))
+                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).windowInsetsPadding(insets))
             }
         }
     }
@@ -115,6 +131,8 @@ private class ToolbarState(
     val metadata: ScoreMetadata?,
     val viewport: ScoreViewport?,
     val audio: ScoreAudioViewModel,
+    val annotations: AnnotationViewModel,
+    val files: ScoreFilesViewModel,
     val onClose: () -> Unit,
 )
 
@@ -122,24 +140,44 @@ private class ToolbarState(
 private fun ViewerContent(
     state: ScoreViewerState,
     viewport: ScoreViewport?,
+    toolbar: ToolbarState,
     viewModel: ScoreViewModel,
-    audioViewModel: ScoreAudioViewModel,
     modifier: Modifier,
 ) {
     val strings = LocalStrings.current
+    val audioViewModel = toolbar.audio
+    val annotationViewModel = toolbar.annotations
     val audio by audioViewModel.state.collectAsStateWithLifecycle()
+    val annotations by annotationViewModel.state.collectAsStateWithLifecycle()
     Box(modifier, contentAlignment = Alignment.Center) {
         when (state) {
             ScoreViewerState.Loading -> CircularProgressIndicator()
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
                 val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
-                ScoreDocument(state.pageSizes, systemBreaks, viewport, viewModel::render)
+                ScoreDocument(
+                    pageSizes = state.pageSizes,
+                    systemBreaks = systemBreaks,
+                    viewport = viewport,
+                    render = viewModel::render,
+                    paperColors = paperColors(),
+                    annotations = annotations.annotations,
+                    annotationInput = AnnotationInput(
+                        tool = annotations.tool,
+                        onStrokes = annotationViewModel::addStrokes,
+                        onErase = annotationViewModel::erase,
+                        onTextTap = annotationViewModel::startText,
+                    ).takeIf { annotations.isEditing },
+                )
                 PersistView(viewport, viewModel)
+                if (annotations.isEditing) {
+                    AnnotationToolbar(annotations, annotationViewModel, Modifier.align(Alignment.TopCenter).padding(Spacing.Large))
+                }
             }
         }
         audio.player?.let { AudioPlayerCard(it, audioViewModel, Modifier.align(Alignment.BottomEnd).padding(PlayerMargin)) }
     }
+    AnnotationDialogs(annotations, annotationViewModel)
     OnAppBackground {
         audioViewModel.pause()
         audioViewModel.finishRecording(strings.recordingName(audio.nextRecordingNumber))
@@ -167,6 +205,13 @@ private fun ScoreViewport.handleKey(event: KeyEvent): Boolean {
         else -> return false
     }
     return true
+}
+
+@Composable
+private fun paperColors(): PaperColors? {
+    if (!LocalDarkTheme.current) return null
+    val colors = MaterialTheme.colorScheme
+    return remember(colors) { PaperColors(paper = colors.surfaceContainerHighest, ink = colors.onSurfaceVariant) }
 }
 
 @Composable
@@ -201,7 +246,9 @@ private fun TopToolbar(toolbar: ToolbarState) {
         },
         navigationIcon = { BackAction(toolbar) },
         actions = {
+            AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
+            FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
         },
@@ -220,7 +267,9 @@ private fun SideToolbar(toolbar: ToolbarState) {
             verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
             BackAction(toolbar)
+            AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
+            FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
         }
@@ -230,6 +279,16 @@ private fun SideToolbar(toolbar: ToolbarState) {
 @Composable
 private fun BackAction(toolbar: ToolbarState) {
     IconAction(Res.drawable.ic_arrow_back, LocalStrings.current.back, onClick = toolbar.onClose)
+}
+
+@Composable
+private fun AnnotationAction(toolbar: ToolbarState) {
+    IconAction(
+        Res.drawable.ic_edit_note,
+        LocalStrings.current.annotate,
+        onClick = toolbar.annotations::toggleEditing,
+        enabled = toolbar.viewport != null,
+    )
 }
 
 @Composable

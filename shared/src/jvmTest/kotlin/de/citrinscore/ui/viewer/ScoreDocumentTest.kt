@@ -14,6 +14,7 @@ import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
+import de.citrinscore.score.ScoreAnnotations
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -26,7 +27,16 @@ class ScoreDocumentTest {
     private fun runDocumentTest(block: androidx.compose.ui.test.ComposeUiTest.(ScoreViewport) -> Unit) = runComposeUiTest {
         val viewport = ScoreViewport(null)
         setContent {
-            ScoreDocument(pageSizes, emptyList(), viewport, { _, _, size -> ImageBitmap(size.width, size.height) }, Modifier.size(400.dp, 600.dp).testTag(TAG))
+            ScoreDocument(
+                pageSizes = pageSizes,
+                systemBreaks = emptyList(),
+                viewport = viewport,
+                render = { _, _, size -> ImageBitmap(size.width, size.height) },
+                paperColors = null,
+                annotations = ScoreAnnotations(),
+                annotationInput = null,
+                modifier = Modifier.size(400.dp, 600.dp).testTag(TAG),
+            )
         }
         waitForIdle()
         block(viewport)
