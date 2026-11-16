@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
@@ -30,6 +32,10 @@ kotlin {
                 group("ios") {
                     withIos()
                 }
+            }
+            group("mobile") {
+                withCompilations { it.platformType == KotlinPlatformType.androidJvm }
+                group("ios")
             }
         }
     }

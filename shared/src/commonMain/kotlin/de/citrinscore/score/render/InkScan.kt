@@ -42,7 +42,7 @@ internal class InkScan(image: ImageBitmap) {
     }
 }
 
-private fun Int.luminanceOnWhite(): Int {
+internal fun Int.luminanceOnWhite(): Int {
     val alpha = ushr(24) and 0xFF
     val red = ushr(16) and 0xFF
     val green = ushr(8) and 0xFF

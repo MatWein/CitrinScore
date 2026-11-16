@@ -125,6 +125,19 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `imported scans are stored as png pages`() = runTest {
+        val scan = File(root, "scan.png").also { ImageIO.write(sheet(400, 500, 100, 100, 300, 400), "png", it) }.readBytes()
+        val crop = PageCrop(90f, 90f, 310f, 410f)
+
+        repository.importScans(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(scan, scan), listOf(crop, crop))
+
+        val score = File(root, "Etude.citscore")
+        val manifest = repository.open(PlatformFile(score))
+        assertEquals(ScoreContent.Images(listOf(ImagePage("pages/001.png", crop), ImagePage("pages/002.png", crop))), manifest.content)
+        assertContentEquals(scan, File(score, "pages/002.png").readBytes())
+    }
+
+    @Test
     fun `thumbnail stacks all pages with a shared scale`() = runTest {
         val firstLine = image("1.png", "png", width = 1200, height = 600, color = Color.RED)
         val secondLine = image("2.png", "png", width = 2400, height = 1200, color = Color.BLUE)

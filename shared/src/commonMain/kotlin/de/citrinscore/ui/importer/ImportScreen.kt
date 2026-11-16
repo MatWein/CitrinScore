@@ -41,6 +41,7 @@ fun ImportScreen(
                 onAdd = viewModel::addFiles,
                 onMove = viewModel::moveFile,
                 onRemove = viewModel::removeFile,
+                onScanThresholdChange = viewModel::updateScanThreshold,
             )
             ImportStep.Metadata -> ImportMetadataStep(
                 state = state,

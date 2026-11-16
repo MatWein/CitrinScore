@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ import de.citrinscore.resources.ic_add
 import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_close
+import de.citrinscore.score.scan.ScanThresholdRange
 import de.citrinscore.ui.components.StepHeader
 import de.citrinscore.ui.components.Tile
 import io.github.vinceglb.filekit.PlatformFile
@@ -61,17 +63,20 @@ fun ImportFilesStep(
     onAdd: (List<PlatformFile>) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onRemove: (Int) -> Unit,
+    onScanThresholdChange: (Float) -> Unit,
 ) {
     val strings = LocalStrings.current
-    val isPdf = state.type == ImportType.Pdf
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        StepHeader(
-            if (isPdf) strings.importPdfTitle else strings.importFilesTitle,
-            if (isPdf) strings.importPdfSubtitle else strings.importFilesSubtitle,
-        )
+        when (state.type) {
+            ImportType.Pdf -> StepHeader(strings.importPdfTitle, strings.importPdfSubtitle)
+            ImportType.Scan -> StepHeader(strings.importScanTitle, strings.importScanSubtitle)
+            ImportType.Images, null -> StepHeader(strings.importFilesTitle, strings.importFilesSubtitle)
+        }
         BoxWithConstraints(contentAlignment = Alignment.TopCenter) {
             val fileList: @Composable (Modifier) -> Unit = { modifier -> FileList(state, onAdd, onMove, onRemove, modifier) }
-            val preview: @Composable (Modifier) -> Unit = { modifier -> if (state.files.isNotEmpty()) PagePreview(state, modifier) }
+            val preview: @Composable (Modifier) -> Unit = { modifier ->
+                if (state.files.isNotEmpty()) PagePreview(state, onScanThresholdChange, modifier)
+            }
             if (maxWidth >= SideBySideWidth) {
                 Row(horizontalArrangement = Arrangement.spacedBy(SectionSpacing)) {
                     fileList(Modifier.weight(FileListWeight))
@@ -103,6 +108,12 @@ private fun FileList(
     ) { picked ->
         picked?.let(onAdd)
     }
+    val scanLauncher = rememberScanLauncher(onAdd)
+    val (addLabel, onAddClick) = when (state.type) {
+        ImportType.Pdf -> strings.choosePdf to picker::launch
+        ImportType.Scan -> (if (scanUsesCamera) strings.takePhoto else strings.addScans) to scanLauncher
+        ImportType.Images, null -> strings.addImages to picker::launch
+    }
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         state.files.forEachIndexed { index, file ->
@@ -117,22 +128,33 @@ private fun FileList(
             )
         }
         OutlinedButton(
-            onClick = picker::launch,
+            onClick = onAddClick,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Icon(painterResource(Res.drawable.ic_add), contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text(if (isPdf) strings.choosePdf else strings.addImages)
+            Text(addLabel)
         }
     }
 }
 
 @Composable
-private fun PagePreview(state: ImportState, modifier: Modifier) {
+private fun PagePreview(state: ImportState, onScanThresholdChange: (Float) -> Unit, modifier: Modifier) {
     val strings = LocalStrings.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(strings.previewLabel, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        if (state.type == ImportType.Scan) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(strings.scanThreshold, style = MaterialTheme.typography.bodyLarge)
+                Slider(
+                    value = state.scanThreshold,
+                    onValueChange = onScanThresholdChange,
+                    valueRange = ScanThresholdRange,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         val pages = state.pages
         val maxWidth = pages.maxOfOrNull { it.crop.size.width } ?: 1f
         Column(

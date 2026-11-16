@@ -68,6 +68,10 @@ interface Strings {
     val importTypeImagesText: String
     val importTypePdf: String
     val importTypePdfText: String
+    val importTypeScan: String
+    val importTypeScanCameraText: String
+    val importTypeScanFilesText: String
+    val noCameraAvailable: String
 
     val importFilesTitle: String
     val importFilesSubtitle: String
@@ -75,6 +79,11 @@ interface Strings {
     val importPdfTitle: String
     val importPdfSubtitle: String
     val choosePdf: String
+    val importScanTitle: String
+    val importScanSubtitle: String
+    val takePhoto: String
+    val addScans: String
+    val scanThreshold: String
     val moveUp: String
     val moveDown: String
     val remove: String

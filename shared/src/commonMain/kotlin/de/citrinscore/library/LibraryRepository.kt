@@ -75,13 +75,25 @@ class LibraryRepository(
         updateManifest(score) { it.copy(systemBreaks = systemBreaks) }
     }
 
-    suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) {
-        val pageNames = images.mapIndexed { index, image -> CitScore.pageFileName(index, image.extension) }
+    suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) =
+        importPages(folder, metadata, images.map { it.extension }, crops) { index, target -> target write images[index] }
+
+    suspend fun importScans(folder: PlatformFile, metadata: ScoreMetadata, scans: List<ByteArray>, crops: List<PageCrop>) =
+        importPages(folder, metadata, scans.map { CitScore.SCAN_EXTENSION }, crops) { index, target -> target.write(scans[index]) }
+
+    private suspend fun importPages(
+        folder: PlatformFile,
+        metadata: ScoreMetadata,
+        extensions: List<String>,
+        crops: List<PageCrop>,
+        writePage: suspend (index: Int, target: PlatformFile) -> Unit,
+    ) {
+        val pageNames = extensions.mapIndexed { index, extension -> CitScore.pageFileName(index, extension) }
         val content = ScoreContent.Images(pageNames.zip(crops) { name, crop -> ImagePage("${CitScore.PAGES_DIRECTORY}/$name", crop) })
         createScore(folder, metadata, content) { score ->
             val pages = score / CitScore.PAGES_DIRECTORY
             pages.createDirectories()
-            images.zip(pageNames).forEach { (image, name) -> (pages / name) write image }
+            pageNames.forEachIndexed { index, name -> writePage(index, pages / name) }
         }
     }
 

@@ -3,6 +3,7 @@ package de.citrinscore.ui.importer
 import androidx.compose.ui.graphics.ImageBitmap
 import de.citrinscore.library.validateName
 import de.citrinscore.score.PageCrop
+import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 
@@ -16,6 +17,7 @@ data class ImportState(
     val files: List<PlatformFile> = emptyList(),
     val previews: Map<String, List<PreviewPage>> = emptyMap(),
     val failedPreviews: Set<String> = emptySet(),
+    val scanThreshold: Float = DEFAULT_SCAN_THRESHOLD,
     val title: String = "",
     val composer: String = "",
     val description: String = "",
