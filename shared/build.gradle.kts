@@ -59,6 +59,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation("androidx.exifinterface:exifinterface:1.4.2")
+            implementation("com.caverock:androidsvg-aar:1.4")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

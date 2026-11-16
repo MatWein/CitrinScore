@@ -13,11 +13,11 @@ object GermanStrings : Strings {
     override val welcomeSubtitle = "Deine persönliche Notenbibliothek – geordnet, kommentiert und abspielbar."
 
     override val featureLibraryTitle = "Alles importieren"
-    override val featureLibraryText = "Bilder, PDFs und MusicXML an einem Ort."
+    override val featureLibraryText = "Bilder, SVGs und PDFs an einem Ort."
     override val featureNotesTitle = "Notizen machen"
     override val featureNotesText = "Noten per Hand oder mit Text kommentieren."
     override val featurePlaybackTitle = "Anhören"
-    override val featurePlaybackText = "MusicXML-Noten abspielen und mitlesen."
+    override val featurePlaybackText = "Noten abspielen und mitlesen."
 
     override val languageTitle = "Wähle deine Sprache"
     override val languageSubtitle = "Du kannst sie später in den Einstellungen ändern."
@@ -69,12 +69,9 @@ object GermanStrings : Strings {
     override val importTypeTitle = "Was möchtest du importieren?"
     override val importTypeSubtitle = "Wähle das Format deiner Noten."
     override val importTypeImages = "Bilder"
-    override val importTypeImagesText = "Ein oder mehrere Bilder, z. B. eingescannte Seiten (PNG, JPG, WebP, BMP)."
+    override val importTypeImagesText = "Ein oder mehrere Bilder, z. B. eingescannte Seiten (PNG, JPG, WebP, BMP, SVG)."
     override val importTypePdf = "PDF"
     override val importTypePdfText = "Ein einzelnes PDF-Dokument."
-    override val importTypeMusicXml = "MusicXML"
-    override val importTypeMusicXmlText = "Digitale Noten, die sich auch abspielen lassen."
-    override val comingSoon = "Bald verfügbar"
 
     override val importFilesTitle = "Wähle deine Bilder"
     override val importFilesSubtitle = "Bring die Seiten in die richtige Reihenfolge und prüfe die Vorschau."
@@ -99,5 +96,7 @@ object GermanStrings : Strings {
 
     override val zoomIn = "Vergrößern"
     override val zoomOut = "Verkleinern"
+    override val previousPage = "Vorherige Seite"
+    override val nextPage = "Nächste Seite"
     override val scoreLoadFailed = "Die Noten konnten nicht geöffnet werden."
 }

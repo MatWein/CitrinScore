@@ -123,7 +123,7 @@ class ImportViewModel(
                 when (current.type) {
                     ImportType.Images -> repository.importImages(folder, metadata, current.files, crops)
                     ImportType.Pdf -> repository.importPdf(folder, metadata, current.files.single(), crops)
-                    ImportType.MusicXml, null -> error("Unsupported import type ${current.type}")
+                    null -> error("Unsupported import type ${current.type}")
                 }
                 onImported()
             } catch (e: CancellationException) {
@@ -137,6 +137,5 @@ class ImportViewModel(
     private suspend fun ImportType.open(file: PlatformFile): PageSource = when (this) {
         ImportType.Images -> openImageSource(file)
         ImportType.Pdf -> openPdfSource(file)
-        ImportType.MusicXml -> error("MusicXML import is not available")
     }
 }

@@ -21,7 +21,7 @@ import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.impl.use
 import org.jetbrains.skia.Rect as SkiaRect
 
-actual suspend fun openImageSource(file: PlatformFile): PageSource {
+actual suspend fun openRasterImageSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
     return withContext(Dispatchers.Default) {
         Image.makeFromEncoded(bytes).use { encoded ->

@@ -5,6 +5,8 @@ import androidx.compose.ui.geometry.Size
 import de.citrinscore.score.ScoreViewState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ScoreViewportTest {
 
@@ -52,5 +54,31 @@ class ScoreViewportTest {
 
         assertEquals(ScoreViewState(2f, 0.2f, 0.25f), original.view)
         assertEquals(Offset(200f, 750f), restored.offset)
+    }
+
+    @Test
+    fun `paging moves by exactly one viewport height`() {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+
+        viewport.nextPage()
+        assertEquals(Offset(0f, 800f), viewport.offset)
+
+        viewport.nextPage()
+        viewport.previousPage()
+        assertEquals(Offset(0f, 800f), viewport.offset)
+    }
+
+    @Test
+    fun `paging stops at the document edges`() {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+
+        assertFalse(viewport.canGoToPreviousPage)
+        assertTrue(viewport.canGoToNextPage)
+
+        repeat(3) { viewport.nextPage() }
+
+        assertEquals(Offset(0f, 2200f), viewport.offset)
+        assertTrue(viewport.canGoToPreviousPage)
+        assertFalse(viewport.canGoToNextPage)
     }
 }

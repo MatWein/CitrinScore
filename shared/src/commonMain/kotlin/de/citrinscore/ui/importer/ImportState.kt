@@ -33,7 +33,7 @@ data class ImportState(
 
     val canAdvance
         get() = when (step) {
-            ImportStep.Type -> type?.isAvailable == true
+            ImportStep.Type -> type != null
             ImportStep.Files -> files.isNotEmpty() && !isLoadingPreview && !previewFailed
             ImportStep.Metadata -> !isSaving && titleError == null
         }

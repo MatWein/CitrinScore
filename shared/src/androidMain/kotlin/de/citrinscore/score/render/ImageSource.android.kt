@@ -23,7 +23,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import android.graphics.Rect as AndroidRect
 
-actual suspend fun openImageSource(file: PlatformFile): PageSource {
+actual suspend fun openRasterImageSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
     return withContext(Dispatchers.Default) {
         val decoder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -7,12 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.i18n.Strings
 import de.citrinscore.resources.Res
-import de.citrinscore.resources.ic_code
 import de.citrinscore.resources.ic_image
 import de.citrinscore.resources.ic_picture_as_pdf
 import de.citrinscore.ui.components.IconBadge
@@ -34,17 +32,10 @@ fun ImportTypeStep(selected: ImportType?, onSelect: (ImportType) -> Unit) {
 @Composable
 private fun ImportTypeTile(type: ImportType, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val strings = LocalStrings.current
-    Tile(
-        modifier = modifier.alpha(if (type.isAvailable) 1f else 0.5f),
-        selected = selected,
-        onClick = onClick.takeIf { type.isAvailable },
-    ) {
+    Tile(modifier = modifier, selected = selected, onClick = onClick) {
         IconBadge(type.icon)
         Text(type.title(strings), style = MaterialTheme.typography.titleLarge)
         Text(type.description(strings), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (!type.isAvailable) {
-            Text(strings.comingSoon, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        }
     }
 }
 
@@ -52,17 +43,14 @@ private val ImportType.icon
     get() = when (this) {
         ImportType.Images -> Res.drawable.ic_image
         ImportType.Pdf -> Res.drawable.ic_picture_as_pdf
-        ImportType.MusicXml -> Res.drawable.ic_code
     }
 
 private fun ImportType.title(strings: Strings) = when (this) {
     ImportType.Images -> strings.importTypeImages
     ImportType.Pdf -> strings.importTypePdf
-    ImportType.MusicXml -> strings.importTypeMusicXml
 }
 
 private fun ImportType.description(strings: Strings) = when (this) {
     ImportType.Images -> strings.importTypeImagesText
     ImportType.Pdf -> strings.importTypePdfText
-    ImportType.MusicXml -> strings.importTypeMusicXmlText
 }

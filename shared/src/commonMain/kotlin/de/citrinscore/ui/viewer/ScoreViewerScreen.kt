@@ -40,6 +40,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
+import de.citrinscore.resources.ic_arrow_downward
+import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.resources.ic_zoom_out
 import de.citrinscore.score.ScoreMetadata
@@ -122,7 +124,10 @@ private fun TopToolbar(toolbar: ToolbarState) {
             }
         },
         navigationIcon = { BackAction(toolbar) },
-        actions = { ZoomActions(toolbar) },
+        actions = {
+            PageActions(toolbar)
+            ZoomActions(toolbar)
+        },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     )
 }
@@ -138,6 +143,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             BackAction(toolbar)
+            PageActions(toolbar)
             ZoomActions(toolbar)
         }
     }
@@ -146,6 +152,18 @@ private fun SideToolbar(toolbar: ToolbarState) {
 @Composable
 private fun BackAction(toolbar: ToolbarState) {
     ToolbarAction(Res.drawable.ic_arrow_back, LocalStrings.current.back, enabled = true, onClick = toolbar.onClose)
+}
+
+@Composable
+private fun PageActions(toolbar: ToolbarState) {
+    val strings = LocalStrings.current
+    val viewport = toolbar.viewport
+    ToolbarAction(Res.drawable.ic_arrow_upward, strings.previousPage, enabled = viewport?.canGoToPreviousPage == true) {
+        viewport?.previousPage()
+    }
+    ToolbarAction(Res.drawable.ic_arrow_downward, strings.nextPage, enabled = viewport?.canGoToNextPage == true) {
+        viewport?.nextPage()
+    }
 }
 
 @Composable

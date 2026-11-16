@@ -13,11 +13,11 @@ object EnglishStrings : Strings {
     override val welcomeSubtitle = "Your personal sheet music library – organized, annotated and playable."
 
     override val featureLibraryTitle = "Import everything"
-    override val featureLibraryText = "Images, PDFs and MusicXML in one place."
+    override val featureLibraryText = "Images, SVGs and PDFs in one place."
     override val featureNotesTitle = "Take notes"
     override val featureNotesText = "Annotate your scores by hand or with text."
     override val featurePlaybackTitle = "Listen"
-    override val featurePlaybackText = "Play MusicXML scores and follow along."
+    override val featurePlaybackText = "Play your scores and follow along."
 
     override val languageTitle = "Choose your language"
     override val languageSubtitle = "You can change this later in the settings."
@@ -69,12 +69,9 @@ object EnglishStrings : Strings {
     override val importTypeTitle = "What would you like to import?"
     override val importTypeSubtitle = "Choose the format of your scores."
     override val importTypeImages = "Images"
-    override val importTypeImagesText = "One or more images, e.g. scanned pages (PNG, JPG, WebP, BMP)."
+    override val importTypeImagesText = "One or more images, e.g. scanned pages (PNG, JPG, WebP, BMP, SVG)."
     override val importTypePdf = "PDF"
     override val importTypePdfText = "A single PDF document."
-    override val importTypeMusicXml = "MusicXML"
-    override val importTypeMusicXmlText = "Digital sheet music that can also be played back."
-    override val comingSoon = "Coming soon"
 
     override val importFilesTitle = "Choose your images"
     override val importFilesSubtitle = "Arrange the pages in the right order and check the preview."
@@ -99,5 +96,7 @@ object EnglishStrings : Strings {
 
     override val zoomIn = "Zoom in"
     override val zoomOut = "Zoom out"
+    override val previousPage = "Previous page"
+    override val nextPage = "Next page"
     override val scoreLoadFailed = "The score could not be opened."
 }

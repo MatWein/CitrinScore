@@ -68,9 +68,6 @@ interface Strings {
     val importTypeImagesText: String
     val importTypePdf: String
     val importTypePdfText: String
-    val importTypeMusicXml: String
-    val importTypeMusicXmlText: String
-    val comingSoon: String
 
     val importFilesTitle: String
     val importFilesSubtitle: String
@@ -95,6 +92,8 @@ interface Strings {
 
     val zoomIn: String
     val zoomOut: String
+    val previousPage: String
+    val nextPage: String
     val scoreLoadFailed: String
 }
 

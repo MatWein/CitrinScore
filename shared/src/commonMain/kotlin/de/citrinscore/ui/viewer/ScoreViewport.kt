@@ -16,11 +16,15 @@ class ScoreViewport(private val initial: ScoreViewState?) {
     var offset by mutableStateOf(Offset.Zero)
         private set
 
-    private var viewportSize = Size.Zero
-    private var documentSize = Size.Zero
+    private var viewportSize by mutableStateOf(Size.Zero)
+    private var documentSize by mutableStateOf(Size.Zero)
+
+    private val maxOffsetY get() = (documentSize.height * zoom - viewportSize.height).coerceAtLeast(0f)
 
     val canZoomIn get() = zoom < MAX_ZOOM
     val canZoomOut get() = zoom > MIN_ZOOM
+    val canGoToPreviousPage get() = offset.y > 0f
+    val canGoToNextPage get() = offset.y < maxOffsetY
 
     val view: ScoreViewState?
         get() = if (documentSize.isEmpty()) initial else ScoreViewState(
@@ -43,6 +47,14 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         return offset - previous
     }
 
+    fun previousPage() {
+        scrollBy(Offset(0f, -viewportSize.height))
+    }
+
+    fun nextPage() {
+        scrollBy(Offset(0f, viewportSize.height))
+    }
+
     fun zoomBy(factor: Float, focus: Offset = Offset(viewportSize.width / 2, viewportSize.height / 2)) {
         val target = (zoom * factor).coerceIn(MIN_ZOOM, MAX_ZOOM)
         val ratio = target / zoom
@@ -52,9 +64,8 @@ class ScoreViewport(private val initial: ScoreViewState?) {
 
     private fun clamp(offset: Offset): Offset {
         val width = documentSize.width * zoom
-        val height = documentSize.height * zoom
         val x = if (width <= viewportSize.width) (width - viewportSize.width) / 2 else offset.x.coerceIn(0f, width - viewportSize.width)
-        val y = if (height <= viewportSize.height) 0f else offset.y.coerceIn(0f, height - viewportSize.height)
+        val y = offset.y.coerceIn(0f, maxOffsetY)
         return Offset(x, y)
     }
 
