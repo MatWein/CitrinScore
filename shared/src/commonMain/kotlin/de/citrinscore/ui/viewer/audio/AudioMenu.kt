@@ -107,7 +107,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
     state.recordingStart?.let { start ->
         RecordingDialog(
             start = start,
-            onSave = { viewModel.finishRecording(strings.recordingName(state.attachments.size + 1)) },
+            onSave = { viewModel.finishRecording(strings.recordingName(state.nextRecordingNumber)) },
             onDiscard = viewModel::discardRecording,
         )
     }

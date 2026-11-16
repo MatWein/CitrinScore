@@ -1,11 +1,13 @@
 package de.citrinscore.ui.library
 
+import androidx.collection.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +16,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.decodeToImageBitmap
+
+private const val THUMBNAIL_CACHE_KILOBYTES = 64 * 1024
+private const val BYTES_PER_PIXEL = 4
+private const val BYTES_PER_KILOBYTE = 1024
 
 class LibraryViewModel(root: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
 
@@ -24,6 +30,10 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
 
     var selectedScore: PlatformFile? = null
         private set
+
+    private val thumbnails = object : LruCache<String, ImageBitmap>(THUMBNAIL_CACHE_KILOBYTES) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * BYTES_PER_PIXEL / BYTES_PER_KILOBYTE
+    }
 
     init {
         refresh()
@@ -55,6 +65,7 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     fun delete(item: PlatformFile) {
         viewModelScope.launch {
             attempt { repository.delete(item) } ?: report(LibraryError.Delete)
+            thumbnails.evictAll()
             refresh()
         }
     }
@@ -69,8 +80,14 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         }
     }
 
-    private fun report(error: LibraryError) = _state.update { it.copy(error = error) }
+    fun report(error: LibraryError) = _state.update { it.copy(error = error) }
 
-    suspend fun thumbnail(score: PlatformFile): ImageBitmap? =
-        repository.thumbnail(score)?.let { bytes -> withContext(Dispatchers.Default) { bytes.decodeToImageBitmap() } }
+    suspend fun thumbnail(score: PlatformFile): ImageBitmap? = thumbnails[score.path]
+        ?: repository.thumbnail(score)
+            ?.let { bytes -> withContext(Dispatchers.Default) { bytes.decodeToImageBitmap() } }
+            ?.also { thumbnails.put(score.path, it) }
+
+    fun invalidateThumbnail(score: PlatformFile) {
+        thumbnails.remove(score.path)
+    }
 }

@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.settings.AppSettings
+import de.citrinscore.ui.editor.EditScoreScreen
 import de.citrinscore.ui.importer.ImportScreen
 import de.citrinscore.ui.settings.SettingsScreen
 import de.citrinscore.ui.viewer.ScoreViewModel
@@ -30,6 +31,9 @@ internal data object ScoreRoute
 @Serializable
 internal data object SettingsRoute
 
+@Serializable
+internal data object EditRoute
+
 @Composable
 fun LibraryNavigation(
     settings: AppSettings,
@@ -45,11 +49,19 @@ fun LibraryNavigation(
         composable<LibraryRoute> {
             LibraryScreen(
                 viewModel = libraryViewModel,
+                sort = settings.librarySort,
+                onSortChange = { sort ->
+                    onSettingsChange(settings.copy(librarySort = sort)) { libraryViewModel.report(LibraryError.SaveSettings) }
+                },
                 onImport = { navController.navigate(ImportRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenScore = { score ->
                     libraryViewModel.select(score)
                     navController.navigate(ScoreRoute)
+                },
+                onEditScore = { score ->
+                    libraryViewModel.select(score)
+                    navController.navigate(EditRoute)
                 },
             )
         }
@@ -63,6 +75,24 @@ fun LibraryNavigation(
                     navController.popBackStack()
                 },
             )
+        }
+        composable<EditRoute> {
+            val score = libraryViewModel.selectedScore
+            if (score == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                EditScoreScreen(
+                    folder = libraryViewModel.currentFolder,
+                    score = score,
+                    repository = repository,
+                    onClose = { navController.popBackStack() },
+                    onSaved = {
+                        libraryViewModel.invalidateThumbnail(score)
+                        libraryViewModel.refresh()
+                        navController.popBackStack()
+                    },
+                )
+            }
         }
         composable<SettingsRoute> {
             SettingsScreen(

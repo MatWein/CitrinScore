@@ -8,7 +8,9 @@ The shared code base is prepared for iOS.
 
 ## Features
 
-- **Library** – browse a folder of your choice, organise scores in sub folders, delete scores and folders.
+- **Library** – browse a folder of your choice, organise scores in sub folders, search and sort them, delete scores and
+  folders.
+- **Editing** – reorder, remove or add pages after the import and change title, composer and description.
 - **Import wizard**
   - **Images** (PNG, JPG, WebP, BMP, SVG): one or more pages, reorderable, rendered as vectors for SVG.
   - **PDF**: a single document, rendered page by page.
@@ -19,6 +21,7 @@ The shared code base is prepared for iOS.
   - Continuous vertical page layout with smooth zooming (pinch, mouse wheel, zoom slider) and panning.
   - Sharp rendering at every zoom level: only the visible area is re-rendered at the current resolution.
   - Previous/next page buttons that page by staff systems, so a partly visible system moves to the top instead of being cut.
+  - Keyboard and Bluetooth page turner support (Page Up/Down, arrow keys, space, +/-).
   - Zoom level and position are remembered per score.
 - **Audio attachments** – attach WAV files or record with the microphone and play them back in a small player while
   reading the score.

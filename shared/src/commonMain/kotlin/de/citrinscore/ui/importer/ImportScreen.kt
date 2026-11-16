@@ -8,6 +8,8 @@ import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.ui.components.WizardScaffold
 import de.citrinscore.ui.components.isLastStep
+import de.citrinscore.ui.pages.ScoreDetails
+import de.citrinscore.ui.pages.ScoreDetailsStep
 import de.citrinscore.ui.theme.ContentWidth
 import io.github.vinceglb.filekit.PlatformFile
 
@@ -42,8 +44,11 @@ fun ImportScreen(
                 onRemove = viewModel::removeFile,
                 onScanThresholdChange = viewModel::updateScanThreshold,
             )
-            ImportStep.Metadata -> ImportMetadataStep(
-                state = state,
+            ImportStep.Metadata -> ScoreDetailsStep(
+                stepTitle = strings.importMetadataTitle,
+                stepSubtitle = strings.importMetadataSubtitle,
+                details = ScoreDetails(state.title, state.composer, state.description, state.titleError),
+                failure = strings.importFailed.takeIf { state.saveFailed },
                 onTitleChange = viewModel::updateTitle,
                 onComposerChange = viewModel::updateComposer,
                 onDescriptionChange = viewModel::updateDescription,

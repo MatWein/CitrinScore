@@ -36,6 +36,11 @@ interface Strings {
     val chooseFolder: String
     val changeFolder: String
     val folderPickerFailed: String
+    val libraryUnavailableTitle: String
+    fun libraryUnavailableText(folder: String): String
+    val retry: String
+    val chooseOtherFolder: String
+    val libraryStillUnavailable: String
 
     val libraryTitle: String
     val libraryEmptyTitle: String
@@ -46,6 +51,13 @@ interface Strings {
     val create: String
 
     val refresh: String
+    val search: String
+    val searchPlaceholder: String
+    val closeSearch: String
+    val noSearchResults: String
+    val sort: String
+    val sortRecentlyUsed: String
+    val sortTitle: String
     val moreOptions: String
     val delete: String
     val deleteTitle: String
@@ -101,6 +113,15 @@ interface Strings {
     val descriptionLabel: String
     val importAction: String
     val importFailed: String
+    val edit: String
+    val editPagesTitle: String
+    val editPagesSubtitle: String
+    val editDetailsTitle: String
+    val editDetailsSubtitle: String
+    val save: String
+    fun pageNumber(number: Int): String
+    val editLoadFailed: String
+    val editSaveFailed: String
 
     val zoom: String
     fun zoomPercent(percent: Int): String

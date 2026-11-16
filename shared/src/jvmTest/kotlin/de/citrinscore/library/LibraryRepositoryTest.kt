@@ -3,6 +3,7 @@ package de.citrinscore.library
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
+import de.citrinscore.score.PdfPage
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
@@ -56,9 +57,21 @@ class LibraryRepositoryTest {
         importAt("New", Instant.parse("2026-03-01T00:00:00Z"))
         score("Reopened", createdAt = "2025-01-01T00:00:00Z", lastOpenedAt = "2026-06-01T00:00:00Z")
 
-        val names = repository.content(PlatformFile(root)).items.map { it.displayName }
+        val content = repository.content(PlatformFile(root))
 
-        assertEquals(listOf("alpha", "Zeta", "Reopened", "New", "Old", "Broken"), names)
+        assertEquals(listOf("alpha", "Zeta", "Reopened", "New", "Old", "Broken"), content.arranged(LibrarySort.RecentlyUsed, "").map { it.displayName })
+        assertEquals(listOf("alpha", "Zeta", "Broken", "New", "Old", "Reopened"), content.arranged(LibrarySort.Title, "").map { it.displayName })
+    }
+
+    @Test
+    fun `search matches names ignoring case`() = runTest {
+        File(root, "Chorwerke").mkdir()
+        importAt("Choral", Instant.parse("2026-01-01T00:00:00Z"))
+        importAt("Etude", Instant.parse("2026-02-01T00:00:00Z"))
+
+        val matches = repository.content(PlatformFile(root)).arranged(LibrarySort.Title, " cHOR ").map { it.displayName }
+
+        assertEquals(listOf("Chorwerke", "Choral"), matches)
     }
 
     @Test
@@ -158,6 +171,51 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `editing an image score reorders, removes, adds pages and renames it`() = runTest {
+        val first = image("a.png", "png", width = 100, height = 140)
+        val second = image("b.png", "png", width = 200, height = 280)
+        val third = image("c.png", "png", width = 300, height = 420)
+        importImages(ScoreMetadata(title = "Etude"), first, second)
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val audio = repository.addAudio(score, PlatformFile(first), "Take")
+        val before = repository.load(score).content as ScoreContent.Images
+
+        val renamed = repository.updateScore(
+            folder = PlatformFile(root),
+            score = score,
+            metadata = ScoreMetadata(title = "Studie", composer = "Czerny"),
+            pages = listOf(PageEdit.Add(PlatformFile(third), PageCrop(0f, 0f, 300f, 420f)), PageEdit.Keep(1)),
+        )
+
+        assertFalse(File(root, "Etude.citscore").exists())
+        val directory = File(root, "Studie.citscore")
+        assertTrue(directory.exists())
+        val manifest = repository.load(renamed)
+        assertEquals(ScoreMetadata(title = "Studie", composer = "Czerny"), manifest.metadata)
+        assertEquals(listOf(audio), manifest.audio)
+        val pages = (manifest.content as ScoreContent.Images).pages
+        assertEquals(listOf(PageCrop(0f, 0f, 300f, 420f), before.pages[1].crop), pages.map { it.crop })
+        assertEquals(before.pages[1], pages[1])
+        assertContentEquals(third.readBytes(), File(directory, pages[0].path).readBytes())
+        assertFalse(File(directory, before.pages[0].path).exists())
+        assertEquals(2, manifest.systemBreaks?.size)
+    }
+
+    @Test
+    fun `editing a pdf score reorders and removes pages`() = runTest {
+        val pdf = PdfSourceTest.samplePdf(root)
+        val crops = openPdfSource(PlatformFile(pdf)).use { source -> source.pageSizes.indices.map { source.contentCrop(it) } }
+        repository.importPdf(PlatformFile(root), ScoreMetadata(title = "Sonate"), PlatformFile(pdf), crops)
+        val score = PlatformFile(File(root, "Sonate.citscore"))
+
+        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Sonate"), listOf(PageEdit.Keep(1)))
+
+        val manifest = repository.load(score)
+        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, listOf(PdfPage(1, crops[1]))), manifest.content)
+        ScoreRenderers.open(score, manifest.content).use { renderer -> assertEquals(listOf(crops[1].size), renderer.pageSizes) }
+    }
+
+    @Test
     fun `thumbnail stacks all pages with a shared scale`() = runTest {
         val firstLine = image("1.png", "png", width = 1200, height = 600, color = Color.RED)
         val secondLine = image("2.png", "png", width = 2400, height = 1200, color = Color.BLUE)
@@ -230,7 +288,7 @@ class LibraryRepositoryTest {
         val score = File(root, "Sonate.citscore")
         assertContentEquals(pdf.readBytes(), File(score, CitScore.PDF_FILE).readBytes())
         val manifest = repository.open(PlatformFile(score))
-        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, crops), manifest.content)
+        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, crops.mapIndexed(::PdfPage)), manifest.content)
         assertNotNull(repository.thumbnail(PlatformFile(score)))
         ScoreRenderers.open(PlatformFile(score), manifest.content).use { renderer ->
             assertEquals(crops.map { it.size }, renderer.pageSizes)

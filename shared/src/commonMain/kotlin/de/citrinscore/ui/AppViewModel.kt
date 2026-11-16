@@ -7,6 +7,7 @@ import de.citrinscore.settings.LibraryReference
 import de.citrinscore.settings.SettingsRepository
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +20,9 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
 
     init {
         viewModelScope.launch {
-            _state.value = settingsRepository.load()?.let { readyState(it) } ?: AppState.Onboarding
+            _state.value = attempt { settingsRepository.load() }
+                ?.let { settings -> readyState(settings) ?: AppState.LibraryUnavailable(settings) }
+                ?: AppState.Onboarding
         }
     }
 
@@ -40,15 +43,31 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
     }
 
     fun changeLibrary(directory: PlatformFile, onFailure: () -> Unit) {
-        val current = _state.value as? AppState.Ready ?: return
+        val current = when (val state = _state.value) {
+            is AppState.Ready -> state.settings
+            is AppState.LibraryUnavailable -> state.settings
+            else -> return
+        }
         viewModelScope.launch {
             val settings = attempt {
-                current.settings.copy(library = LibraryReference.of(directory)).also { settingsRepository.save(it) }
+                current.copy(library = LibraryReference.of(directory)).also { settingsRepository.save(it) }
             }
             if (settings == null) onFailure() else _state.value = AppState.Ready(settings, directory)
         }
     }
 
-    private suspend fun readyState(settings: AppSettings): AppState.Ready? =
-        attempt { AppState.Ready(settings, settings.library.resolve()) }
+    fun retryLibrary(onFailure: () -> Unit) {
+        val unavailable = _state.value as? AppState.LibraryUnavailable ?: return
+        viewModelScope.launch {
+            val ready = readyState(unavailable.settings)
+            if (ready == null) onFailure() else _state.value = ready
+        }
+    }
+
+    private suspend fun readyState(settings: AppSettings): AppState.Ready? = attempt {
+        val library = settings.library.resolve().takeIf { it.exists() } ?: return@attempt null
+        val described = settings.copy(library = settings.library.describing(library))
+        if (described != settings) attempt { settingsRepository.save(described) }
+        AppState.Ready(described, library)
+    }
 }

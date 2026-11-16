@@ -22,4 +22,12 @@ data class FolderContent(val items: List<LibraryItem>) {
     val isEmpty get() = items.isEmpty()
     val names get() = items.map { it.file.name }
     val scoreTitles get() = items.filterIsInstance<LibraryItem.Score>().map { it.displayName }
+
+    fun arranged(sort: LibrarySort, query: String): List<LibraryItem> {
+        val search = query.trim()
+        val matching = items.filter { search.isEmpty() || it.displayName.contains(search, ignoreCase = true) }
+        val folders = matching.filterIsInstance<LibraryItem.Folder>().sortedBy { it.displayName.lowercase() }
+        val scores = matching.filterIsInstance<LibraryItem.Score>().sortedWith(sort.scoreOrder)
+        return folders + scores
+    }
 }

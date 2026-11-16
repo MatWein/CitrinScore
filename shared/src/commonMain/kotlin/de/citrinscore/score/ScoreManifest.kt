@@ -4,10 +4,15 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import kotlin.time.Instant
 
 @Serializable
@@ -49,8 +54,11 @@ sealed interface ScoreContent {
 
     @Serializable
     @SerialName("pdf")
-    data class Pdf(val path: String, val pages: List<PageCrop>) : ScoreContent
+    data class Pdf(val path: String, @Serializable(with = PdfPagesSerializer::class) val pages: List<PdfPage>) : ScoreContent
 }
+
+@Serializable
+data class PdfPage(val index: Int, val crop: PageCrop)
 
 @Serializable
 data class ImagePage(val path: String, val crop: PageCrop? = null)
@@ -60,6 +68,21 @@ data class PageCrop(val left: Float, val top: Float, val right: Float, val botto
     val size get() = Size(right - left, bottom - top)
 
     val rect get() = Rect(left, top, right, bottom)
+}
+
+private object PdfPagesSerializer : JsonTransformingSerializer<List<PdfPage>>(ListSerializer(PdfPage.serializer())) {
+    override fun transformDeserialize(element: JsonElement): JsonElement = JsonArray(
+        element.jsonArray.mapIndexed { index, page ->
+            if (PdfPage::crop.name in page.jsonObject) {
+                page
+            } else {
+                buildJsonObject {
+                    put(PdfPage::index.name, index)
+                    put(PdfPage::crop.name, page)
+                }
+            }
+        },
+    )
 }
 
 private object ImagePageSerializer : JsonTransformingSerializer<ImagePage>(ImagePage.serializer()) {

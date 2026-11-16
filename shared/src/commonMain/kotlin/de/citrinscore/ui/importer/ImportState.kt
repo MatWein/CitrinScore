@@ -1,15 +1,12 @@
 package de.citrinscore.ui.importer
 
-import androidx.compose.ui.graphics.ImageBitmap
 import de.citrinscore.library.validateName
-import de.citrinscore.score.PageCrop
 import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
+import de.citrinscore.ui.pages.PreviewPage
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 
 enum class ImportStep { Type, Files, Metadata }
-
-data class PreviewPage(val image: ImageBitmap, val crop: PageCrop)
 
 data class ImportState(
     val step: ImportStep = ImportStep.Type,

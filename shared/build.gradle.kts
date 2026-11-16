@@ -12,7 +12,9 @@ val composeVersion: String by project
 val material3Version: String by project
 val lifecycleVersion: String by project
 val navigationVersion: String by project
+val navigationEventVersion: String by project
 val coroutinesVersion: String by project
+val collectionVersion: String by project
 val serializationVersion: String by project
 val fileKitVersion: String by project
 val pdfboxVersion: String by project
@@ -67,7 +69,9 @@ kotlin {
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
             implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
             implementation("org.jetbrains.androidx.navigation:navigation-compose:$navigationVersion")
+            implementation("org.jetbrains.androidx.navigationevent:navigationevent-compose:$navigationEventVersion")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+            implementation("androidx.collection:collection:$collectionVersion")
         }
         jvmMain.dependencies {
             implementation("org.apache.pdfbox:pdfbox:$pdfboxVersion")

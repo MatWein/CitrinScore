@@ -19,4 +19,6 @@ data class AudioState(
     val recordingStart: TimeSource.Monotonic.ValueTimeMark? = null,
     val microphoneAvailable: Boolean? = null,
     val error: AudioError? = null,
-)
+) {
+    val nextRecordingNumber get() = attachments.size + 1
+}

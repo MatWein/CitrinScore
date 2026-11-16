@@ -4,6 +4,7 @@ import de.citrinscore.score.AudioAttachment
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
+import de.citrinscore.score.PdfPage
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
@@ -47,12 +48,8 @@ class LibraryRepository(
     suspend fun content(folder: PlatformFile): FolderContent = withContext(Dispatchers.IO) {
         val directories = folder.list().filter { !it.name.startsWith(".") && it.isDirectory() }
         val (scoreDirectories, subfolders) = directories.partition { it.isScore() }
-        val folders = subfolders
-            .sortedBy { it.name.lowercase() }
-            .map(LibraryItem::Folder)
-        val scores = scoreDirectories
-            .map { LibraryItem.Score(it, manifest(it)?.lastActivity) }
-            .sortedWith(compareByDescending<LibraryItem.Score> { it.lastActivity }.thenBy { it.displayName.lowercase() })
+        val folders = subfolders.map(LibraryItem::Folder)
+        val scores = scoreDirectories.map { LibraryItem.Score(it, manifest(it)?.lastActivity) }
         FolderContent(folders + scores)
     }
 
@@ -67,6 +64,40 @@ class LibraryRepository(
 
     suspend fun open(score: PlatformFile): ScoreManifest = updateManifest(score) { manifest ->
         manifest.copy(content = manifest.content.withCrops(score), lastOpenedAt = clock.now())
+    }
+
+    suspend fun load(score: PlatformFile): ScoreManifest = readManifest(score).let { it.copy(content = it.content.withCrops(score)) }
+
+    suspend fun updateScore(folder: PlatformFile, score: PlatformFile, metadata: ScoreMetadata, pages: List<PageEdit>): PlatformFile {
+        val previous = load(score)
+        val content = when (val current = previous.content) {
+            is ScoreContent.Images -> ScoreContent.Images(
+                pages.map { page ->
+                    when (page) {
+                        is PageEdit.Keep -> current.pages[page.index]
+                        is PageEdit.Add -> addPage(score, page)
+                    }
+                },
+            )
+            is ScoreContent.Pdf -> ScoreContent.Pdf(
+                current.path,
+                pages.map { page ->
+                    require(page is PageEdit.Keep) { "Pages cannot be added to a PDF score" }
+                    current.pages[page.index]
+                },
+            )
+        }
+        val systemBreaks = writeDerivedData(score, content)
+        updateManifest(score) { manifest ->
+            manifest.copy(
+                metadata = metadata,
+                content = content,
+                systemBreaks = systemBreaks,
+                view = manifest.view.takeIf { content == previous.content },
+            )
+        }
+        removedImages(previous.content, content).forEach { CitScore.resolve(score, it.path).delete(mustExist = false) }
+        return if (metadata.title == previous.metadata.title) score else score.renameDirectory(folder, CitScore.directoryName(metadata.title))
     }
 
     suspend fun saveView(score: PlatformFile, view: ScoreViewState) {
@@ -119,7 +150,7 @@ class LibraryRepository(
     }
 
     suspend fun importPdf(folder: PlatformFile, metadata: ScoreMetadata, pdf: PlatformFile, crops: List<PageCrop>) =
-        createScore(folder, metadata, ScoreContent.Pdf(CitScore.PDF_FILE, crops)) { score -> (score / CitScore.PDF_FILE) write pdf }
+        createScore(folder, metadata, ScoreContent.Pdf(CitScore.PDF_FILE, crops.mapIndexed(::PdfPage))) { score -> (score / CitScore.PDF_FILE) write pdf }
 
     suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
 
@@ -133,15 +164,31 @@ class LibraryRepository(
         try {
             score.createDirectories()
             writeContent(score)
-            val systemBreaks = ScoreRenderers.open(score, content).use { renderer ->
-                (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
-                renderer.pageSizes.indices.map { renderer.systemBreaks(it) }
-            }
+            val systemBreaks = writeDerivedData(score, content)
             writeManifest(score, ScoreManifest(metadata, content, createdAt = clock.now(), systemBreaks = systemBreaks))
         } catch (e: Exception) {
             score.delete(mustExist = false, recursively = true)
             throw e
         }
+    }
+
+    private suspend fun writeDerivedData(score: PlatformFile, content: ScoreContent): List<List<Float>> =
+        ScoreRenderers.open(score, content).use { renderer ->
+            (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
+            renderer.pageSizes.indices.map { renderer.systemBreaks(it) }
+        }
+
+    private suspend fun addPage(score: PlatformFile, page: PageEdit.Add): ImagePage {
+        val path = "${CitScore.PAGES_DIRECTORY}/${Uuid.random()}.${page.image.extension.lowercase()}"
+        (score / CitScore.PAGES_DIRECTORY).createDirectories()
+        CitScore.resolve(score, path) write page.image
+        return ImagePage(path, page.crop)
+    }
+
+    private fun removedImages(previous: ScoreContent, current: ScoreContent): List<ImagePage> {
+        if (previous !is ScoreContent.Images || current !is ScoreContent.Images) return emptyList()
+        val kept = current.pages.map { it.path }.toSet()
+        return previous.pages.filterNot { it.path in kept }
     }
 
     private suspend fun ScoreContent.withCrops(score: PlatformFile): ScoreContent = when (this) {
@@ -152,9 +199,10 @@ class LibraryRepository(
     private suspend fun imageCrop(image: PlatformFile) = openImageSource(image).use { it.contentCrop(0) }
 
     private suspend fun updateManifest(score: PlatformFile, transform: suspend (ScoreManifest) -> ScoreManifest) = manifestUpdates.withLock {
-        val manifest = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
-        transform(manifest).also { writeManifest(score, it) }
+        transform(readManifest(score)).also { writeManifest(score, it) }
     }
+
+    private suspend fun readManifest(score: PlatformFile) = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
 
     private suspend fun writeManifest(score: PlatformFile, manifest: ScoreManifest) {
         (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))

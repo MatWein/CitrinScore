@@ -1,6 +1,9 @@
 package de.citrinscore.ui.viewer
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,7 +38,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,6 +66,7 @@ import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.Spacing
 import de.citrinscore.ui.viewer.audio.AudioMenu
 import de.citrinscore.ui.viewer.audio.AudioPlayerCard
+import de.citrinscore.ui.viewer.audio.OnAppBackground
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -72,8 +86,15 @@ fun ScoreViewerScreen(viewModel: ScoreViewModel, audioViewModel: ScoreAudioViewM
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
     val toolbar = ToolbarState(ready?.metadata, viewport, audioViewModel, onClose)
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .keyboardNavigation(viewport, focusRequester),
+    ) {
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize()) {
                 SideToolbar(toolbar)
@@ -119,6 +140,33 @@ private fun ViewerContent(
         }
         audio.player?.let { AudioPlayerCard(it, audioViewModel, Modifier.align(Alignment.BottomEnd).padding(PlayerMargin)) }
     }
+    OnAppBackground {
+        audioViewModel.pause()
+        audioViewModel.finishRecording(strings.recordingName(audio.nextRecordingNumber))
+    }
+}
+
+private fun Modifier.keyboardNavigation(viewport: ScoreViewport?, focusRequester: FocusRequester) = this
+    .focusRequester(focusRequester)
+    .focusable()
+    .onPreviewKeyEvent { event -> viewport?.handleKey(event) == true }
+    .pointerInput(focusRequester) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            focusRequester.requestFocus()
+        }
+    }
+
+private fun ScoreViewport.handleKey(event: KeyEvent): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    when (event.key) {
+        Key.PageDown, Key.DirectionDown, Key.DirectionRight, Key.Spacebar -> nextPage()
+        Key.PageUp, Key.DirectionUp, Key.DirectionLeft -> previousPage()
+        Key.Plus, Key.Equals, Key.NumPadAdd -> zoomBy(ScoreViewport.ZOOM_STEP)
+        Key.Minus, Key.NumPadSubtract -> zoomBy(1 / ScoreViewport.ZOOM_STEP)
+        else -> return false
+    }
+    return true
 }
 
 @Composable

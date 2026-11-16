@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,8 +71,11 @@ fun ScoreDocument(
         val layout = remember(pageSizes, viewportSize.width, density) {
             with(density) { PageLayout(pageSizes, viewportSize.width, Margin.toPx(), PageGap.toPx()) }
         }
-        viewport.setBounds(viewportSize, Size(layout.width, layout.height))
-        viewport.breaks = remember(layout, systemBreaks) { layout.documentBreaks(systemBreaks) }
+        val breaks = remember(layout, systemBreaks) { layout.documentBreaks(systemBreaks) }
+        SideEffect {
+            viewport.setBounds(viewportSize, Size(layout.width, layout.height))
+            viewport.breaks = breaks
+        }
         val baseImages = remember(layout) { mutableStateMapOf<Int, ImageBitmap>() }
         var tiles by remember(layout) { mutableStateOf(emptyList<Tile>()) }
 

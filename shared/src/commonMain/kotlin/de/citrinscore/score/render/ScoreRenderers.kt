@@ -14,7 +14,7 @@ object ScoreRenderers {
         )
         is ScoreContent.Pdf -> {
             val document = CitScore.resolve(score, content.path)
-            SourceScoreRenderer(content.pages.mapIndexed { index, crop -> SourcePage(document, index, crop) }, ::openPdfSource)
+            SourceScoreRenderer(content.pages.map { SourcePage(document, it.index, it.crop) }, ::openPdfSource)
         }
     }
 }

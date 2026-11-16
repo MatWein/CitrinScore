@@ -1,6 +1,5 @@
 package de.citrinscore.ui.importer
 
-import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
@@ -15,6 +14,7 @@ import de.citrinscore.score.scan.ScanPage
 import de.citrinscore.score.scan.scanPages
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
+import de.citrinscore.ui.pages.previewPage
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.ImageFormat
 import io.github.vinceglb.filekit.PlatformFile
@@ -29,9 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
-private const val PREVIEW_WIDTH = 1000
 private const val THRESHOLD_DELAY_MILLIS = 300L
 
 class ImportViewModel(
@@ -140,12 +138,6 @@ class ImportViewModel(
     }
 
     private suspend fun ScanPage.preview(threshold: Float) = BitmapPageSource(binarized(threshold)).use { it.previewPage(0) }
-
-    private suspend fun PageSource.previewPage(page: Int): PreviewPage {
-        val crop = contentCrop(page)
-        val size = IntSize(PREVIEW_WIDTH, (PREVIEW_WIDTH * crop.size.height / crop.size.width).roundToInt().coerceAtLeast(1))
-        return PreviewPage(withContext(Dispatchers.Default) { render(page, crop.rect, size) }, crop)
-    }
 
     private fun save(current: ImportState, onImported: () -> Unit) {
         _state.update { it.copy(isSaving = true, saveFailed = false) }

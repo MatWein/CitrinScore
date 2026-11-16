@@ -10,10 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.FileSettingsRepository
 import de.citrinscore.ui.AppState
 import de.citrinscore.ui.AppViewModel
 import de.citrinscore.ui.library.LibraryNavigation
+import de.citrinscore.ui.library.LibraryUnavailableScreen
 import de.citrinscore.ui.onboarding.OnboardingScreen
 import de.citrinscore.ui.theme.CitrinScreen
 import io.github.vinceglb.filekit.FileKit
@@ -32,16 +34,28 @@ fun App() {
         when (current) {
             AppState.Loading -> Unit
             AppState.Onboarding -> OnboardingScreen(onFinished = viewModel::completeOnboarding)
-            is AppState.Ready -> CitrinScreen(current.settings.theme) {
-                CompositionLocalProvider(LocalStrings provides current.settings.language.strings) {
-                    LibraryNavigation(
-                        settings = current.settings,
-                        library = current.library,
-                        onSettingsChange = viewModel::updateSettings,
-                        onLibraryChange = viewModel::changeLibrary,
-                    )
-                }
+            is AppState.LibraryUnavailable -> ConfiguredScreen(current.settings) {
+                LibraryUnavailableScreen(
+                    folder = current.settings.library.displayPath,
+                    onRetry = viewModel::retryLibrary,
+                    onChooseFolder = viewModel::changeLibrary,
+                )
+            }
+            is AppState.Ready -> ConfiguredScreen(current.settings) {
+                LibraryNavigation(
+                    settings = current.settings,
+                    library = current.library,
+                    onSettingsChange = viewModel::updateSettings,
+                    onLibraryChange = viewModel::changeLibrary,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun ConfiguredScreen(settings: AppSettings, content: @Composable () -> Unit) {
+    CitrinScreen(settings.theme) {
+        CompositionLocalProvider(LocalStrings provides settings.language.strings, content = content)
     }
 }
