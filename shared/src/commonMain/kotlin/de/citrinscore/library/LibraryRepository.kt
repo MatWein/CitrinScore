@@ -2,12 +2,15 @@ package de.citrinscore.library
 
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
+import de.citrinscore.score.PageCrop
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScoreThumbnail
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.contentCrop
+import de.citrinscore.score.render.openImageSource
 import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.createDirectories
@@ -66,33 +69,45 @@ class LibraryRepository(
         writeManifest(score, requireManifest(score).copy(view = view))
     }
 
-    suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>) {
-        val score = folder / CitScore.directoryName(metadata.title)
+    suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) {
         val pageNames = images.mapIndexed { index, image -> CitScore.pageFileName(index, image.extension) }
-        val crops = images.map { contentCrop(it) }
-        val manifest = ScoreManifest(
-            metadata = metadata,
-            content = ScoreContent.Images(pageNames.zip(crops) { name, crop -> ImagePage("${CitScore.PAGES_DIRECTORY}/$name", crop) }),
-            createdAt = clock.now(),
-        )
-
-        try {
+        val content = ScoreContent.Images(pageNames.zip(crops) { name, crop -> ImagePage("${CitScore.PAGES_DIRECTORY}/$name", crop) })
+        createScore(folder, metadata, content) { score ->
             val pages = score / CitScore.PAGES_DIRECTORY
             pages.createDirectories()
             images.zip(pageNames).forEach { (image, name) -> (pages / name) write image }
-            (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(images, crops)
-            writeManifest(score, manifest)
+        }
+    }
+
+    suspend fun importPdf(folder: PlatformFile, metadata: ScoreMetadata, pdf: PlatformFile, crops: List<PageCrop>) =
+        createScore(folder, metadata, ScoreContent.Pdf(CitScore.PDF_FILE, crops)) { score -> (score / CitScore.PDF_FILE) write pdf }
+
+    suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
+
+    private suspend fun createScore(
+        folder: PlatformFile,
+        metadata: ScoreMetadata,
+        content: ScoreContent,
+        writeContent: suspend (PlatformFile) -> Unit,
+    ) {
+        val score = folder / CitScore.directoryName(metadata.title)
+        try {
+            score.createDirectories()
+            writeContent(score)
+            (score / CitScore.THUMBNAIL_FILE) write ScoreRenderers.open(score, content).use { ScoreThumbnail.render(it) }
+            writeManifest(score, ScoreManifest(metadata = metadata, content = content, createdAt = clock.now()))
         } catch (e: Exception) {
             score.delete(mustExist = false, recursively = true)
             throw e
         }
     }
 
-    suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
-
     private suspend fun ScoreContent.withCrops(score: PlatformFile): ScoreContent = when (this) {
-        is ScoreContent.Images -> copy(pages = pages.map { page -> page.crop?.let { page } ?: page.copy(crop = contentCrop(CitScore.resolve(score, page.path))) })
+        is ScoreContent.Images -> copy(pages = pages.map { page -> page.crop?.let { page } ?: page.copy(crop = imageCrop(CitScore.resolve(score, page.path))) })
+        is ScoreContent.Pdf -> this
     }
+
+    private suspend fun imageCrop(image: PlatformFile) = openImageSource(image).use { it.contentCrop(0) }
 
     private suspend fun requireManifest(score: PlatformFile) = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
 

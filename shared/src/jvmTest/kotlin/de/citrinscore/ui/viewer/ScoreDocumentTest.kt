@@ -3,6 +3,7 @@ package de.citrinscore.ui.viewer
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -12,7 +13,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class ScoreDocumentTest {
 
-    private val pageSizes = List(3) { IntSize(1000, 1400) }
+    private val pageSizes = List(3) { Size(1000f, 1400f) }
 
     private fun runDocumentTest(block: androidx.compose.ui.test.ComposeUiTest.(ScoreViewport) -> Unit) = runComposeUiTest {
         val viewport = ScoreViewport(null)

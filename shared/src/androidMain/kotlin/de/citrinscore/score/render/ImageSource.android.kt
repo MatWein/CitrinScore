@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -22,7 +23,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import android.graphics.Rect as AndroidRect
 
-actual suspend fun ImageSource(file: PlatformFile): ImageSource {
+actual suspend fun openImageSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
     return withContext(Dispatchers.Default) {
         val decoder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -40,7 +41,7 @@ private class AndroidImageSource(
     private val decoder: BitmapRegionDecoder,
     rotationDegrees: Int,
     flipped: Boolean,
-) : ImageSource {
+) : PageSource {
     private val rawBounds = RectF(0f, 0f, decoder.width.toFloat(), decoder.height.toFloat())
     private val rawToOriented = Matrix().apply {
         if (flipped) postScale(-1f, 1f)
@@ -50,19 +51,19 @@ private class AndroidImageSource(
     }
     private val orientedToRaw = Matrix().also { rawToOriented.invert(it) }
 
-    override val size = RectF().also { rawToOriented.mapRect(it, rawBounds) }.let { IntSize(it.width().toInt(), it.height().toInt()) }
+    override val pageSizes = listOf(RectF().also { rawToOriented.mapRect(it, rawBounds) }.let { Size(it.width(), it.height()) })
 
-    override fun render(region: Rect, size: IntSize): ImageBitmap {
+    override fun render(page: Int, region: Rect, size: IntSize): ImageBitmap {
         val rawRegion = RectF().also { orientedToRaw.mapRect(it, RectF(region.left, region.top, region.right, region.bottom)) }
         val decodeRect = AndroidRect().also { rawRegion.roundOut(it) }
-        if (!decodeRect.intersect(0, 0, decoder.width, decoder.height)) return Bitmap.createBitmap(size.width, size.height, Bitmap.Config.ARGB_8888).asImageBitmap()
+        val output = Bitmap.createBitmap(size.width, size.height, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
+        if (!decodeRect.intersect(0, 0, decoder.width, decoder.height)) return output.asImageBitmap()
         val reduction = region.width / size.width
         val options = BitmapFactory.Options().apply {
             inSampleSize = Integer.highestOneBit(max(1, floor(reduction).toInt()))
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         val decoded = synchronized(decoder) { decoder.decodeRegion(decodeRect, options) }
-        val output = Bitmap.createBitmap(size.width, size.height, Bitmap.Config.ARGB_8888)
         val transform = Matrix().apply {
             setScale(decodeRect.width().toFloat() / decoded.width, decodeRect.height().toFloat() / decoded.height)
             postTranslate(decodeRect.left.toFloat(), decodeRect.top.toFloat())
@@ -70,10 +71,7 @@ private class AndroidImageSource(
             postTranslate(-region.left, -region.top)
             postScale(size.width / region.width, size.height / region.height)
         }
-        Canvas(output).apply {
-            drawColor(android.graphics.Color.WHITE)
-            drawBitmap(decoded, transform, Paint(Paint.FILTER_BITMAP_FLAG))
-        }
+        Canvas(output).drawBitmap(decoded, transform, Paint(Paint.FILTER_BITMAP_FLAG))
         decoded.recycle()
         return output.asImageBitmap()
     }

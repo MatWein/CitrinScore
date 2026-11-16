@@ -25,7 +25,7 @@ compose.desktop {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "citrinScore"
             packageVersion = project.version.toString()
-            modules("jdk.security.auth")
+            modules("java.instrument", "jdk.security.auth", "jdk.unsupported")
 
             linux.iconFile = file("packaging/icon.png")
             windows.iconFile = file("packaging/icon.ico")

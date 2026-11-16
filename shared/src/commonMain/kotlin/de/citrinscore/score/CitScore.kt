@@ -8,6 +8,7 @@ object CitScore {
     const val MANIFEST_FILE = "manifest.json"
     const val THUMBNAIL_FILE = "thumbnail.jpg"
     const val PAGES_DIRECTORY = "pages"
+    const val PDF_FILE = "score.pdf"
     const val THUMBNAIL_WIDTH = 600
     const val PAGE_ASPECT_RATIO = 210f / 297f
 

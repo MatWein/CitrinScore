@@ -64,6 +64,9 @@ interface Strings {
     val importFilesTitle: String
     val importFilesSubtitle: String
     val addImages: String
+    val importPdfTitle: String
+    val importPdfSubtitle: String
+    val choosePdf: String
     val moveUp: String
     val moveDown: String
     val remove: String

@@ -1,10 +1,10 @@
 package de.citrinscore.score.render
 
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Size
 
-class PageLayout(pageSizes: List<IntSize>, val width: Float, margin: Float, gap: Float) {
-    val scale = (width - 2 * margin) / (pageSizes.maxOfOrNull { it.width } ?: 1).coerceAtLeast(1)
+class PageLayout(pageSizes: List<Size>, val width: Float, margin: Float, gap: Float) {
+    val scale = (width - 2 * margin) / (pageSizes.maxOfOrNull { it.width } ?: 1f).coerceAtLeast(1f)
 
     val pages: List<Rect>
 

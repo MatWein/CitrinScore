@@ -1,6 +1,7 @@
 package de.citrinscore.ui.importer
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,8 @@ private val CompactRowWidth = 360.dp
 private val SideBySideWidth = 720.dp
 private val SingleColumnWidth = 640.dp
 private val SectionSpacing = 32.dp
+private val PreviewMargin = 4.dp
+private val PreviewGap = 8.dp
 private const val FileListWeight = 2f
 private const val PreviewWeight = 3f
 
@@ -60,8 +63,12 @@ fun ImportFilesStep(
     onRemove: (Int) -> Unit,
 ) {
     val strings = LocalStrings.current
+    val isPdf = state.type == ImportType.Pdf
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        StepHeader(strings.importFilesTitle, strings.importFilesSubtitle)
+        StepHeader(
+            if (isPdf) strings.importPdfTitle else strings.importFilesTitle,
+            if (isPdf) strings.importPdfSubtitle else strings.importFilesSubtitle,
+        )
         BoxWithConstraints(contentAlignment = Alignment.TopCenter) {
             val fileList: @Composable (Modifier) -> Unit = { modifier -> FileList(state, onAdd, onMove, onRemove, modifier) }
             val preview: @Composable (Modifier) -> Unit = { modifier -> if (state.files.isNotEmpty()) PagePreview(state, modifier) }
@@ -89,9 +96,10 @@ private fun FileList(
     modifier: Modifier,
 ) {
     val strings = LocalStrings.current
+    val isPdf = state.type == ImportType.Pdf
     val picker = rememberFilePickerLauncher(
         type = FileKitType.File(state.type?.extensions.orEmpty()),
-        mode = FileKitMode.Multiple(),
+        mode = FileKitMode.Multiple(maxItems = if (isPdf) 1 else null),
     ) { picked ->
         picked?.let(onAdd)
     }
@@ -102,6 +110,7 @@ private fun FileList(
                 position = index + 1,
                 name = file.name,
                 failed = file.path in state.failedPreviews,
+                reorderable = !isPdf,
                 onMoveUp = { onMove(index, index - 1) }.takeIf { index > 0 },
                 onMoveDown = { onMove(index, index + 1) }.takeIf { index < state.files.lastIndex },
                 onRemove = { onRemove(index) },
@@ -114,7 +123,7 @@ private fun FileList(
         ) {
             Icon(painterResource(Res.drawable.ic_add), contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text(strings.addImages)
+            Text(if (isPdf) strings.choosePdf else strings.addImages)
         }
     }
 }
@@ -124,9 +133,19 @@ private fun PagePreview(state: ImportState, modifier: Modifier) {
     val strings = LocalStrings.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(strings.previewLabel, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
-        Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)) {
-            state.pages.forEach { page ->
-                Image(page, contentDescription = null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
+        val pages = state.pages
+        val maxWidth = pages.maxOfOrNull { it.crop.size.width } ?: 1f
+        Column(
+            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Color.White).padding(PreviewMargin),
+            verticalArrangement = Arrangement.spacedBy(PreviewGap),
+        ) {
+            pages.forEach { page ->
+                Image(
+                    page.image,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth(page.crop.size.width / maxWidth),
+                    contentScale = ContentScale.FillWidth,
+                )
             }
         }
         if (state.isLoadingPreview) CircularProgressIndicator()
@@ -135,7 +154,15 @@ private fun PagePreview(state: ImportState, modifier: Modifier) {
 }
 
 @Composable
-private fun FileRow(position: Int, name: String, failed: Boolean, onMoveUp: (() -> Unit)?, onMoveDown: (() -> Unit)?, onRemove: () -> Unit) {
+private fun FileRow(
+    position: Int,
+    name: String,
+    failed: Boolean,
+    reorderable: Boolean,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
+    onRemove: () -> Unit,
+) {
     val strings = LocalStrings.current
     val label: @Composable RowScope.() -> Unit = {
         Text(
@@ -154,8 +181,10 @@ private fun FileRow(position: Int, name: String, failed: Boolean, onMoveUp: (() 
         )
     }
     val actions: @Composable () -> Unit = {
-        RowAction(Res.drawable.ic_arrow_upward, strings.moveUp, onMoveUp)
-        RowAction(Res.drawable.ic_arrow_downward, strings.moveDown, onMoveDown)
+        if (reorderable) {
+            RowAction(Res.drawable.ic_arrow_upward, strings.moveUp, onMoveUp)
+            RowAction(Res.drawable.ic_arrow_downward, strings.moveDown, onMoveDown)
+        }
         RowAction(Res.drawable.ic_close, strings.remove, onRemove)
     }
 

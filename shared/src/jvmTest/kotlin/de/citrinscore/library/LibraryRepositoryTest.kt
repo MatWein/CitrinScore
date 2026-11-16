@@ -7,6 +7,11 @@ import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.render.PdfSourceTest
+import de.citrinscore.score.render.ScoreRenderers
+import de.citrinscore.score.render.contentCrop
+import de.citrinscore.score.render.openImageSource
+import de.citrinscore.score.render.openPdfSource
 import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.test.runTest
@@ -69,7 +74,7 @@ class LibraryRepositoryTest {
         val first = image("a.png", "png", width = 800, height = 1100)
         val metadata = ScoreMetadata(title = "Etude", composer = "Chopin")
 
-        repository.importImages(PlatformFile(root), metadata, listOf(PlatformFile(second), PlatformFile(first)))
+        importImages(metadata, second, first)
 
         val score = File(root, "Etude.citscore")
         val manifest = AppJson.decodeFromString<ScoreManifest>(File(score, CitScore.MANIFEST_FILE).readText())
@@ -78,7 +83,7 @@ class LibraryRepositoryTest {
         assertNull(manifest.lastOpenedAt)
         val pages = (manifest.content as ScoreContent.Images).pages
         assertEquals(listOf("pages/001.jpg", "pages/002.png"), pages.map { it.path })
-        assertEquals(listOf(PageCrop(0, 0, 1200, 1700), PageCrop(0, 0, 800, 1100)), pages.map { it.crop })
+        assertEquals(listOf(PageCrop(0f, 0f, 1200f, 1700f), PageCrop(0f, 0f, 800f, 1100f)), pages.map { it.crop })
         assertContentEquals(second.readBytes(), File(score, "pages/001.jpg").readBytes())
         assertContentEquals(first.readBytes(), File(score, "pages/002.png").readBytes())
     }
@@ -87,7 +92,7 @@ class LibraryRepositoryTest {
     fun `thumbnail stacks all pages with a shared scale`() = runTest {
         val firstLine = image("1.png", "png", width = 1200, height = 600, color = Color.RED)
         val secondLine = image("2.png", "png", width = 2400, height = 1200, color = Color.BLUE)
-        repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(firstLine), PlatformFile(secondLine)))
+        importImages(ScoreMetadata(title = "Etude"), firstLine, secondLine)
 
         val thumbnail = assertNotNull(repository.thumbnail(PlatformFile(File(root, "Etude.citscore"))))
 
@@ -130,7 +135,7 @@ class LibraryRepositoryTest {
 
         val manifest = repository.open(PlatformFile(score))
 
-        val expected = ImagePage("pages/001.png", PageCrop(190, 290, 810, 1110))
+        val expected = ImagePage("pages/001.png", PageCrop(190f, 290f, 810f, 1110f))
         assertEquals(ScoreContent.Images(listOf(expected)), manifest.content)
         assertEquals(manifest, AppJson.decodeFromString<ScoreManifest>(File(score, CitScore.MANIFEST_FILE).readText()))
     }
@@ -144,6 +149,23 @@ class LibraryRepositoryTest {
         repository.saveView(score, ScoreViewState(zoom = 1.5f, x = 0.25f, y = 0.5f))
 
         assertEquals(opened.copy(view = ScoreViewState(1.5f, 0.25f, 0.5f)), repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt))
+    }
+
+    @Test
+    fun `imported pdfs keep the original file and store page crops`() = runTest {
+        val pdf = PdfSourceTest.samplePdf(root)
+        val crops = openPdfSource(PlatformFile(pdf)).use { source -> source.pageSizes.indices.map { source.contentCrop(it) } }
+
+        repository.importPdf(PlatformFile(root), ScoreMetadata(title = "Sonate"), PlatformFile(pdf), crops)
+
+        val score = File(root, "Sonate.citscore")
+        assertContentEquals(pdf.readBytes(), File(score, CitScore.PDF_FILE).readBytes())
+        val manifest = repository.open(PlatformFile(score))
+        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, crops), manifest.content)
+        assertNotNull(repository.thumbnail(PlatformFile(score)))
+        ScoreRenderers.open(PlatformFile(score), manifest.content).use { renderer ->
+            assertEquals(crops.map { it.size }, renderer.pageSizes)
+        }
     }
 
     @Test
@@ -164,15 +186,20 @@ class LibraryRepositoryTest {
     fun `failed imports leave no partial score behind`() = runTest {
         val notAnImage = File(root, "broken.png").apply { writeText("not an image") }
 
-        runCatching { repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(notAnImage))) }
+        runCatching { repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(notAnImage)), listOf(PageCrop(0f, 0f, 1f, 1f))) }
 
         assertFalse(File(root, "Etude.citscore").exists())
+    }
+
+    private suspend fun importImages(metadata: ScoreMetadata, vararg images: File) {
+        val files = images.map(::PlatformFile)
+        repository.importImages(PlatformFile(root), metadata, files, files.map { file -> openImageSource(file).use { it.contentCrop(0) } })
     }
 
     private suspend fun importAt(title: String, time: Instant) {
         now = time
         val page = image("$title.png", "png", width = 10, height = 14)
-        repository.importImages(PlatformFile(root), ScoreMetadata(title), listOf(PlatformFile(page)))
+        importImages(ScoreMetadata(title), page)
         page.delete()
     }
 

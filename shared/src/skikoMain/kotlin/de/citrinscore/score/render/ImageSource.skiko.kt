@@ -1,6 +1,7 @@
 package de.citrinscore.score.render
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -20,7 +21,7 @@ import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.impl.use
 import org.jetbrains.skia.Rect as SkiaRect
 
-actual suspend fun ImageSource(file: PlatformFile): ImageSource {
+actual suspend fun openImageSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
     return withContext(Dispatchers.Default) {
         Image.makeFromEncoded(bytes).use { encoded ->
@@ -31,10 +32,10 @@ actual suspend fun ImageSource(file: PlatformFile): ImageSource {
     }
 }
 
-private class SkiaImageSource(private val image: Image) : ImageSource {
-    override val size = IntSize(image.width, image.height)
+private class SkiaImageSource(private val image: Image) : PageSource {
+    override val pageSizes = listOf(Size(image.width.toFloat(), image.height.toFloat()))
 
-    override fun render(region: Rect, size: IntSize): ImageBitmap {
+    override fun render(page: Int, region: Rect, size: IntSize): ImageBitmap {
         val bitmap = Bitmap().apply { allocN32Pixels(size.width, size.height) }
         val sampling = if (size.width < region.width) FilterMipmap(FilterMode.LINEAR, MipmapMode.LINEAR) else SamplingMode.CATMULL_ROM
         Canvas(bitmap).use { canvas ->

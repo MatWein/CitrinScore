@@ -1,6 +1,7 @@
 package de.citrinscore.score
 
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -40,14 +41,20 @@ sealed interface ScoreContent {
     @Serializable
     @SerialName("images")
     data class Images(val pages: List<@Serializable(with = ImagePageSerializer::class) ImagePage>) : ScoreContent
+
+    @Serializable
+    @SerialName("pdf")
+    data class Pdf(val path: String, val pages: List<PageCrop>) : ScoreContent
 }
 
 @Serializable
 data class ImagePage(val path: String, val crop: PageCrop? = null)
 
 @Serializable
-data class PageCrop(val left: Int, val top: Int, val right: Int, val bottom: Int) {
-    val size get() = IntSize(right - left, bottom - top)
+data class PageCrop(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    val size get() = Size(right - left, bottom - top)
+
+    val rect get() = Rect(left, top, right, bottom)
 }
 
 private object ImagePageSerializer : JsonTransformingSerializer<ImagePage>(ImagePage.serializer()) {

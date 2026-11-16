@@ -67,6 +67,9 @@ object GermanStrings : Strings {
 
     override val importFilesTitle = "Wähle deine Bilder"
     override val importFilesSubtitle = "Bring die Seiten in die richtige Reihenfolge und prüfe die Vorschau."
+    override val importPdfTitle = "Wähle dein PDF"
+    override val importPdfSubtitle = "Prüfe die Vorschau der Seiten."
+    override val choosePdf = "PDF auswählen"
     override val addImages = "Bilder hinzufügen"
     override val moveUp = "Nach oben"
     override val moveDown = "Nach unten"

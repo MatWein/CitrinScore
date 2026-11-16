@@ -54,6 +54,9 @@ kotlin {
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
         }
+        jvmMain.dependencies {
+            implementation("org.apache.pdfbox:pdfbox:3.0.8")
+        }
         androidMain.dependencies {
             implementation("androidx.exifinterface:exifinterface:1.4.2")
         }

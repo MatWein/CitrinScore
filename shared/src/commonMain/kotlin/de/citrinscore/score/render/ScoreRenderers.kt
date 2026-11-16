@@ -6,9 +6,15 @@ import io.github.vinceglb.filekit.PlatformFile
 
 object ScoreRenderers {
     fun open(score: PlatformFile, content: ScoreContent): ScoreRenderer = when (content) {
-        is ScoreContent.Images -> ImageScoreRenderer(
-            files = content.pages.map { CitScore.resolve(score, it.path) },
-            crops = content.pages.map { requireNotNull(it.crop) { "${it.path} has no crop" } },
+        is ScoreContent.Images -> SourceScoreRenderer(
+            pages = content.pages.map { page ->
+                SourcePage(CitScore.resolve(score, page.path), 0, requireNotNull(page.crop) { "${page.path} has no crop" })
+            },
+            open = ::openImageSource,
         )
+        is ScoreContent.Pdf -> {
+            val document = CitScore.resolve(score, content.path)
+            SourceScoreRenderer(content.pages.mapIndexed { index, crop -> SourcePage(document, index, crop) }, ::openPdfSource)
+        }
     }
 }

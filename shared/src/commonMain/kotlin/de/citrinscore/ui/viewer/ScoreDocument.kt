@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.roundToIntRect
-import androidx.compose.ui.unit.toSize
 import de.citrinscore.score.render.PageLayout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -57,7 +56,7 @@ typealias PageRenderer = suspend (page: Int, region: Rect, size: IntSize) -> Ima
 private class Tile(val image: ImageBitmap, val documentRect: Rect)
 
 @Composable
-fun ScoreDocument(pageSizes: List<IntSize>, viewport: ScoreViewport, render: PageRenderer, modifier: Modifier = Modifier) {
+fun ScoreDocument(pageSizes: List<Size>, viewport: ScoreViewport, render: PageRenderer, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
         val viewportSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
@@ -76,7 +75,7 @@ fun ScoreDocument(pageSizes: List<IntSize>, viewport: ScoreViewport, render: Pag
                     pages.filterNot(baseImages::containsKey).forEach { page ->
                         val target = layout.pages[page]
                         val size = IntSize(target.width.roundToInt(), target.height.roundToInt())
-                        render(page, Rect(Offset.Zero, pageSizes[page].toSize()), size)?.let { baseImages[page] = it }
+                        render(page, Rect(Offset.Zero, pageSizes[page]), size)?.let { baseImages[page] = it }
                     }
                 }
         }
