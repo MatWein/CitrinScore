@@ -9,8 +9,8 @@ import de.citrinscore.settings.ThemeMode
 import de.citrinscore.ui.components.isLastStep
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +32,7 @@ class OnboardingViewModel : ViewModel() {
 
     fun back() = _state.update { it.copy(step = it.step.previousStep()) }
 
-    fun next(onFinished: (AppSettings) -> Unit) {
+    fun next(onFinished: (AppSettings, onFailure: () -> Unit) -> Unit) {
         val current = _state.value
         if (!current.canAdvance) return
         if (!current.step.isLastStep()) {
@@ -42,13 +42,10 @@ class OnboardingViewModel : ViewModel() {
         val library = current.library ?: return
         _state.update { it.copy(isCompleting = true) }
         viewModelScope.launch {
-            try {
-                onFinished(AppSettings(current.language, LibraryReference.of(library), current.theme))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _state.update { it.copy(isCompleting = false, libraryError = true) }
-            }
+            val reference = attempt { LibraryReference.of(library) } ?: return@launch failCompletion()
+            onFinished(AppSettings(current.language, reference, current.theme), ::failCompletion)
         }
     }
+
+    private fun failCompletion() = _state.update { it.copy(isCompleting = false, libraryError = true) }
 }

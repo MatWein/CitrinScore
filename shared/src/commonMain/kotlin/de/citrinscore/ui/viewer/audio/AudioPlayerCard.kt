@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -26,12 +24,13 @@ import de.citrinscore.resources.ic_close
 import de.citrinscore.resources.ic_pause
 import de.citrinscore.resources.ic_play
 import de.citrinscore.resources.ic_stop
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
+import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.theme.Spacing
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
 private val PlayerWidth = 320.dp
+private val PlayerElevation = 6.dp
 private const val MIN_SLIDER_SECONDS = 0.001f
 
 @Composable
@@ -42,9 +41,9 @@ fun AudioPlayerCard(player: PlayerState, viewModel: ScoreAudioViewModel, modifie
         modifier = modifier.width(PlayerWidth),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 6.dp,
+        shadowElevation = PlayerElevation,
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)) {
+        Column(Modifier.padding(start = Spacing.Large, end = Spacing.ExtraSmall, top = Spacing.ExtraSmall, bottom = Spacing.ExtraSmall)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     player.attachment.name,
@@ -53,7 +52,7 @@ fun AudioPlayerCard(player: PlayerState, viewModel: ScoreAudioViewModel, modifie
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                PlayerAction(Res.drawable.ic_close, strings.closePlayer, viewModel::closePlayer)
+                IconAction(Res.drawable.ic_close, strings.closePlayer, viewModel::closePlayer)
             }
             Slider(
                 value = dragged ?: player.position.toDouble(DurationUnit.SECONDS).toFloat(),
@@ -63,29 +62,22 @@ fun AudioPlayerCard(player: PlayerState, viewModel: ScoreAudioViewModel, modifie
                     dragged = null
                 },
                 valueRange = 0f..player.duration.toDouble(DurationUnit.SECONDS).toFloat().coerceAtLeast(MIN_SLIDER_SECONDS),
-                modifier = Modifier.padding(end = 12.dp),
+                modifier = Modifier.padding(end = Spacing.Medium),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (player.isPlaying) {
-                    PlayerAction(Res.drawable.ic_pause, strings.pause, viewModel::pause)
+                    IconAction(Res.drawable.ic_pause, strings.pause, viewModel::pause)
                 } else {
-                    PlayerAction(Res.drawable.ic_play, strings.play, viewModel::play)
+                    IconAction(Res.drawable.ic_play, strings.play, viewModel::play)
                 }
-                PlayerAction(Res.drawable.ic_stop, strings.stop, viewModel::stop)
+                IconAction(Res.drawable.ic_stop, strings.stop, viewModel::stop)
                 Spacer(Modifier.weight(1f))
                 Text(
                     "${(dragged?.toDouble()?.seconds ?: player.position).clock()} / ${player.duration.clock()}",
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(end = 12.dp),
+                    modifier = Modifier.padding(end = Spacing.Medium),
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PlayerAction(icon: DrawableResource, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(painterResource(icon), contentDescription = label)
     }
 }

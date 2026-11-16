@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -36,24 +35,26 @@ import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_close
 import de.citrinscore.score.scan.ScanThresholdRange
-import de.citrinscore.ui.components.StepHeader
+import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.Tile
+import de.citrinscore.ui.components.WizardStep
+import de.citrinscore.ui.theme.ContentWidth
+import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
-private val RowPadding = PaddingValues(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+private val RowPadding = PaddingValues(start = Spacing.Page, end = Spacing.Small, top = Spacing.Small, bottom = Spacing.Small)
+private val AddButtonPadding = PaddingValues(horizontal = Spacing.ExtraLarge, vertical = 14.dp)
 private val CompactRowWidth = 360.dp
 private val SideBySideWidth = 720.dp
-private val SingleColumnWidth = 640.dp
-private val SectionSpacing = 32.dp
-private val PreviewMargin = 4.dp
-private val PreviewGap = 8.dp
+private val SectionSpacing = Spacing.Section
+private val PreviewMargin = Spacing.ExtraSmall
+private val PreviewGap = Spacing.Small
 private const val FileListWeight = 2f
 private const val PreviewWeight = 3f
 
@@ -66,12 +67,12 @@ fun ImportFilesStep(
     onScanThresholdChange: (Float) -> Unit,
 ) {
     val strings = LocalStrings.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        when (state.type) {
-            ImportType.Pdf -> StepHeader(strings.importPdfTitle, strings.importPdfSubtitle)
-            ImportType.Scan -> StepHeader(strings.importScanTitle, strings.importScanSubtitle)
-            ImportType.Images, null -> StepHeader(strings.importFilesTitle, strings.importFilesSubtitle)
-        }
+    val (title, subtitle) = when (state.type) {
+        ImportType.Pdf -> strings.importPdfTitle to strings.importPdfSubtitle
+        ImportType.Scan -> strings.importScanTitle to strings.importScanSubtitle
+        ImportType.Images, null -> strings.importFilesTitle to strings.importFilesSubtitle
+    }
+    WizardStep(title, subtitle) {
         BoxWithConstraints(contentAlignment = Alignment.TopCenter) {
             val fileList: @Composable (Modifier) -> Unit = { modifier -> FileList(state, onAdd, onMove, onRemove, modifier) }
             val preview: @Composable (Modifier) -> Unit = { modifier ->
@@ -83,7 +84,7 @@ fun ImportFilesStep(
                     preview(Modifier.weight(PreviewWeight))
                 }
             } else {
-                Column(Modifier.widthIn(max = SingleColumnWidth), verticalArrangement = Arrangement.spacedBy(SectionSpacing)) {
+                Column(Modifier.widthIn(max = ContentWidth.Form), verticalArrangement = Arrangement.spacedBy(SectionSpacing)) {
                     fileList(Modifier.fillMaxWidth())
                     preview(Modifier.fillMaxWidth())
                 }
@@ -115,7 +116,7 @@ private fun FileList(
         ImportType.Images, null -> strings.addImages to picker::launch
     }
 
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
         state.files.forEachIndexed { index, file ->
             FileRow(
                 position = index + 1,
@@ -129,11 +130,11 @@ private fun FileList(
         }
         OutlinedButton(
             onClick = onAddClick,
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
-            modifier = Modifier.padding(top = 16.dp),
+            contentPadding = AddButtonPadding,
+            modifier = Modifier.padding(top = Spacing.Large),
         ) {
             Icon(painterResource(Res.drawable.ic_add), contentDescription = null)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.Small))
             Text(addLabel)
         }
     }
@@ -142,10 +143,10 @@ private fun FileList(
 @Composable
 private fun PagePreview(state: ImportState, onScanThresholdChange: (Float) -> Unit, modifier: Modifier) {
     val strings = LocalStrings.current
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
         Text(strings.previewLabel, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         if (state.type == ImportType.Scan) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Large)) {
                 Text(strings.scanThreshold, style = MaterialTheme.typography.bodyLarge)
                 Slider(
                     value = state.scanThreshold,
@@ -204,32 +205,25 @@ private fun FileRow(
     }
     val actions: @Composable () -> Unit = {
         if (reorderable) {
-            RowAction(Res.drawable.ic_arrow_upward, strings.moveUp, onMoveUp)
-            RowAction(Res.drawable.ic_arrow_downward, strings.moveDown, onMoveDown)
+            IconAction(Res.drawable.ic_arrow_upward, strings.moveUp, onClick = { onMoveUp?.invoke() }, enabled = onMoveUp != null)
+            IconAction(Res.drawable.ic_arrow_downward, strings.moveDown, onClick = { onMoveDown?.invoke() }, enabled = onMoveDown != null)
         }
-        RowAction(Res.drawable.ic_close, strings.remove, onRemove)
+        IconAction(Res.drawable.ic_close, strings.remove, onClick = onRemove)
     }
 
     Tile(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, contentPadding = RowPadding) {
         BoxWithConstraints {
             if (maxWidth < CompactRowWidth) {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), content = label)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium), content = label)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
                 }
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
                     label()
                     actions()
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun RowAction(icon: DrawableResource, label: String, onClick: (() -> Unit)?) {
-    IconButton(onClick = { onClick?.invoke() }, enabled = onClick != null) {
-        Icon(painterResource(icon), contentDescription = label)
     }
 }

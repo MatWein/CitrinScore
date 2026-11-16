@@ -12,14 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import de.citrinscore.ui.theme.Spacing
 
 @Composable
 fun <T> TileGrid(
     items: List<T>,
     minTileWidth: Dp,
     modifier: Modifier = Modifier,
-    spacing: Dp = 16.dp,
+    spacing: Dp = Spacing.Large,
     tile: @Composable (item: T, modifier: Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier) {

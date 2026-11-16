@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.LibraryReference
 import de.citrinscore.settings.SettingsRepository
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,39 +23,32 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
         }
     }
 
-    fun completeOnboarding(settings: AppSettings) {
+    fun completeOnboarding(settings: AppSettings, onFailure: () -> Unit) {
         viewModelScope.launch {
-            settingsRepository.save(settings)
-            _state.value = readyState(settings) ?: AppState.Onboarding
+            val ready = attempt {
+                settingsRepository.save(settings)
+                readyState(settings)
+            }
+            if (ready == null) onFailure() else _state.value = ready
         }
     }
 
-    fun updateSettings(settings: AppSettings) {
+    fun updateSettings(settings: AppSettings, onFailure: () -> Unit) {
         val current = _state.value as? AppState.Ready ?: return
         _state.value = current.copy(settings = settings)
-        viewModelScope.launch { settingsRepository.save(settings) }
+        viewModelScope.launch { attempt { settingsRepository.save(settings) } ?: onFailure() }
     }
 
     fun changeLibrary(directory: PlatformFile, onFailure: () -> Unit) {
         val current = _state.value as? AppState.Ready ?: return
         viewModelScope.launch {
-            try {
-                val settings = current.settings.copy(library = LibraryReference.of(directory))
-                settingsRepository.save(settings)
-                _state.value = AppState.Ready(settings, directory)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                onFailure()
+            val settings = attempt {
+                current.settings.copy(library = LibraryReference.of(directory)).also { settingsRepository.save(it) }
             }
+            if (settings == null) onFailure() else _state.value = AppState.Ready(settings, directory)
         }
     }
 
-    private suspend fun readyState(settings: AppSettings): AppState.Ready? = try {
-        AppState.Ready(settings, settings.library.resolve())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        null
-    }
+    private suspend fun readyState(settings: AppSettings): AppState.Ready? =
+        attempt { AppState.Ready(settings, settings.library.resolve()) }
 }

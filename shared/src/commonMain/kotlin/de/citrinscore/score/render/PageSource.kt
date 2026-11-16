@@ -14,6 +14,7 @@ interface PageSource : AutoCloseable {
 }
 
 private const val SVG_EXTENSION = "svg"
+private const val HALF_TURN_DEGREES = 180
 private const val PDF_EXTENSION = "pdf"
 
 suspend fun openPageSource(file: PlatformFile): PageSource =
@@ -21,6 +22,9 @@ suspend fun openPageSource(file: PlatformFile): PageSource =
 
 suspend fun openImageSource(file: PlatformFile): PageSource =
     if (file.extension.equals(SVG_EXTENSION, ignoreCase = true)) openSvgSource(file) else openRasterImageSource(file)
+
+internal fun orientedPageSize(width: Float, height: Float, rotationDegrees: Int) =
+    if (rotationDegrees % HALF_TURN_DEGREES == 0) Size(width, height) else Size(height, width)
 
 expect suspend fun openRasterImageSource(file: PlatformFile): PageSource
 

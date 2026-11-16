@@ -1,14 +1,10 @@
 package de.citrinscore.ui.importer
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.i18n.Strings
 import de.citrinscore.resources.Res
@@ -16,17 +12,17 @@ import de.citrinscore.resources.ic_document_scanner
 import de.citrinscore.resources.ic_image
 import de.citrinscore.resources.ic_picture_as_pdf
 import de.citrinscore.ui.components.IconBadge
-import de.citrinscore.ui.components.StepHeader
 import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.TileGrid
+import de.citrinscore.ui.components.WizardStep
+import de.citrinscore.ui.theme.TileWidth
 
 @Composable
 fun ImportTypeStep(selected: ImportType?, onSelect: (ImportType) -> Unit) {
     val strings = LocalStrings.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        StepHeader(strings.importTypeTitle, strings.importTypeSubtitle)
+    WizardStep(strings.importTypeTitle, strings.importTypeSubtitle) {
         val scanAvailable = isScanAvailable()
-        TileGrid(ImportType.entries, minTileWidth = 220.dp) { type, modifier ->
+        TileGrid(ImportType.entries, minTileWidth = TileWidth.Feature) { type, modifier ->
             val available = type != ImportType.Scan || scanAvailable
             ImportTypeTile(type, selected = type == selected, available = available, onClick = { onSelect(type) }, modifier)
         }

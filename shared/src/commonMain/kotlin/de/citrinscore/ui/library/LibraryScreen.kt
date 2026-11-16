@@ -22,7 +22,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -63,9 +62,12 @@ import de.citrinscore.resources.ic_settings
 import de.citrinscore.resources.ic_upload_file
 import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
+import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.IconBadge
+import de.citrinscore.ui.components.IconBadgeSize
 import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.VerticalScrollIndicator
+import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
@@ -73,8 +75,8 @@ import org.jetbrains.compose.resources.painterResource
 
 private val FabClearance = 96.dp
 private val TileMinWidth = 160.dp
-private val TilePadding = PaddingValues(12.dp)
-private val TileMenuSize = 32.dp
+private val TilePadding = PaddingValues(Spacing.Medium)
+private val TileMenuSize = Spacing.Section
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,10 +92,16 @@ fun LibraryScreen(
     var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.deleteFailed) {
-        if (state.deleteFailed) {
-            snackbarHostState.showSnackbar(strings.deleteFailed)
-            viewModel.dismissDeleteFailure()
+    LaunchedEffect(state.error) {
+        state.error?.let { error ->
+            snackbarHostState.showSnackbar(
+                when (error) {
+                    LibraryError.Load -> strings.folderLoadFailed
+                    LibraryError.CreateFolder -> strings.createFolderFailed
+                    LibraryError.Delete -> strings.deleteFailed
+                },
+            )
+            viewModel.dismissError()
         }
     }
 
@@ -109,21 +117,18 @@ fun LibraryScreen(
                 },
                 navigationIcon = {
                     if (!state.isRoot) {
-                        IconButton(onClick = viewModel::up) {
-                            Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = strings.back)
-                        }
+                        IconAction(Res.drawable.ic_arrow_back, strings.back, onClick = viewModel::up)
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::refresh) {
-                        Icon(painterResource(Res.drawable.ic_refresh), contentDescription = strings.refresh)
-                    }
-                    IconButton(onClick = { showNewFolderDialog = true }, enabled = state.content != null) {
-                        Icon(painterResource(Res.drawable.ic_create_new_folder), contentDescription = strings.newFolder)
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(painterResource(Res.drawable.ic_settings), contentDescription = strings.settings)
-                    }
+                    IconAction(Res.drawable.ic_refresh, strings.refresh, onClick = viewModel::refresh)
+                    IconAction(
+                        Res.drawable.ic_create_new_folder,
+                        strings.newFolder,
+                        onClick = { showNewFolderDialog = true },
+                        enabled = state.content != null,
+                    )
+                    IconAction(Res.drawable.ic_settings, strings.settings, onClick = onOpenSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
@@ -197,9 +202,9 @@ private fun LibraryGrid(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(TileMinWidth),
             state = gridState,
-            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = FabClearance),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(start = Spacing.Large, top = Spacing.Large, end = Spacing.Large, bottom = FabClearance),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Large),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Large),
             modifier = Modifier.fillMaxSize(),
         ) {
             items(content.items, key = { it.file.path }) { item ->
@@ -210,7 +215,7 @@ private fun LibraryGrid(
                 LibraryTile(item, onClick = { onClick(item.file) }, onDelete = { onDelete(item) }, loadThumbnail)
             }
         }
-        VerticalScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp))
+        VerticalScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = Spacing.ExtraSmall))
     }
 }
 
@@ -229,7 +234,7 @@ private fun LibraryTile(
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(top = 4.dp),
+                modifier = Modifier.weight(1f).padding(top = Spacing.ExtraSmall),
             )
             TileMenu(onDelete)
         }
@@ -242,7 +247,7 @@ private fun LibraryTile(
             contentAlignment = Alignment.Center,
         ) {
             when (item) {
-                is LibraryItem.Folder -> IconBadge(Res.drawable.ic_folder, size = 72.dp)
+                is LibraryItem.Folder -> IconBadge(Res.drawable.ic_folder, size = IconBadgeSize.Large)
                 is LibraryItem.Score -> ScorePreview(item.file, loadThumbnail)
             }
         }
@@ -254,9 +259,7 @@ private fun TileMenu(onDelete: () -> Unit) {
     val strings = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(TileMenuSize)) {
-            Icon(painterResource(Res.drawable.ic_more_vert), contentDescription = strings.moreOptions)
-        }
+        IconAction(Res.drawable.ic_more_vert, strings.moreOptions, onClick = { expanded = true }, modifier = Modifier.size(TileMenuSize))
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(strings.delete) },
@@ -284,8 +287,8 @@ private fun ScorePreview(score: PlatformFile, loadThumbnail: suspend (PlatformFi
 @Composable
 private fun EmptyLibrary(title: String, modifier: Modifier) {
     val strings = LocalStrings.current
-    Column(modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        IconBadge(Res.drawable.ic_library_music, size = 112.dp)
+    Column(modifier.padding(Spacing.ExtraLarge), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
+        IconBadge(Res.drawable.ic_library_music, size = IconBadgeSize.Hero)
         Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Text(
             strings.libraryEmptyText,

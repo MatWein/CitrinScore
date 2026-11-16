@@ -52,6 +52,9 @@ interface Strings {
     fun deleteScoreText(name: String): String
     fun deleteFolderText(name: String): String
     val deleteFailed: String
+    val createFolderFailed: String
+    val folderLoadFailed: String
+    val settingsSaveFailed: String
 
     val newFolder: String
     val importScores: String

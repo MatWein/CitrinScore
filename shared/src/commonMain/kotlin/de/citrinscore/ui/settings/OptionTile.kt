@@ -16,9 +16,11 @@ import androidx.compose.ui.unit.dp
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_check
 import de.citrinscore.ui.components.Tile
+import de.citrinscore.ui.theme.Spacing
 import org.jetbrains.compose.resources.painterResource
 
-private val OptionPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+private val CheckIconSize = 20.dp
+private val OptionPadding = PaddingValues(horizontal = Spacing.Large, vertical = 14.dp)
 
 @Composable
 fun OptionTile(
@@ -29,7 +31,7 @@ fun OptionTile(
     leading: @Composable RowScope.() -> Unit,
 ) {
     Tile(modifier, selected, onClick, MaterialTheme.shapes.medium, OptionPadding) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
             leading()
             Text(
                 label,
@@ -43,7 +45,7 @@ fun OptionTile(
                     painterResource(Res.drawable.ic_check),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(CheckIconSize),
                 )
             }
         }

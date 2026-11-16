@@ -1,7 +1,6 @@
 package de.citrinscore.score.render
 
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -24,10 +23,7 @@ actual suspend fun openPdfSource(file: PlatformFile): PageSource {
 private class PdfBoxSource(private val document: PDDocument) : PageSource {
     private val renderer = PDFRenderer(document)
 
-    override val pageSizes = document.pages.map { page ->
-        val box = page.cropBox
-        if (page.rotation % 180 == 0) Size(box.width, box.height) else Size(box.height, box.width)
-    }
+    override val pageSizes = document.pages.map { page -> orientedPageSize(page.cropBox.width, page.cropBox.height, page.rotation) }
 
     override fun render(page: Int, region: Rect, size: IntSize): ImageBitmap = synchronized(document) {
         val image = BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_RGB)

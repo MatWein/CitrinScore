@@ -11,13 +11,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.library.displayPath
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_folder
 import de.citrinscore.ui.components.IconBadge
+import de.citrinscore.ui.components.IconBadgeSize
 import de.citrinscore.ui.components.Tile
+import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 import io.github.vinceglb.filekit.name
@@ -35,11 +36,11 @@ fun LibraryFolderTile(
         directory?.let(onSelect)
     }
 
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
         Tile(Modifier.fillMaxWidth(), selected = library != null, onClick = picker::launch) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                IconBadge(Res.drawable.ic_folder, size = 72.dp)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Page)) {
+                IconBadge(Res.drawable.ic_folder, size = IconBadgeSize.Large)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
                     Text(
                         library?.name ?: strings.chooseFolder,
                         style = MaterialTheme.typography.headlineSmall,

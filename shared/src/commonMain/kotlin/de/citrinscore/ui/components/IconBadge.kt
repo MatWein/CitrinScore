@@ -14,19 +14,28 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
+private const val BACKGROUND_ALPHA = 0.14f
+private const val ICON_SCALE = 0.5f
+
+object IconBadgeSize {
+    val Regular = 56.dp
+    val Large = 72.dp
+    val Hero = 112.dp
+}
+
 @Composable
-fun IconBadge(icon: DrawableResource, modifier: Modifier = Modifier, size: Dp = 56.dp) {
+fun IconBadge(icon: DrawableResource, modifier: Modifier = Modifier, size: Dp = IconBadgeSize.Regular) {
     Box(
         modifier = modifier
             .size(size)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), CircleShape),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = BACKGROUND_ALPHA), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(size / 2),
+            modifier = Modifier.size(size * ICON_SCALE),
         )
     }
 }

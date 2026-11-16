@@ -52,6 +52,9 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.kCGInterpolationHigh
 import platform.CoreGraphics.kCGPDFCropBox
 
+private const val BYTES_PER_PIXEL = 4
+private const val BITS_PER_COMPONENT = 8
+
 @OptIn(ExperimentalForeignApi::class)
 actual suspend fun openPdfSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
@@ -77,8 +80,8 @@ private class CoreGraphicsPdfSource(private val document: CGPDFDocumentRef) : Pa
             null,
             size.width.convert(),
             size.height.convert(),
-            8u,
-            (size.width * 4).convert(),
+            BITS_PER_COMPONENT.convert(),
+            (size.width * BYTES_PER_PIXEL).convert(),
             colorSpace,
             CGImageAlphaInfo.kCGImageAlphaPremultipliedLast.value,
         )
@@ -94,9 +97,9 @@ private class CoreGraphicsPdfSource(private val document: CGPDFDocumentRef) : Pa
             val pageBounds = CGRectMake(0.0, 0.0, pageSize.width.toDouble(), pageSize.height.toDouble())
             CGContextConcatCTM(context, CGPDFPageGetDrawingTransform(pdfPage, kCGPDFCropBox, pageBounds, 0, false))
             CGContextDrawPDFPage(context, pdfPage)
-            val pixels = requireNotNull(CGBitmapContextGetData(context)).reinterpret<ByteVar>().readBytes(size.width * size.height * 4)
+            val pixels = requireNotNull(CGBitmapContextGetData(context)).reinterpret<ByteVar>().readBytes(size.width * size.height * BYTES_PER_PIXEL)
             val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
-            return Image.makeRaster(info, pixels, size.width * 4).toComposeImageBitmap()
+            return Image.makeRaster(info, pixels, size.width * BYTES_PER_PIXEL).toComposeImageBitmap()
         } finally {
             CGContextRelease(context)
         }
@@ -107,10 +110,6 @@ private class CoreGraphicsPdfSource(private val document: CGPDFDocumentRef) : Pa
     private fun page(index: Int): CGPDFPageRef? = CGPDFDocumentGetPage(document, (index + 1).convert())
 
     private fun orientedSize(page: CGPDFPageRef?): Size = CGPDFPageGetBoxRect(page, kCGPDFCropBox).useContents {
-        if (CGPDFPageGetRotationAngle(page) % 180 == 0) {
-            Size(size.width.toFloat(), size.height.toFloat())
-        } else {
-            Size(size.height.toFloat(), size.width.toFloat())
-        }
+        orientedPageSize(size.width.toFloat(), size.height.toFloat(), CGPDFPageGetRotationAngle(page))
     }
 }

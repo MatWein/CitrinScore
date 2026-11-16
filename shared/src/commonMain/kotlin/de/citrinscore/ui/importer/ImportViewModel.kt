@@ -15,11 +15,11 @@ import de.citrinscore.score.scan.ScanPage
 import de.citrinscore.score.scan.scanPages
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.ImageFormat
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.util.encodeToByteArray
 import io.github.vinceglb.filekit.path
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -171,14 +171,6 @@ class ImportViewModel(
             withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) } to crop
         }.unzip()
         repository.importScans(folder, metadata, images, crops)
-    }
-
-    private suspend fun <T> attempt(block: suspend () -> T): T? = try {
-        block()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        null
     }
 
     private suspend fun ImportType.open(file: PlatformFile): PageSource = when (this) {

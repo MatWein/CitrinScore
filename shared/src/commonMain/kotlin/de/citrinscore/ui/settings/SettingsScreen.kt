@@ -12,67 +12,77 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.settings.AppSettings
-import de.citrinscore.ui.components.ContentMaxWidth
+import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.VerticalScrollIndicator
+import de.citrinscore.ui.theme.ContentWidth
+import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
-import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
     library: PlatformFile,
-    onSettingsChange: (AppSettings) -> Unit,
+    onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
     onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
     onClose: () -> Unit,
 ) {
     val strings = LocalStrings.current
     var libraryError by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val change = { updated: AppSettings -> onSettingsChange(updated) { saveFailed = true } }
+
+    LaunchedEffect(saveFailed) {
+        if (saveFailed) {
+            snackbarHostState.showSnackbar(strings.settingsSaveFailed)
+            saveFailed = false
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(strings.settings) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = strings.back)
-                    }
+                    IconAction(Res.drawable.ic_arrow_back, strings.back, onClick = onClose)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(20.dp),
+                modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(Spacing.Page),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Column(Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                Column(Modifier.widthIn(max = ContentWidth.Regular).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.Section)) {
                     SettingsSection(strings.settingsLanguage) {
-                        LanguageOptions(settings.language, onSelect = { onSettingsChange(settings.copy(language = it)) })
+                        LanguageOptions(settings.language, onSelect = { change(settings.copy(language = it)) })
                     }
                     SettingsSection(strings.settingsTheme) {
-                        ThemeOptions(settings.theme, onSelect = { onSettingsChange(settings.copy(theme = it)) })
+                        ThemeOptions(settings.theme, onSelect = { change(settings.copy(theme = it)) })
                     }
                     SettingsSection(strings.settingsLibrary) {
                         LibraryFolderTile(
@@ -88,14 +98,14 @@ fun SettingsScreen(
                     }
                 }
             }
-            VerticalScrollIndicator(scrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp))
+            VerticalScrollIndicator(scrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = Spacing.ExtraSmall))
         }
     }
 }
 
 @Composable
 private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         content()
     }

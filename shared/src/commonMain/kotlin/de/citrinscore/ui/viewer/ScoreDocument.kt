@@ -50,6 +50,7 @@ private val Margin = 4.dp
 private val PageGap = 8.dp
 private val WheelStep = 64.dp
 private const val SETTLE_MILLIS = 150L
+private const val PINCH_POINTERS = 2
 
 typealias PageRenderer = suspend (page: Int, region: Rect, size: IntSize) -> ImageBitmap?
 
@@ -147,7 +148,7 @@ private fun Modifier.pinchToZoom(viewport: ScoreViewport) = pointerInput(viewpor
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
-            if (event.changes.count { it.pressed } >= 2) {
+            if (event.changes.count { it.pressed } >= PINCH_POINTERS) {
                 viewport.zoomBy(event.calculateZoom(), event.calculateCentroid())
                 viewport.scrollBy(-event.calculatePan())
                 event.changes.forEach { it.consume() }

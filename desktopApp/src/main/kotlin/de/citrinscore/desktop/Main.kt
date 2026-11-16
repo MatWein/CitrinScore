@@ -18,10 +18,12 @@ import org.jetbrains.compose.resources.painterResource
 import java.awt.Dimension
 import java.io.File
 
+private const val SETTINGS_DIRECTORY = ".citrinscore"
 private val MinimumWindowSize = Dimension(300, 600)
+private val InitialWindowSize = DpSize(1280.dp, 800.dp)
 
 fun main() {
-    FileKit.init(appId = AppInfo.ID, filesDir = File(System.getProperty("user.home"), ".citrinscore"))
+    FileKit.init(appId = AppInfo.ID, filesDir = File(System.getProperty("user.home"), SETTINGS_DIRECTORY))
     application {
         Window(
             onCloseRequest = ::exitApplication,
@@ -30,7 +32,7 @@ fun main() {
             state = rememberWindowState(
                 placement = WindowPlacement.Maximized,
                 position = WindowPosition(Alignment.Center),
-                size = DpSize(1280.dp, 800.dp),
+                size = InitialWindowSize,
             ),
         ) {
             LaunchedEffect(window) {

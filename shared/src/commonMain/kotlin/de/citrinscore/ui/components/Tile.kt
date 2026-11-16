@@ -14,6 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import de.citrinscore.ui.theme.Spacing
+
+private val BorderWidth = 1.dp
+private val SelectedBorderWidth = 2.dp
 
 @Composable
 fun Tile(
@@ -21,17 +25,17 @@ fun Tile(
     selected: Boolean = false,
     onClick: (() -> Unit)? = null,
     shape: Shape = MaterialTheme.shapes.large,
-    contentPadding: PaddingValues = PaddingValues(24.dp),
+    contentPadding: PaddingValues = PaddingValues(Spacing.ExtraLarge),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(if (selected) colors.primaryContainer else colors.surfaceContainerLow)
     val borderColor by animateColorAsState(if (selected) colors.primary else colors.outlineVariant)
-    val border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor)
+    val border = BorderStroke(if (selected) SelectedBorderWidth else BorderWidth, borderColor)
     val body: @Composable () -> Unit = {
         Column(
             modifier = Modifier.padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Medium),
             content = content,
         )
     }

@@ -13,7 +13,7 @@ import de.citrinscore.ui.theme.CitrinScreen
 
 @Composable
 fun OnboardingScreen(
-    onFinished: (AppSettings) -> Unit,
+    onFinished: (AppSettings, onFailure: () -> Unit) -> Unit,
     viewModel: OnboardingViewModel = viewModel { OnboardingViewModel() },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()

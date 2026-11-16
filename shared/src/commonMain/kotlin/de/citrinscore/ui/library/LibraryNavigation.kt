@@ -34,7 +34,7 @@ internal data object SettingsRoute
 fun LibraryNavigation(
     settings: AppSettings,
     library: PlatformFile,
-    onSettingsChange: (AppSettings) -> Unit,
+    onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
     onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
 ) {
     val repository = remember { LibraryRepository() }

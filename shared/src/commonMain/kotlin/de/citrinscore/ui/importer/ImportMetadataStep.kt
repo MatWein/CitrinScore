@@ -7,13 +7,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.ui.components.CitrinTextField
-import de.citrinscore.ui.components.StepHeader
+import de.citrinscore.ui.components.WizardStep
 import de.citrinscore.ui.components.text
+import de.citrinscore.ui.theme.ContentWidth
+import de.citrinscore.ui.theme.Spacing
 
 @Composable
 fun ImportMetadataStep(
@@ -26,9 +26,8 @@ fun ImportMetadataStep(
     val titleError = state.titleError?.takeIf { state.title.isNotEmpty() }?.text
     val fieldModifier = Modifier.fillMaxWidth()
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        StepHeader(strings.importMetadataTitle, strings.importMetadataSubtitle)
-        Column(Modifier.widthIn(max = 640.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    WizardStep(strings.importMetadataTitle, strings.importMetadataSubtitle) {
+        Column(Modifier.widthIn(max = ContentWidth.Form).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
             CitrinTextField(
                 value = state.title,
                 onValueChange = onTitleChange,

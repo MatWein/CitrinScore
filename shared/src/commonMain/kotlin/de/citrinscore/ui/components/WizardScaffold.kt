@@ -45,12 +45,15 @@ import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_forward
+import de.citrinscore.ui.theme.ContentWidth
+import de.citrinscore.ui.theme.Spacing
 import org.jetbrains.compose.resources.painterResource
 
-val ContentMaxWidth = 880.dp
-val WideContentMaxWidth = 1440.dp
-private val PagePadding = 20.dp
+private const val SLIDE_DIVISOR = 4
 private val CompactWidth = 480.dp
+private val ButtonVerticalPadding = 18.dp
+private val StepMarkerWidth = 48.dp
+private val StepMarkerHeight = 6.dp
 
 @Composable
 fun <S : Enum<S>> WizardScaffold(
@@ -61,7 +64,7 @@ fun <S : Enum<S>> WizardScaffold(
     nextLabel: String,
     nextEnabled: Boolean,
     onNext: () -> Unit,
-    contentMaxWidth: (S) -> Dp = { ContentMaxWidth },
+    contentMaxWidth: (S) -> Dp = { ContentWidth.Regular },
     content: @Composable (S) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -71,7 +74,7 @@ fun <S : Enum<S>> WizardScaffold(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(colors.surface, colors.primaryContainer.copy(alpha = 0.45f))))
             .safeDrawingPadding()
-            .padding(vertical = 16.dp),
+            .padding(vertical = Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StepIndicator(step.ordinal, stepCount)
@@ -80,8 +83,8 @@ fun <S : Enum<S>> WizardScaffold(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             transitionSpec = {
                 val direction = if (targetState > initialState) 1 else -1
-                (slideInHorizontally { direction * it / 4 } + fadeIn()) togetherWith
-                    (slideOutHorizontally { -direction * it / 4 } + fadeOut())
+                (slideInHorizontally { direction * it / SLIDE_DIVISOR } + fadeIn()) togetherWith
+                    (slideOutHorizontally { -direction * it / SLIDE_DIVISOR } + fadeOut())
             },
         ) { current ->
             ScrollableStep(contentMaxWidth(current)) { content(current) }
@@ -92,7 +95,7 @@ fun <S : Enum<S>> WizardScaffold(
             nextLabel = nextLabel,
             nextEnabled = nextEnabled,
             onNext = onNext,
-            modifier = Modifier.padding(start = PagePadding, end = PagePadding, top = 16.dp).widthIn(max = navigationMaxWidth),
+            modifier = Modifier.padding(start = Spacing.Page, end = Spacing.Page, top = Spacing.Large).widthIn(max = navigationMaxWidth),
         )
     }
 }
@@ -105,7 +108,7 @@ private fun ScrollableStep(maxWidth: Dp, content: @Composable () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(start = PagePadding, end = PagePadding, top = 24.dp, bottom = 32.dp),
+                .padding(start = Spacing.Page, end = Spacing.Page, top = Spacing.ExtraLarge, bottom = Spacing.Section),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -115,20 +118,20 @@ private fun ScrollableStep(maxWidth: Dp, content: @Composable () -> Unit) {
         }
         VerticalScrollIndicator(
             scrollState = scrollState,
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp),
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = Spacing.ExtraSmall),
         )
     }
 }
 
 @Composable
 private fun StepIndicator(currentIndex: Int, stepCount: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
             repeat(stepCount) { index ->
                 val color by animateColorAsState(
                     if (index <= currentIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 )
-                Box(Modifier.size(width = 48.dp, height = 6.dp).background(color, CircleShape))
+                Box(Modifier.size(width = StepMarkerWidth, height = StepMarkerHeight).background(color, CircleShape))
             }
         }
         Text(
@@ -156,10 +159,10 @@ private fun NavigationBar(
             Button(
                 onClick = onNext,
                 enabled = nextEnabled,
-                contentPadding = PaddingValues(horizontal = if (compact) 24.dp else 32.dp, vertical = 18.dp),
+                contentPadding = PaddingValues(horizontal = if (compact) Spacing.ExtraLarge else Spacing.Section, vertical = ButtonVerticalPadding),
             ) {
                 Text(nextLabel, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.Small))
                 Icon(painterResource(Res.drawable.ic_arrow_forward), contentDescription = null)
             }
         }
@@ -180,10 +183,10 @@ private fun BackButton(label: String?, compact: Boolean, onClick: () -> Unit) {
             onClick = onClick,
             enabled = visible,
             modifier = modifier,
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.ExtraLarge, vertical = ButtonVerticalPadding),
         ) {
             Icon(icon, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.Small))
             Text(label.orEmpty(), style = MaterialTheme.typography.titleMedium)
         }
     }

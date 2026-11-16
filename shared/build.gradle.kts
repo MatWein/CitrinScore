@@ -24,7 +24,7 @@ val androidMinSdk: String by project
 
 kotlin {
     android {
-        namespace = "de.citrinscore.shared"
+        namespace = "${project.group}.shared"
         compileSdk = androidCompileSdk.toInt()
         minSdk = androidMinSdk.toInt()
         androidResources {

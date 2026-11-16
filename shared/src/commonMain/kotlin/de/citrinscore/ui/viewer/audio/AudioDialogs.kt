@@ -15,11 +15,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_mic
 import de.citrinscore.ui.components.CitrinTextField
+import de.citrinscore.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.jetbrains.compose.resources.painterResource
@@ -43,7 +43,7 @@ fun RecordingDialog(start: TimeSource.Monotonic.ValueTimeMark, onSave: () -> Uni
         onDismissRequest = {},
         title = { Text(strings.recordingTitle) },
         text = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
                 Icon(painterResource(Res.drawable.ic_mic), contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 Text(elapsed.clock(), style = MaterialTheme.typography.headlineMedium)
             }

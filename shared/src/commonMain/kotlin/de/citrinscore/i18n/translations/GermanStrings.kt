@@ -56,6 +56,9 @@ object GermanStrings : Strings {
     override fun deleteFolderText(name: String) =
         "Der Ordner „$name“ und sein gesamter Inhalt werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden."
     override val deleteFailed = "Der Eintrag konnte nicht gelöscht werden."
+    override val createFolderFailed = "Der Ordner konnte nicht angelegt werden."
+    override val folderLoadFailed = "Der Ordner konnte nicht gelesen werden."
+    override val settingsSaveFailed = "Die Einstellungen konnten nicht gespeichert werden."
 
     override val newFolder = "Neuer Ordner"
     override val importScores = "Noten importieren"

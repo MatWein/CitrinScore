@@ -10,13 +10,13 @@ import de.citrinscore.score.audio.AudioRecording
 import de.citrinscore.score.audio.isMicrophoneAvailable
 import de.citrinscore.score.audio.openAudioPlayer
 import de.citrinscore.score.audio.startAudioRecording
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.cacheDir
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
 import io.github.vinceglb.filekit.nameWithoutExtension
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,14 +44,14 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
 
     init {
         viewModelScope.launch {
-            attempt(AudioError.Save) { _state.update { it.copy(attachments = repository.audio(score)) } }
+            reporting(AudioError.Save) { _state.update { it.copy(attachments = repository.audio(score)) } }
         }
     }
 
     fun load(attachment: AudioAttachment) {
         releasePlayer()
         viewModelScope.launch {
-            attempt(AudioError.Playback) {
+            reporting(AudioError.Playback) {
                 val opened = openAudioPlayer(CitScore.resolve(score, attachment.path))
                 player = opened
                 _state.update { it.copy(player = PlayerState(attachment, opened.duration, Duration.ZERO, isPlaying = false)) }
@@ -101,7 +101,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
 
     fun addFiles(files: List<PlatformFile>) {
         viewModelScope.launch {
-            attempt(AudioError.Save) {
+            reporting(AudioError.Save) {
                 files.forEach { file -> append(repository.addAudio(score, file, file.nameWithoutExtension)) }
             }
         }
@@ -118,7 +118,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
     fun startRecording() {
         if (recording != null) return
         viewModelScope.launch {
-            attempt(AudioError.Recording) {
+            reporting(AudioError.Recording) {
                 recording = startAudioRecording(recordingFile)
                 _state.update { it.copy(recordingStart = TimeSource.Monotonic.markNow()) }
             }
@@ -130,7 +130,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
         recording = null
         _state.update { it.copy(recordingStart = null) }
         viewModelScope.launch {
-            attempt(AudioError.Save) {
+            reporting(AudioError.Save) {
                 active.finish()
                 append(repository.addAudio(score, recordingFile, name))
             }
@@ -146,7 +146,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
 
     fun rename(attachment: AudioAttachment, name: String) {
         viewModelScope.launch {
-            attempt(AudioError.Save) {
+            reporting(AudioError.Save) {
                 repository.renameAudio(score, attachment, name)
                 _state.update { state ->
                     val renamed = attachment.copy(name = name)
@@ -162,7 +162,7 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
     fun delete(attachment: AudioAttachment) {
         if (_state.value.player?.attachment?.path == attachment.path) closePlayer()
         viewModelScope.launch {
-            attempt(AudioError.Save) {
+            reporting(AudioError.Save) {
                 repository.deleteAudio(score, attachment)
                 _state.update { state -> state.copy(attachments = state.attachments.filterNot { it.path == attachment.path }) }
             }
@@ -183,14 +183,8 @@ class ScoreAudioViewModel(private val score: PlatformFile, private val repositor
         player = null
     }
 
-    private suspend fun attempt(error: AudioError, block: suspend () -> Unit) {
-        try {
-            block()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            _state.update { it.copy(error = error) }
-        }
+    private inline fun reporting(error: AudioError, block: () -> Unit) {
+        attempt(block) ?: _state.update { it.copy(error = error) }
     }
 
     override fun onCleared() {

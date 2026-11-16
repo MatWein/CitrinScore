@@ -10,6 +10,11 @@ internal const val SCAN_WIDTH = 1000f
 private const val INK_LUMINANCE = 160
 private const val MARK_LUMINANCE = 224
 private const val MIN_INK_PIXELS = 3
+private const val MAX_CHANNEL = 255
+private const val RED_WEIGHT = 299
+private const val GREEN_WEIGHT = 587
+private const val BLUE_WEIGHT = 114
+private const val WEIGHT_TOTAL = RED_WEIGHT + GREEN_WEIGHT + BLUE_WEIGHT
 
 internal fun scanSize(size: Size, scale: Float) =
     IntSize(max(1, (size.width * scale).roundToInt()), max(1, (size.height * scale).roundToInt()))
@@ -47,6 +52,6 @@ internal fun Int.luminanceOnWhite(): Int {
     val red = ushr(16) and 0xFF
     val green = ushr(8) and 0xFF
     val blue = and(0xFF)
-    val luminance = (red * 299 + green * 587 + blue * 114) / 1000
-    return 255 - (255 - luminance) * alpha / 255
+    val luminance = (red * RED_WEIGHT + green * GREEN_WEIGHT + blue * BLUE_WEIGHT) / WEIGHT_TOTAL
+    return MAX_CHANNEL - (MAX_CHANNEL - luminance) * alpha / MAX_CHANNEL
 }

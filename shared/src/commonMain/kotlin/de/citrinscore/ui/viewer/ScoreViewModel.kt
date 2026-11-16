@@ -10,8 +10,8 @@ import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.render.ScoreRenderer
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.systemBreaks
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,21 +60,9 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         savedView = view
         viewModelScope.launch {
             withContext(NonCancellable) {
-                try {
-                    repository.saveView(score, view)
-                } catch (_: Exception) {
-                    savedView = null
-                }
+                attempt { repository.saveView(score, view) } ?: run { savedView = null }
             }
         }
-    }
-
-    private suspend fun <T> attempt(block: suspend () -> T): T? = try {
-        block()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        null
     }
 
     override fun onCleared() {

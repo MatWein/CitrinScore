@@ -9,11 +9,11 @@ val androidMinSdk: String by project
 val androidVersionCode: String by project
 
 android {
-    namespace = "de.citrinscore.android"
+    namespace = "${project.group}.android"
     compileSdk = androidCompileSdk.toInt()
 
     defaultConfig {
-        applicationId = "de.citrinscore"
+        applicationId = project.group.toString()
         minSdk = androidMinSdk.toInt()
         targetSdk = androidTargetSdk.toInt()
         versionCode = androidVersionCode.toInt()

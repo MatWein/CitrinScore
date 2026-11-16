@@ -56,6 +56,9 @@ object EnglishStrings : Strings {
     override fun deleteFolderText(name: String) =
         "The folder “$name” and everything in it will be deleted permanently. This cannot be undone."
     override val deleteFailed = "The item could not be deleted."
+    override val createFolderFailed = "The folder could not be created."
+    override val folderLoadFailed = "The folder could not be read."
+    override val settingsSaveFailed = "The settings could not be saved."
 
     override val newFolder = "New folder"
     override val importScores = "Import scores"

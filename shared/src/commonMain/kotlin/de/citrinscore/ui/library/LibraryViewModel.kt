@@ -4,8 +4,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,7 +43,7 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     fun createFolder(name: String) {
         val parent = currentFolder
         viewModelScope.launch {
-            repository.createFolder(parent, name.trim())
+            attempt { repository.createFolder(parent, name.trim()) } ?: report(LibraryError.CreateFolder)
             refresh()
         }
     }
@@ -54,26 +54,22 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
 
     fun delete(item: PlatformFile) {
         viewModelScope.launch {
-            try {
-                repository.delete(item)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _state.update { it.copy(deleteFailed = true) }
-            }
+            attempt { repository.delete(item) } ?: report(LibraryError.Delete)
             refresh()
         }
     }
 
-    fun dismissDeleteFailure() = _state.update { it.copy(deleteFailed = false) }
+    fun dismissError() = _state.update { it.copy(error = null) }
 
     fun refresh() {
         val folder = currentFolder
         viewModelScope.launch {
-            val content = repository.content(folder)
+            val content = attempt { repository.content(folder) } ?: return@launch report(LibraryError.Load)
             _state.update { if (it.currentFolder == folder) it.copy(content = content) else it }
         }
     }
+
+    private fun report(error: LibraryError) = _state.update { it.copy(error = error) }
 
     suspend fun thumbnail(score: PlatformFile): ImageBitmap? =
         repository.thumbnail(score)?.let { bytes -> withContext(Dispatchers.Default) { bytes.decodeToImageBitmap() } }

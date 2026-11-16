@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -51,21 +49,22 @@ import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.score.ScoreMetadata
+import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.theme.Spacing
 import de.citrinscore.ui.viewer.audio.AudioMenu
 import de.citrinscore.ui.viewer.audio.AudioPlayerCard
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.roundToInt
 
 private const val SAVE_DELAY_MILLIS = 1000L
+private const val PERCENT = 100
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
-private val PlayerMargin = 16.dp
+private val PlayerMargin = Spacing.Large
 
 @Composable
 fun ScoreViewerScreen(viewModel: ScoreViewModel, audioViewModel: ScoreAudioViewModel, onClose: () -> Unit) {
@@ -168,9 +167,9 @@ private fun SideToolbar(toolbar: ToolbarState) {
         Column(
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Vertical))
-                .padding(horizontal = 4.dp, vertical = 8.dp),
+                .padding(horizontal = Spacing.ExtraSmall, vertical = Spacing.Small),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
             BackAction(toolbar)
             AudioMenu(toolbar.audio)
@@ -182,26 +181,32 @@ private fun SideToolbar(toolbar: ToolbarState) {
 
 @Composable
 private fun BackAction(toolbar: ToolbarState) {
-    ToolbarAction(Res.drawable.ic_arrow_back, LocalStrings.current.back, enabled = true, onClick = toolbar.onClose)
+    IconAction(Res.drawable.ic_arrow_back, LocalStrings.current.back, onClick = toolbar.onClose)
 }
 
 @Composable
 private fun PageActions(toolbar: ToolbarState) {
     val strings = LocalStrings.current
     val viewport = toolbar.viewport
-    ToolbarAction(Res.drawable.ic_arrow_upward, strings.previousPage, enabled = viewport?.canGoToPreviousPage == true) {
-        viewport?.previousPage()
-    }
-    ToolbarAction(Res.drawable.ic_arrow_downward, strings.nextPage, enabled = viewport?.canGoToNextPage == true) {
-        viewport?.nextPage()
-    }
+    IconAction(
+        Res.drawable.ic_arrow_upward,
+        strings.previousPage,
+        onClick = { viewport?.previousPage() },
+        enabled = viewport?.canGoToPreviousPage == true,
+    )
+    IconAction(
+        Res.drawable.ic_arrow_downward,
+        strings.nextPage,
+        onClick = { viewport?.nextPage() },
+        enabled = viewport?.canGoToNextPage == true,
+    )
 }
 
 @Composable
 private fun ZoomAction(toolbar: ToolbarState) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        ToolbarAction(Res.drawable.ic_zoom_in, LocalStrings.current.zoom, enabled = toolbar.viewport != null) { expanded = true }
+        IconAction(Res.drawable.ic_zoom_in, LocalStrings.current.zoom, onClick = { expanded = true }, enabled = toolbar.viewport != null)
         DropdownMenu(expanded = expanded && toolbar.viewport != null, onDismissRequest = { expanded = false }) {
             toolbar.viewport?.let { ZoomSlider(it) }
         }
@@ -211,9 +216,9 @@ private fun ZoomAction(toolbar: ToolbarState) {
 @Composable
 private fun ZoomSlider(viewport: ScoreViewport) {
     Row(
-        modifier = Modifier.width(ZoomSliderWidth).padding(horizontal = 16.dp),
+        modifier = Modifier.width(ZoomSliderWidth).padding(horizontal = Spacing.Large),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         Slider(
             value = ln(viewport.zoom),
@@ -222,17 +227,10 @@ private fun ZoomSlider(viewport: ScoreViewport) {
             modifier = Modifier.weight(1f),
         )
         Text(
-            LocalStrings.current.zoomPercent((viewport.zoom * 100).roundToInt()),
+            LocalStrings.current.zoomPercent((viewport.zoom * PERCENT).roundToInt()),
             style = MaterialTheme.typography.labelLarge,
             textAlign = TextAlign.End,
             modifier = Modifier.widthIn(min = ZoomLabelWidth),
         )
-    }
-}
-
-@Composable
-private fun ToolbarAction(icon: DrawableResource, label: String, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled) {
-        Icon(painterResource(icon), contentDescription = label)
     }
 }

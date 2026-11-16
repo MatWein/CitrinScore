@@ -26,7 +26,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
-            packageName = "citrinScore"
+            packageName = rootProject.name
             packageVersion = project.version.toString()
             modules("java.instrument", "jdk.security.auth", "jdk.unsupported")
 
