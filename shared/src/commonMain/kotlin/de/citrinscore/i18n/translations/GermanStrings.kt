@@ -37,6 +37,15 @@ object GermanStrings : Strings {
     override val cancel = "Abbrechen"
     override val create = "Erstellen"
 
+    override val refresh = "Aktualisieren"
+    override val moreOptions = "Weitere Optionen"
+    override val delete = "Löschen"
+    override val deleteTitle = "Endgültig löschen?"
+    override fun deleteScoreText(name: String) = "„$name“ wird endgültig gelöscht. Das kann nicht rückgängig gemacht werden."
+    override fun deleteFolderText(name: String) =
+        "Der Ordner „$name“ und sein gesamter Inhalt werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden."
+    override val deleteFailed = "Der Eintrag konnte nicht gelöscht werden."
+
     override val newFolder = "Neuer Ordner"
     override val importScores = "Noten importieren"
     override val newFolderTitle = "Neuen Ordner erstellen"
@@ -73,4 +82,8 @@ object GermanStrings : Strings {
     override val descriptionLabel = "Beschreibung"
     override val importAction = "Importieren"
     override val importFailed = "Die Noten konnten nicht gespeichert werden. Bitte versuche es erneut."
+
+    override val zoomIn = "Vergrößern"
+    override val zoomOut = "Verkleinern"
+    override val scoreLoadFailed = "Die Noten konnten nicht geöffnet werden."
 }

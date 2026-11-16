@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
 import io.github.vinceglb.filekit.PlatformFile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,9 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     val state: StateFlow<LibraryState> = _state.asStateFlow()
 
     val currentFolder get() = _state.value.currentFolder
+
+    var selectedScore: PlatformFile? = null
+        private set
 
     init {
         refresh()
@@ -43,6 +47,25 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
             refresh()
         }
     }
+
+    fun select(score: PlatformFile) {
+        selectedScore = score
+    }
+
+    fun delete(item: PlatformFile) {
+        viewModelScope.launch {
+            try {
+                repository.delete(item)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(deleteFailed = true) }
+            }
+            refresh()
+        }
+    }
+
+    fun dismissDeleteFailure() = _state.update { it.copy(deleteFailed = false) }
 
     fun refresh() {
         val folder = currentFolder

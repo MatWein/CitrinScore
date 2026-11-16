@@ -34,6 +34,14 @@ interface Strings {
     val cancel: String
     val create: String
 
+    val refresh: String
+    val moreOptions: String
+    val delete: String
+    val deleteTitle: String
+    fun deleteScoreText(name: String): String
+    fun deleteFolderText(name: String): String
+    val deleteFailed: String
+
     val newFolder: String
     val importScores: String
     val newFolderTitle: String
@@ -70,6 +78,10 @@ interface Strings {
     val descriptionLabel: String
     val importAction: String
     val importFailed: String
+
+    val zoomIn: String
+    val zoomOut: String
+    val scoreLoadFailed: String
 }
 
 val LocalStrings = staticCompositionLocalOf { AppLanguage.English.strings }

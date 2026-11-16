@@ -23,6 +23,17 @@ kotlin {
 
     jvm()
 
+    applyDefaultHierarchyTemplate {
+        common {
+            group("skiko") {
+                withJvm()
+                group("ios") {
+                    withIos()
+                }
+            }
+        }
+    }
+
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {
             baseName = "Shared"
@@ -43,12 +54,16 @@ kotlin {
             implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
         }
+        androidMain.dependencies {
+            implementation("androidx.exifinterface:exifinterface:1.4.2")
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation("org.jetbrains.compose.ui:ui-test:$composeVersion")
         }
     }
 }

@@ -37,6 +37,15 @@ object EnglishStrings : Strings {
     override val cancel = "Cancel"
     override val create = "Create"
 
+    override val refresh = "Refresh"
+    override val moreOptions = "More options"
+    override val delete = "Delete"
+    override val deleteTitle = "Delete permanently?"
+    override fun deleteScoreText(name: String) = "“$name” will be deleted permanently. This cannot be undone."
+    override fun deleteFolderText(name: String) =
+        "The folder “$name” and everything in it will be deleted permanently. This cannot be undone."
+    override val deleteFailed = "The item could not be deleted."
+
     override val newFolder = "New folder"
     override val importScores = "Import scores"
     override val newFolderTitle = "Create new folder"
@@ -73,4 +82,8 @@ object EnglishStrings : Strings {
     override val descriptionLabel = "Description"
     override val importAction = "Import"
     override val importFailed = "The score could not be saved. Please try again."
+
+    override val zoomIn = "Zoom in"
+    override val zoomOut = "Zoom out"
+    override val scoreLoadFailed = "The score could not be opened."
 }
