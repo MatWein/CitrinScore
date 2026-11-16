@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.rememberScrollable2DState
 import androidx.compose.foundation.gestures.scrollable2D
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,9 +28,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -97,6 +100,7 @@ fun ScoreDocument(pageSizes: List<IntSize>, viewport: ScoreViewport, render: Pag
                 .fillMaxSize()
                 .pinchToZoom(viewport)
                 .wheelScroll(viewport, wheelStep)
+                .mouseDrag(viewport)
                 .scrollable2D(scrollState),
         ) {
             val zoom = viewport.zoom
@@ -143,6 +147,17 @@ private fun Modifier.pinchToZoom(viewport: ScoreViewport) = pointerInput(viewpor
                 event.changes.forEach { it.consume() }
             }
         } while (event.changes.any { it.pressed })
+    }
+}
+
+private fun Modifier.mouseDrag(viewport: ScoreViewport) = pointerInput(viewport) {
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        if (down.type != PointerType.Mouse) return@awaitEachGesture
+        drag(down.id) { change ->
+            viewport.scrollBy(-change.positionChange())
+            change.consume()
+        }
     }
 }
 

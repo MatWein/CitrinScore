@@ -53,6 +53,32 @@ class ScoreDocumentTest {
     }
 
     @Test
+    fun `dragging with the mouse scrolls`() = runDocumentTest { viewport ->
+        onNodeWithTag(TAG).performMouseInput {
+            moveTo(center)
+            press()
+            moveBy(Offset(-100f, -200f))
+            release()
+        }
+        waitForIdle()
+
+        assertEquals(1f, viewport.zoom)
+        assertEquals(Offset(0f, 200f), viewport.offset)
+    }
+
+    @Test
+    fun `a touch drag scrolls by the finger distance only once`() = runDocumentTest { viewport ->
+        onNodeWithTag(TAG).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -100f))
+            moveBy(Offset(0f, -100f))
+        }
+        waitForIdle()
+
+        assertTrue(viewport.offset.y in 150f..200f, "offset was ${viewport.offset}")
+    }
+
+    @Test
     fun `mouse wheel scrolls`() = runDocumentTest { viewport ->
         onNodeWithTag(TAG).performMouseInput { scroll(3f) }
         waitForIdle()
