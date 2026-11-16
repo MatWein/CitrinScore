@@ -26,7 +26,7 @@ class ScoreDocumentTest {
     private fun runDocumentTest(block: androidx.compose.ui.test.ComposeUiTest.(ScoreViewport) -> Unit) = runComposeUiTest {
         val viewport = ScoreViewport(null)
         setContent {
-            ScoreDocument(pageSizes, viewport, { _, _, size -> ImageBitmap(size.width, size.height) }, Modifier.size(400.dp, 600.dp).testTag(TAG))
+            ScoreDocument(pageSizes, emptyList(), viewport, { _, _, size -> ImageBitmap(size.width, size.height) }, Modifier.size(400.dp, 600.dp).testTag(TAG))
         }
         waitForIdle()
         block(viewport)

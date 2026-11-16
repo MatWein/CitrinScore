@@ -11,6 +11,7 @@ import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.contentCrop
 import de.citrinscore.score.render.openImageSource
+import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.createDirectories
@@ -27,6 +28,8 @@ import io.github.vinceglb.filekit.write
 import io.github.vinceglb.filekit.writeString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
@@ -36,6 +39,8 @@ class LibraryRepository(
     private val json: Json = AppJson,
     private val clock: Clock = Clock.System,
 ) {
+
+    private val manifestUpdates = Mutex()
 
     suspend fun content(folder: PlatformFile): FolderContent = withContext(Dispatchers.IO) {
         val directories = folder.list().filter { !it.name.startsWith(".") && it.isDirectory() }
@@ -58,15 +63,16 @@ class LibraryRepository(
         if (item.exists()) throw IOException("${item.name} could not be deleted")
     }
 
-    suspend fun open(score: PlatformFile): ScoreManifest {
-        val manifest = requireManifest(score)
-        val opened = manifest.copy(content = manifest.content.withCrops(score), lastOpenedAt = clock.now())
-        writeManifest(score, opened)
-        return opened
+    suspend fun open(score: PlatformFile): ScoreManifest = updateManifest(score) { manifest ->
+        manifest.copy(content = manifest.content.withCrops(score), lastOpenedAt = clock.now())
     }
 
     suspend fun saveView(score: PlatformFile, view: ScoreViewState) {
-        writeManifest(score, requireManifest(score).copy(view = view))
+        updateManifest(score) { it.copy(view = view) }
+    }
+
+    suspend fun saveSystemBreaks(score: PlatformFile, systemBreaks: List<List<Float>>) {
+        updateManifest(score) { it.copy(systemBreaks = systemBreaks) }
     }
 
     suspend fun importImages(folder: PlatformFile, metadata: ScoreMetadata, images: List<PlatformFile>, crops: List<PageCrop>) {
@@ -94,8 +100,11 @@ class LibraryRepository(
         try {
             score.createDirectories()
             writeContent(score)
-            (score / CitScore.THUMBNAIL_FILE) write ScoreRenderers.open(score, content).use { ScoreThumbnail.render(it) }
-            writeManifest(score, ScoreManifest(metadata = metadata, content = content, createdAt = clock.now()))
+            val systemBreaks = ScoreRenderers.open(score, content).use { renderer ->
+                (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
+                renderer.pageSizes.indices.map { renderer.systemBreaks(it) }
+            }
+            writeManifest(score, ScoreManifest(metadata, content, createdAt = clock.now(), systemBreaks = systemBreaks))
         } catch (e: Exception) {
             score.delete(mustExist = false, recursively = true)
             throw e
@@ -109,7 +118,10 @@ class LibraryRepository(
 
     private suspend fun imageCrop(image: PlatformFile) = openImageSource(image).use { it.contentCrop(0) }
 
-    private suspend fun requireManifest(score: PlatformFile) = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
+    private suspend fun updateManifest(score: PlatformFile, transform: suspend (ScoreManifest) -> ScoreManifest) = manifestUpdates.withLock {
+        val manifest = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
+        transform(manifest).also { writeManifest(score, it) }
+    }
 
     private suspend fun writeManifest(score: PlatformFile, manifest: ScoreManifest) {
         (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))

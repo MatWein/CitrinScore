@@ -17,6 +17,7 @@ data class ScoreManifest(
     val createdAt: Instant,
     val lastOpenedAt: Instant? = null,
     val view: ScoreViewState? = null,
+    val systemBreaks: List<List<Float>>? = null,
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
 ) {
     val lastActivity get() = lastOpenedAt ?: createdAt

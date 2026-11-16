@@ -94,8 +94,8 @@ object EnglishStrings : Strings {
     override val importAction = "Import"
     override val importFailed = "The score could not be saved. Please try again."
 
-    override val zoomIn = "Zoom in"
-    override val zoomOut = "Zoom out"
+    override val zoom = "Zoom"
+    override fun zoomPercent(percent: Int) = "$percent%"
     override val previousPage = "Previous page"
     override val nextPage = "Next page"
     override val scoreLoadFailed = "The score could not be opened."

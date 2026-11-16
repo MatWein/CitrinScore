@@ -94,8 +94,8 @@ object GermanStrings : Strings {
     override val importAction = "Importieren"
     override val importFailed = "Die Noten konnten nicht gespeichert werden. Bitte versuche es erneut."
 
-    override val zoomIn = "Vergrößern"
-    override val zoomOut = "Verkleinern"
+    override val zoom = "Zoom"
+    override fun zoomPercent(percent: Int) = "$percent %"
     override val previousPage = "Vorherige Seite"
     override val nextPage = "Nächste Seite"
     override val scoreLoadFailed = "Die Noten konnten nicht geöffnet werden."

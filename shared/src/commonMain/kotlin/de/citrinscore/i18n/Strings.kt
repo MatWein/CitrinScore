@@ -90,8 +90,8 @@ interface Strings {
     val importAction: String
     val importFailed: String
 
-    val zoomIn: String
-    val zoomOut: String
+    val zoom: String
+    fun zoomPercent(percent: Int): String
     val previousPage: String
     val nextPage: String
     val scoreLoadFailed: String

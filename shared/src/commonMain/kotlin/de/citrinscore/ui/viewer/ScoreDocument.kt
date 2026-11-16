@@ -56,7 +56,13 @@ typealias PageRenderer = suspend (page: Int, region: Rect, size: IntSize) -> Ima
 private class Tile(val image: ImageBitmap, val documentRect: Rect)
 
 @Composable
-fun ScoreDocument(pageSizes: List<Size>, viewport: ScoreViewport, render: PageRenderer, modifier: Modifier = Modifier) {
+fun ScoreDocument(
+    pageSizes: List<Size>,
+    systemBreaks: List<List<Float>>,
+    viewport: ScoreViewport,
+    render: PageRenderer,
+    modifier: Modifier = Modifier,
+) {
     BoxWithConstraints(modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
         val viewportSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
@@ -64,6 +70,7 @@ fun ScoreDocument(pageSizes: List<Size>, viewport: ScoreViewport, render: PageRe
             with(density) { PageLayout(pageSizes, viewportSize.width, Margin.toPx(), PageGap.toPx()) }
         }
         viewport.setBounds(viewportSize, Size(layout.width, layout.height))
+        viewport.breaks = remember(layout, systemBreaks) { layout.documentBreaks(systemBreaks) }
         val baseImages = remember(layout) { mutableStateMapOf<Int, ImageBitmap>() }
         var tiles by remember(layout) { mutableStateOf(emptyList<Tile>()) }
 

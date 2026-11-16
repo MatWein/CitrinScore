@@ -84,8 +84,44 @@ class LibraryRepositoryTest {
         val pages = (manifest.content as ScoreContent.Images).pages
         assertEquals(listOf("pages/001.jpg", "pages/002.png"), pages.map { it.path })
         assertEquals(listOf(PageCrop(0f, 0f, 1200f, 1700f), PageCrop(0f, 0f, 800f, 1100f)), pages.map { it.crop })
+        assertEquals(listOf(emptyList(), emptyList<Float>()), manifest.systemBreaks)
         assertContentEquals(second.readBytes(), File(score, "pages/001.jpg").readBytes())
         assertContentEquals(first.readBytes(), File(score, "pages/002.png").readBytes())
+    }
+
+    @Test
+    fun `imports store the system breaks relative to the cropped page`() = runTest {
+        val page = File(root, "systems.png")
+        ImageIO.write(
+            BufferedImage(1000, 1000, BufferedImage.TYPE_INT_RGB).apply {
+                createGraphics().apply {
+                    color = Color.WHITE
+                    fillRect(0, 0, 1000, 1000)
+                    color = Color.BLACK
+                    fillRect(100, 100, 800, 200)
+                    fillRect(100, 600, 800, 200)
+                    dispose()
+                }
+            },
+            "png",
+            page,
+        )
+
+        importImages(ScoreMetadata(title = "Etude"), page)
+
+        val manifest = repository.open(PlatformFile(File(root, "Etude.citscore")))
+        assertEquals(360f, assertNotNull(manifest.systemBreaks).single().single(), absoluteTolerance = 0.5f)
+    }
+
+    @Test
+    fun `saving the system breaks keeps the rest of the manifest`() = runTest {
+        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val opened = repository.open(score)
+
+        repository.saveSystemBreaks(score, listOf(listOf(4f)))
+
+        assertEquals(opened.copy(systemBreaks = listOf(listOf(4f))), repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt))
     }
 
     @Test

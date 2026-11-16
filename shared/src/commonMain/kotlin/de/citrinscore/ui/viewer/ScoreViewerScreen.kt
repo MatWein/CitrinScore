@@ -13,12 +13,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -27,11 +31,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -43,14 +50,18 @@ import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_zoom_in
-import de.citrinscore.resources.ic_zoom_out
 import de.citrinscore.score.ScoreMetadata
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 private const val SAVE_DELAY_MILLIS = 1000L
+private val ZoomSliderWidth = 320.dp
+private val ZoomLabelWidth = 56.dp
 
 @Composable
 fun ScoreViewerScreen(viewModel: ScoreViewModel, onClose: () -> Unit) {
@@ -86,7 +97,8 @@ private fun ViewerContent(state: ScoreViewerState, viewport: ScoreViewport?, vie
             ScoreViewerState.Loading -> CircularProgressIndicator()
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
-                ScoreDocument(state.pageSizes, viewport, viewModel::render)
+                val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
+                ScoreDocument(state.pageSizes, systemBreaks, viewport, viewModel::render)
                 PersistView(viewport, viewModel)
             }
         }
@@ -126,7 +138,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
         navigationIcon = { BackAction(toolbar) },
         actions = {
             PageActions(toolbar)
-            ZoomActions(toolbar)
+            ZoomAction(toolbar)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     )
@@ -144,7 +156,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
         ) {
             BackAction(toolbar)
             PageActions(toolbar)
-            ZoomActions(toolbar)
+            ZoomAction(toolbar)
         }
     }
 }
@@ -167,14 +179,35 @@ private fun PageActions(toolbar: ToolbarState) {
 }
 
 @Composable
-private fun ZoomActions(toolbar: ToolbarState) {
-    val strings = LocalStrings.current
-    val viewport = toolbar.viewport
-    ToolbarAction(Res.drawable.ic_zoom_out, strings.zoomOut, enabled = viewport?.canZoomOut == true) {
-        viewport?.zoomBy(1 / ScoreViewport.ZOOM_STEP)
+private fun ZoomAction(toolbar: ToolbarState) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        ToolbarAction(Res.drawable.ic_zoom_in, LocalStrings.current.zoom, enabled = toolbar.viewport != null) { expanded = true }
+        DropdownMenu(expanded = expanded && toolbar.viewport != null, onDismissRequest = { expanded = false }) {
+            toolbar.viewport?.let { ZoomSlider(it) }
+        }
     }
-    ToolbarAction(Res.drawable.ic_zoom_in, strings.zoomIn, enabled = viewport?.canZoomIn == true) {
-        viewport?.zoomBy(ScoreViewport.ZOOM_STEP)
+}
+
+@Composable
+private fun ZoomSlider(viewport: ScoreViewport) {
+    Row(
+        modifier = Modifier.width(ZoomSliderWidth).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Slider(
+            value = ln(viewport.zoom),
+            onValueChange = { viewport.zoomTo(exp(it)) },
+            valueRange = ln(ScoreViewport.MIN_ZOOM)..ln(ScoreViewport.MAX_ZOOM),
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            LocalStrings.current.zoomPercent((viewport.zoom * 100).roundToInt()),
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(min = ZoomLabelWidth),
+        )
     }
 }
 

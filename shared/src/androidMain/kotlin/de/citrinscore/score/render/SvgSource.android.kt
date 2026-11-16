@@ -16,6 +16,8 @@ import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val FILL_VIEWPORT = "100%"
+
 actual suspend fun openSvgSource(file: PlatformFile): PageSource {
     val bytes = file.readBytes()
     return withContext(Dispatchers.Default) { AndroidSvgSource(SVG.getFromInputStream(bytes.inputStream())) }
@@ -26,6 +28,8 @@ private class AndroidSvgSource(private val svg: SVG) : PageSource {
 
     init {
         check(viewBox.width() > 0f && viewBox.height() > 0f) { "SVG has no size" }
+        svg.setDocumentWidth(FILL_VIEWPORT)
+        svg.setDocumentHeight(FILL_VIEWPORT)
     }
 
     override val pageSizes = listOf(Size(viewBox.width(), viewBox.height()))

@@ -81,4 +81,46 @@ class ScoreViewportTest {
         assertTrue(viewport.canGoToPreviousPage)
         assertFalse(viewport.canGoToNextPage)
     }
+
+    @Test
+    fun `paging keeps a partly visible system for the next page`() {
+        val viewport = ScoreViewport(null).apply {
+            setBounds(viewportSize, documentSize)
+            breaks = listOf(0f, 300f, 600f, 900f, 1200f, 1500f)
+        }
+
+        viewport.nextPage()
+        assertEquals(600f, viewport.offset.y)
+
+        viewport.nextPage()
+        assertEquals(1200f, viewport.offset.y)
+
+        viewport.previousPage()
+        assertEquals(600f, viewport.offset.y)
+    }
+
+    @Test
+    fun `paging scales the breaks with the zoom`() {
+        val viewport = ScoreViewport(null).apply {
+            setBounds(viewportSize, documentSize)
+            breaks = listOf(0f, 300f, 600f)
+            zoomTo(2f, Offset.Zero)
+        }
+
+        viewport.nextPage()
+
+        assertEquals(600f, viewport.offset.y)
+    }
+
+    @Test
+    fun `paging falls back to the viewport height without a break in view`() {
+        val viewport = ScoreViewport(null).apply {
+            setBounds(viewportSize, documentSize)
+            breaks = listOf(0f, 1000f)
+        }
+
+        viewport.nextPage()
+
+        assertEquals(800f, viewport.offset.y)
+    }
 }

@@ -19,10 +19,10 @@ class ScoreViewport(private val initial: ScoreViewState?) {
     private var viewportSize by mutableStateOf(Size.Zero)
     private var documentSize by mutableStateOf(Size.Zero)
 
+    var breaks: List<Float> = listOf(0f)
+
     private val maxOffsetY get() = (documentSize.height * zoom - viewportSize.height).coerceAtLeast(0f)
 
-    val canZoomIn get() = zoom < MAX_ZOOM
-    val canZoomOut get() = zoom > MIN_ZOOM
     val canGoToPreviousPage get() = offset.y > 0f
     val canGoToNextPage get() = offset.y < maxOffsetY
 
@@ -48,19 +48,31 @@ class ScoreViewport(private val initial: ScoreViewState?) {
     }
 
     fun previousPage() {
-        scrollBy(Offset(0f, -viewportSize.height))
+        val top = offset.y
+        val limit = top - viewportSize.height
+        val target = scaledBreaks.firstOrNull { it >= limit && it < top - BREAK_TOLERANCE } ?: limit
+        scrollBy(Offset(0f, target - top))
     }
 
     fun nextPage() {
-        scrollBy(Offset(0f, viewportSize.height))
+        val top = offset.y
+        val bottom = top + viewportSize.height
+        val target = scaledBreaks.lastOrNull { it > top + BREAK_TOLERANCE && it <= bottom } ?: bottom
+        scrollBy(Offset(0f, target - top))
     }
 
-    fun zoomBy(factor: Float, focus: Offset = Offset(viewportSize.width / 2, viewportSize.height / 2)) {
-        val target = (zoom * factor).coerceIn(MIN_ZOOM, MAX_ZOOM)
-        val ratio = target / zoom
-        zoom = target
+    fun zoomBy(factor: Float, focus: Offset = viewportCenter) = zoomTo(zoom * factor, focus)
+
+    fun zoomTo(target: Float, focus: Offset = viewportCenter) {
+        val clamped = target.coerceIn(MIN_ZOOM, MAX_ZOOM)
+        val ratio = clamped / zoom
+        zoom = clamped
         offset = clamp((offset + focus) * ratio - focus)
     }
+
+    private val viewportCenter get() = Offset(viewportSize.width / 2, viewportSize.height / 2)
+
+    private val scaledBreaks get() = breaks.map { it * zoom }
 
     private fun clamp(offset: Offset): Offset {
         val width = documentSize.width * zoom
@@ -73,5 +85,6 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         const val MIN_ZOOM = 0.5f
         const val MAX_ZOOM = 5f
         const val ZOOM_STEP = 1.25f
+        private const val BREAK_TOLERANCE = 1f
     }
 }
