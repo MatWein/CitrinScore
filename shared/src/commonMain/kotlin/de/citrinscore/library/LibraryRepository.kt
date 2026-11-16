@@ -111,7 +111,7 @@ class LibraryRepository(
     suspend fun audio(score: PlatformFile): List<AudioAttachment> = manifest(score)?.audio.orEmpty()
 
     suspend fun addAudio(score: PlatformFile, source: PlatformFile, name: String): AudioAttachment {
-        val attachment = AudioAttachment("${CitScore.AUDIO_DIRECTORY}/${Uuid.random()}.${CitScore.AUDIO_EXTENSION}", name)
+        val attachment = AudioAttachment("${CitScore.AUDIO_DIRECTORY}/${Uuid.random()}.${source.extension.lowercase()}", name)
         (score / CitScore.AUDIO_DIRECTORY).createDirectories()
         CitScore.resolve(score, attachment.path) write source
         updateManifest(score) { it.copy(audio = it.audio + attachment) }

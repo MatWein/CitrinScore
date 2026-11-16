@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 private val PositionInterval = 200.milliseconds
-private const val RECORDING_FILE = "recording.${CitScore.AUDIO_EXTENSION}"
+private const val RECORDING_FILE = "recording.${CitScore.RECORDING_EXTENSION}"
 
 class ScoreAudioViewModel(private val score: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
 

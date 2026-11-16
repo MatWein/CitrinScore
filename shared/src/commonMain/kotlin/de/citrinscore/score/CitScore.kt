@@ -11,7 +11,8 @@ object CitScore {
     const val PDF_FILE = "score.pdf"
     const val SCAN_EXTENSION = "png"
     const val AUDIO_DIRECTORY = "audio"
-    const val AUDIO_EXTENSION = "wav"
+    const val RECORDING_EXTENSION = "wav"
+    val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")
     const val THUMBNAIL_WIDTH = 600
     const val PAGE_ASPECT_RATIO = 210f / 297f
 

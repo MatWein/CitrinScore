@@ -13,8 +13,11 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
+private val MP3_PADDING = 100.milliseconds
 
 class AudioPlayerTest {
 
@@ -36,6 +39,19 @@ class AudioPlayerTest {
             player.seekTo(1500.milliseconds)
 
             assertEquals(1500.milliseconds, player.position)
+        }
+    }
+
+    @Test
+    fun `mp3 files are decoded and can be positioned`() = runTest {
+        val mp3 = File(requireNotNull(javaClass.getResource("/tone.mp3")).toURI())
+
+        openAudioPlayer(PlatformFile(mp3)).use { player ->
+            assertTrue((player.duration - 2.seconds).absoluteValue < MP3_PADDING, "duration was ${player.duration}")
+
+            player.seekTo(1.seconds)
+
+            assertTrue((player.position - 1.seconds).absoluteValue < 1.milliseconds, "position was ${player.position}")
         }
     }
 

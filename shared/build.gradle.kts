@@ -18,6 +18,7 @@ val collectionVersion: String by project
 val serializationVersion: String by project
 val fileKitVersion: String by project
 val pdfboxVersion: String by project
+val mp3spiVersion: String by project
 val exifInterfaceVersion: String by project
 val androidSvgVersion: String by project
 val activityComposeVersion: String by project
@@ -75,6 +76,9 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation("org.apache.pdfbox:pdfbox:$pdfboxVersion")
+            implementation("com.googlecode.soundlibs:mp3spi:$mp3spiVersion") {
+                exclude(group = "junit")
+            }
         }
         androidMain.dependencies {
             implementation("androidx.exifinterface:exifinterface:$exifInterfaceVersion")

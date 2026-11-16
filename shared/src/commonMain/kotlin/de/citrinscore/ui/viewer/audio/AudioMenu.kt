@@ -44,7 +44,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
     var expanded by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<AudioAttachment?>(null) }
     var deleting by remember { mutableStateOf<AudioAttachment?>(null) }
-    val picker = rememberFilePickerLauncher(FileKitType.File(listOf(CitScore.AUDIO_EXTENSION)), FileKitMode.Multiple()) { files ->
+    val picker = rememberFilePickerLauncher(FileKitType.File(CitScore.AUDIO_EXTENSIONS), FileKitMode.Multiple()) { files ->
         files?.let(viewModel::addFiles)
     }
     val requestRecording = rememberMicrophoneAccess(viewModel::startRecording)

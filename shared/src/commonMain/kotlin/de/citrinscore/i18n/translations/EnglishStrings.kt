@@ -134,7 +134,7 @@ object EnglishStrings : Strings {
     override val nextPage = "Next page"
     override val audio = "Audio"
     override val noAudio = "No audio attachments yet"
-    override val addAudioFile = "Add WAV file"
+    override val addAudioFile = "Add audio file"
     override val recordAudio = "Record"
     override val recordingTitle = "Recording"
     override val saveRecording = "Save"

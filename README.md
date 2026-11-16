@@ -23,8 +23,8 @@ The shared code base is prepared for iOS.
   - Previous/next page buttons that page by staff systems, so a partly visible system moves to the top instead of being cut.
   - Keyboard and Bluetooth page turner support (Page Up/Down, arrow keys, space, +/-).
   - Zoom level and position are remembered per score.
-- **Audio attachments** – attach WAV files or record with the microphone and play them back in a small player while
-  reading the score.
+- **Audio attachments** – attach WAV or MP3 files or record with the microphone and play them back in a small player
+  while reading the score.
 - **Settings** – language (English, German), light/dark/system theme, library location.
 
 ## Supported platforms
@@ -45,7 +45,7 @@ Etude.citscore/
 ├── thumbnail.jpg     preview used by the library
 ├── pages/001.png     original images (image and scan imports)
 ├── score.pdf         original document (PDF imports)
-└── audio/*.wav       audio attachments
+└── audio/            audio attachments (WAV, MP3)
 ```
 
 Unknown keys in `manifest.json` are ignored, missing optional values are recomputed when a score is opened.
@@ -94,6 +94,7 @@ Source sets in `shared`:
 - [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) for the manifest and settings
 - [Apache PDFBox](https://pdfbox.apache.org/) for PDF rendering on desktop
 - [AndroidSVG](https://github.com/BigBadaboom/androidsvg) for SVG rendering on Android
+- [JLayer and MP3SPI](https://github.com/pdudits/soundlibs) for MP3 playback on desktop
 
 Audio playback and recording use the platform APIs (Java Sound, Android MediaPlayer/AudioRecord, AVFoundation).
 

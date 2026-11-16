@@ -134,7 +134,7 @@ object GermanStrings : Strings {
     override val nextPage = "Nächste Seite"
     override val audio = "Audio"
     override val noAudio = "Noch keine Audio-Anhänge"
-    override val addAudioFile = "WAV-Datei hinzufügen"
+    override val addAudioFile = "Audiodatei hinzufügen"
     override val recordAudio = "Aufnehmen"
     override val recordingTitle = "Aufnahme läuft"
     override val saveRecording = "Speichern"
