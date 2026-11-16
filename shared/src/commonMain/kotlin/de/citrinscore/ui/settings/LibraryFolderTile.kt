@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.library.displayPath
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_folder
 import de.citrinscore.ui.components.IconBadge
@@ -20,7 +21,6 @@ import de.citrinscore.ui.components.Tile
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.path
 
 @Composable
 fun LibraryFolderTile(
@@ -46,9 +46,9 @@ fun LibraryFolderTile(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (library != null) {
+                    library?.displayPath?.let { path ->
                         Text(
-                            library.path,
+                            path,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
