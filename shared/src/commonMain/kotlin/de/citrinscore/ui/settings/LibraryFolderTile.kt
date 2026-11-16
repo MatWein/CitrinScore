@@ -1,0 +1,68 @@
+package de.citrinscore.ui.settings
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.resources.Res
+import de.citrinscore.resources.ic_folder
+import de.citrinscore.ui.components.IconBadge
+import de.citrinscore.ui.components.Tile
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
+import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.path
+
+@Composable
+fun LibraryFolderTile(
+    library: PlatformFile?,
+    showError: Boolean,
+    onSelect: (PlatformFile) -> Unit,
+    onError: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalStrings.current
+    val picker = rememberDirectoryPickerLauncher(directory = library, onError = { onError() }) { directory ->
+        directory?.let(onSelect)
+    }
+
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Tile(Modifier.fillMaxWidth(), selected = library != null, onClick = picker::launch) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                IconBadge(Res.drawable.ic_folder, size = 72.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        library?.name ?: strings.chooseFolder,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (library != null) {
+                        Text(
+                            library.path,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.MiddleEllipsis,
+                        )
+                    }
+                }
+                if (library != null) {
+                    Text(strings.changeFolder, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        if (showError) {
+            Text(strings.folderPickerFailed, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        }
+    }
+}

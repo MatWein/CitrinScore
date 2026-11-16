@@ -7,4 +7,5 @@ import kotlinx.serialization.Serializable
 data class AppSettings(
     val language: AppLanguage,
     val library: LibraryReference,
+    val theme: ThemeMode = ThemeMode.System,
 )

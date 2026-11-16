@@ -22,6 +22,17 @@ object EnglishStrings : Strings {
     override val languageTitle = "Choose your language"
     override val languageSubtitle = "You can change this later in the settings."
 
+    override val themeTitle = "Light or dark?"
+    override val themeSubtitle = "Choose how citrinScore should look. You can change this later in the settings."
+    override val themeSystem = "Like the system"
+    override val themeLight = "Light"
+    override val themeDark = "Dark"
+
+    override val settings = "Settings"
+    override val settingsLanguage = "Language"
+    override val settingsTheme = "Appearance"
+    override val settingsLibrary = "Library folder"
+
     override val libraryLocationTitle = "Where should your library live?"
     override val libraryLocationSubtitle =
         "Pick a folder for your scores. Everything is stored there as plain files, so you can back it up or move it anytime."

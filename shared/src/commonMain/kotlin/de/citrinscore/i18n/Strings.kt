@@ -20,6 +20,17 @@ interface Strings {
     val languageTitle: String
     val languageSubtitle: String
 
+    val themeTitle: String
+    val themeSubtitle: String
+    val themeSystem: String
+    val themeLight: String
+    val themeDark: String
+
+    val settings: String
+    val settingsLanguage: String
+    val settingsTheme: String
+    val settingsLibrary: String
+
     val libraryLocationTitle: String
     val libraryLocationSubtitle: String
     val chooseFolder: String

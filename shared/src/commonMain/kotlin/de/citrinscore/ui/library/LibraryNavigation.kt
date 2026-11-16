@@ -8,7 +8,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.settings.AppSettings
 import de.citrinscore.ui.importer.ImportScreen
+import de.citrinscore.ui.settings.SettingsScreen
 import de.citrinscore.ui.viewer.ScoreViewModel
 import de.citrinscore.ui.viewer.ScoreViewerScreen
 import io.github.vinceglb.filekit.PlatformFile
@@ -24,8 +26,16 @@ internal data object ImportRoute
 @Serializable
 internal data object ScoreRoute
 
+@Serializable
+internal data object SettingsRoute
+
 @Composable
-fun LibraryNavigation(library: PlatformFile) {
+fun LibraryNavigation(
+    settings: AppSettings,
+    library: PlatformFile,
+    onSettingsChange: (AppSettings) -> Unit,
+    onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
+) {
     val repository = remember { LibraryRepository() }
     val libraryViewModel = viewModel(key = library.path) { LibraryViewModel(library, repository) }
     val navController = rememberNavController()
@@ -35,6 +45,7 @@ fun LibraryNavigation(library: PlatformFile) {
             LibraryScreen(
                 viewModel = libraryViewModel,
                 onImport = { navController.navigate(ImportRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenScore = { score ->
                     libraryViewModel.select(score)
                     navController.navigate(ScoreRoute)
@@ -50,6 +61,15 @@ fun LibraryNavigation(library: PlatformFile) {
                     libraryViewModel.refresh()
                     navController.popBackStack()
                 },
+            )
+        }
+        composable<SettingsRoute> {
+            SettingsScreen(
+                settings = settings,
+                library = library,
+                onSettingsChange = onSettingsChange,
+                onLibraryChange = onLibraryChange,
+                onClose = { navController.popBackStack() },
             )
         }
         composable<ScoreRoute> {

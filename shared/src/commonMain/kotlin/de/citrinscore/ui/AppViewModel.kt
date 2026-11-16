@@ -3,7 +3,9 @@ package de.citrinscore.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.settings.AppSettings
+import de.citrinscore.settings.LibraryReference
 import de.citrinscore.settings.SettingsRepository
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,27 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
         viewModelScope.launch {
             settingsRepository.save(settings)
             _state.value = readyState(settings) ?: AppState.Onboarding
+        }
+    }
+
+    fun updateSettings(settings: AppSettings) {
+        val current = _state.value as? AppState.Ready ?: return
+        _state.value = current.copy(settings = settings)
+        viewModelScope.launch { settingsRepository.save(settings) }
+    }
+
+    fun changeLibrary(directory: PlatformFile, onFailure: () -> Unit) {
+        val current = _state.value as? AppState.Ready ?: return
+        viewModelScope.launch {
+            try {
+                val settings = current.settings.copy(library = LibraryReference.of(directory))
+                settingsRepository.save(settings)
+                _state.value = AppState.Ready(settings, directory)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                onFailure()
+            }
         }
     }
 

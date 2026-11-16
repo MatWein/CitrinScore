@@ -1,14 +1,18 @@
 package de.citrinscore.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import de.citrinscore.settings.ThemeMode
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF8A5100),
@@ -61,6 +65,22 @@ private val DarkColors = darkColorScheme(
 private val CitrinShapes = Shapes(extraLarge = RoundedCornerShape(20.dp))
 
 @Composable
-fun CitrinTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun CitrinTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors, shapes = CitrinShapes, content = content)
+}
+
+@Composable
+fun CitrinScreen(theme: ThemeMode, content: @Composable () -> Unit) {
+    val darkTheme = theme.isDark()
+    SystemBarsAppearance(darkTheme)
+    CitrinTheme(darkTheme) {
+        Surface(Modifier.fillMaxSize(), content = content)
+    }
+}
+
+@Composable
+fun ThemeMode.isDark(): Boolean = when (this) {
+    ThemeMode.System -> isSystemInDarkTheme()
+    ThemeMode.Light -> false
+    ThemeMode.Dark -> true
 }

@@ -59,6 +59,7 @@ import de.citrinscore.resources.ic_library_music
 import de.citrinscore.resources.ic_more_vert
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.resources.ic_refresh
+import de.citrinscore.resources.ic_settings
 import de.citrinscore.resources.ic_upload_file
 import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.IconBadge
@@ -76,7 +77,12 @@ private val TileMenuSize = 32.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(viewModel: LibraryViewModel, onImport: () -> Unit, onOpenScore: (PlatformFile) -> Unit) {
+fun LibraryScreen(
+    viewModel: LibraryViewModel,
+    onImport: () -> Unit,
+    onOpenScore: (PlatformFile) -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val strings = LocalStrings.current
     var showNewFolderDialog by rememberSaveable { mutableStateOf(false) }
@@ -113,6 +119,9 @@ fun LibraryScreen(viewModel: LibraryViewModel, onImport: () -> Unit, onOpenScore
                     }
                     IconButton(onClick = { showNewFolderDialog = true }, enabled = state.content != null) {
                         Icon(painterResource(Res.drawable.ic_create_new_folder), contentDescription = strings.newFolder)
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(painterResource(Res.drawable.ic_settings), contentDescription = strings.settings)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),

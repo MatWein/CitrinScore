@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.i18n.AppLanguage
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.LibraryReference
+import de.citrinscore.settings.ThemeMode
 import de.citrinscore.ui.components.isLastStep
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
@@ -23,6 +24,8 @@ class OnboardingViewModel : ViewModel() {
 
     fun selectLanguage(language: AppLanguage) = _state.update { it.copy(language = language) }
 
+    fun selectTheme(theme: ThemeMode) = _state.update { it.copy(theme = theme) }
+
     fun selectLibrary(directory: PlatformFile) = _state.update { it.copy(library = directory, libraryError = false) }
 
     fun reportLibraryError() = _state.update { it.copy(libraryError = true) }
@@ -40,7 +43,7 @@ class OnboardingViewModel : ViewModel() {
         _state.update { it.copy(isCompleting = true) }
         viewModelScope.launch {
             try {
-                onFinished(AppSettings(current.language, LibraryReference.of(library)))
+                onFinished(AppSettings(current.language, LibraryReference.of(library), current.theme))
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

@@ -4,12 +4,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.citrinscore.i18n.LocalStrings
@@ -18,7 +15,7 @@ import de.citrinscore.ui.AppState
 import de.citrinscore.ui.AppViewModel
 import de.citrinscore.ui.library.LibraryNavigation
 import de.citrinscore.ui.onboarding.OnboardingScreen
-import de.citrinscore.ui.theme.CitrinTheme
+import de.citrinscore.ui.theme.CitrinScreen
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.filesDir
 
@@ -27,19 +24,22 @@ fun App() {
     val viewModel = viewModel { AppViewModel(FileSettingsRepository(FileKit.filesDir)) }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    CitrinTheme {
-        Surface(Modifier.fillMaxSize()) {
-            AnimatedContent(
-                targetState = state,
-                contentKey = { it::class },
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-            ) { current ->
-                when (current) {
-                    AppState.Loading -> Unit
-                    AppState.Onboarding -> OnboardingScreen(onFinished = viewModel::completeOnboarding)
-                    is AppState.Ready -> CompositionLocalProvider(LocalStrings provides current.settings.language.strings) {
-                        LibraryNavigation(current.library)
-                    }
+    AnimatedContent(
+        targetState = state,
+        contentKey = { it::class },
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+    ) { current ->
+        when (current) {
+            AppState.Loading -> Unit
+            AppState.Onboarding -> OnboardingScreen(onFinished = viewModel::completeOnboarding)
+            is AppState.Ready -> CitrinScreen(current.settings.theme) {
+                CompositionLocalProvider(LocalStrings provides current.settings.language.strings) {
+                    LibraryNavigation(
+                        settings = current.settings,
+                        library = current.library,
+                        onSettingsChange = viewModel::updateSettings,
+                        onLibraryChange = viewModel::changeLibrary,
+                    )
                 }
             }
         }
