@@ -24,6 +24,10 @@ compose.desktop {
         mainClass = "de.citrinscore.desktop.MainKt"
         jvmArgs += "--enable-native-access=ALL-UNNAMED"
 
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = rootProject.name

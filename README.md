@@ -94,6 +94,8 @@ Requirements:
   `sdk.dir` in `local.properties` or `ANDROID_HOME`).
 - CMake 3.24 or newer and a C++20 compiler to build Verovio and FluidSynth for the desktop.
 - The third party sources, checked out as git submodules: `git submodule update --init --recursive`.
+- `dpkg-deb` and `rpmbuild` to package the desktop app on Linux, since jpackage builds both a `.deb` and an `.rpm`
+  (on Arch Linux: `pacman -S dpkg rpm-tools`).
 
 All versions are defined in [`gradle.properties`](gradle.properties).
 
