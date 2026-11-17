@@ -34,14 +34,27 @@ compose.desktop {
             packageVersion = project.version.toString()
             modules("java.instrument", "java.management", "java.security.jgss", "java.sql", "jdk.security.auth", "jdk.unsupported", "jdk.xml.dom")
 
-            linux.iconFile = file("packaging/icon.png")
+            linux {
+                iconFile = file("packaging/icon.png")
+                shortcut = true
+                menuGroup = "AudioVideo;Audio"
+            }
             windows {
                 iconFile = file("packaging/icon.ico")
                 menu = true
                 shortcut = true
                 upgradeUuid = "bc46cebd-3747-4492-bb3d-63996ce758ae"
             }
-            macOS.iconFile = file("packaging/icon.icns")
+            macOS {
+                iconFile = file("packaging/icon.icns")
+                bundleID = project.group.toString()
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>NSMicrophoneUsageDescription</key>
+                        <string>${rootProject.name} uses the microphone to record audio and to follow your playing.</string>
+                    """.trimIndent()
+                }
+            }
         }
     }
 }

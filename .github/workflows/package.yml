@@ -1,0 +1,53 @@
+name: Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to package
+        type: choice
+        options: [all, linux, windows, macos]
+        default: all
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platform == 'all' && '["linux","windows","macos"]' || format('["{0}"]', inputs.platform)) }}
+    runs-on: ${{ fromJSON('{"linux":"ubuntu-latest","windows":"windows-latest","macos":"macos-latest"}')[matrix.platform] }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Install packaging tools
+        if: matrix.platform == 'linux'
+        run: sudo apt-get install -y fakeroot rpm
+
+      - name: Install WiX Toolset
+        if: matrix.platform == 'windows'
+        run: |
+          choco install wixtoolset --no-progress -y
+          Add-Content $env:GITHUB_PATH "${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin"
+
+      - name: Package
+        run: ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: citrinScore-${{ matrix.platform }}
+          path: |
+            desktopApp/build/compose/binaries/main-release/deb/*.deb
+            desktopApp/build/compose/binaries/main-release/rpm/*.rpm
+            desktopApp/build/compose/binaries/main-release/msi/*.msi
+            desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+          retention-days: 7
+          if-no-files-found: error

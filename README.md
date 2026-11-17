@@ -123,6 +123,10 @@ All versions are defined in [`gradle.properties`](gradle.properties).
 | Build the Android app | `./gradlew :androidApp:assembleRelease` |
 | Run the tests | `./gradlew :shared:jvmTest` |
 
+The installers for Linux (`.deb`, `.rpm`), Windows (`.msi`) and macOS (`.dmg`) are built by the
+[Package](.github/workflows/package.yml) workflow on GitHub Actions. Start it manually and choose a platform or all of them.
+The macOS package is not signed, so macOS asks for confirmation when it is opened for the first time.
+
 The desktop app keeps its settings and extracted resources in `~/.citrinscore`. Start it with
 `-Dcitrinscore.home=/absolute/path` to use another directory, for example a separate test library during development.
 
