@@ -19,7 +19,7 @@ import kotlinx.coroutines.isActive
 @RequiresPermission(Manifest.permission.RECORD_AUDIO)
 actual fun microphoneSamples(sampleRate: Int): Flow<FloatArray> = flow {
     val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-    val record = AudioRecord(analysisSource(), sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+    val record = AudioRecord(rawMicrophoneSource(), sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
     check(record.state == AudioRecord.STATE_INITIALIZED) { "Microphone is not available" }
     record.startRecording()
     try {
@@ -34,7 +34,7 @@ actual fun microphoneSamples(sampleRate: Int): Flow<FloatArray> = flow {
     }
 }.flowOn(Dispatchers.IO)
 
-private fun analysisSource(): Int {
+internal fun rawMicrophoneSource(): Int {
     val audio = FileKit.context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     val unprocessed = audio.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED).toBoolean()
     return if (unprocessed) MediaRecorder.AudioSource.UNPROCESSED else MediaRecorder.AudioSource.VOICE_RECOGNITION

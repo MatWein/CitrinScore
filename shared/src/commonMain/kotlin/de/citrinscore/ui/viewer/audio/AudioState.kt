@@ -17,8 +17,10 @@ data class AudioState(
     val attachments: List<Attachment> = emptyList(),
     val player: PlayerState? = null,
     val recordingStart: TimeSource.Monotonic.ValueTimeMark? = null,
+    val finishedRecording: Duration? = null,
     val microphoneAvailable: Boolean? = null,
     val error: AudioError? = null,
 ) {
     val nextRecordingNumber get() = attachments.size + 1
+    val isRecording get() = recordingStart != null
 }

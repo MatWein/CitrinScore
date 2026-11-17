@@ -221,7 +221,7 @@ private fun ViewerContent(
     OnAppBackground {
         playbackViewModel.stop()
         audioViewModel.pause()
-        audioViewModel.finishRecording(strings.recordingName(audio.nextRecordingNumber))
+        audioViewModel.saveActiveRecording(strings.recordingName(audio.nextRecordingNumber))
     }
 }
 
@@ -301,7 +301,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio)
+            AudioMenu(toolbar.audio, onOpenPlayer = toolbar.playback::close)
             FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
@@ -324,7 +324,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio)
+            AudioMenu(toolbar.audio, onOpenPlayer = toolbar.playback::close)
             FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
@@ -355,7 +355,7 @@ private fun PartAction(toolbar: ToolbarState) {
     val audio by toolbar.audio.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true }, enabled = audio.recordingStart == null)
+        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true }, enabled = !audio.isRecording)
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ready.parts.forEachIndexed { index, part ->
                 val selected = part.directory == ready.part.directory
@@ -375,7 +375,15 @@ private fun PartAction(toolbar: ToolbarState) {
 @Composable
 private fun PlaybackAction(toolbar: ToolbarState) {
     if (toolbar.ready?.isReflowable != true) return
-    IconAction(Res.drawable.ic_music_note, LocalStrings.current.playback, onClick = toolbar.playback::toggle, enabled = toolbar.viewport != null)
+    IconAction(
+        Res.drawable.ic_music_note,
+        LocalStrings.current.playback,
+        onClick = {
+            toolbar.audio.closePlayer()
+            toolbar.playback.toggle()
+        },
+        enabled = toolbar.viewport != null,
+    )
 }
 
 @Composable

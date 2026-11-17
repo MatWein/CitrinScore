@@ -146,8 +146,11 @@ interface Strings {
     val audio: String
     val noAudio: String
     val addAudioFile: String
-    val recordAudio: String
+    val startRecording: String
+    val stopRecording: String
+    val recordingActive: String
     val recordingTitle: String
+    fun recordingLength(length: String): String
     val saveRecording: String
     val discardRecording: String
     fun recordingName(number: Int): String

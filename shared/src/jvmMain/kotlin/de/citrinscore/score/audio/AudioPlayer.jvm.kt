@@ -8,8 +8,10 @@ import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Clip
 import javax.sound.sampled.LineEvent
+import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.DurationUnit
 
 private const val PCM_BITS_PER_SAMPLE = 16
 private const val BITS_PER_BYTE = 8
@@ -50,7 +52,7 @@ private class ClipAudioPlayer(private val clip: Clip) : AudioPlayer {
     override fun pause() = clip.stop()
 
     override fun seekTo(position: Duration) {
-        clip.microsecondPosition = position.inWholeMicroseconds
+        clip.framePosition = (position.toDouble(DurationUnit.SECONDS) * clip.format.frameRate).roundToInt()
     }
 
     override fun close() = clip.close()

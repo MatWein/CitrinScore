@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -31,7 +30,7 @@ actual suspend fun isMicrophoneAvailable() = FileKit.context.packageManager.hasS
 actual suspend fun startAudioRecording(target: PlatformFile): AudioRecording = withContext(Dispatchers.IO) {
     val bufferSize = AudioRecord.getMinBufferSize(RECORDING_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val record = AudioRecord(
-        MediaRecorder.AudioSource.MIC,
+        rawMicrophoneSource(),
         RECORDING_SAMPLE_RATE,
         AudioFormat.CHANNEL_IN_MONO,
         AudioFormat.ENCODING_PCM_16BIT,

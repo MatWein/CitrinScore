@@ -26,6 +26,7 @@ import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_headphones
 import de.citrinscore.resources.ic_mic
 import de.citrinscore.resources.ic_play
+import de.citrinscore.resources.ic_stop
 import de.citrinscore.score.Attachment
 import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
@@ -38,7 +39,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun AudioMenu(viewModel: ScoreAudioViewModel) {
+fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenPlayer: () -> Unit) {
     val strings = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
@@ -51,7 +52,12 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
     LaunchedEffect(expanded) { if (expanded) viewModel.checkMicrophone() }
 
     Box {
-        IconAction(Res.drawable.ic_headphones, strings.audio, onClick = { expanded = true })
+        IconAction(
+            Res.drawable.ic_headphones,
+            if (state.isRecording) strings.recordingActive else strings.audio,
+            onClick = { expanded = true },
+            badge = state.isRecording,
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (state.attachments.isEmpty()) {
                 Text(
@@ -66,6 +72,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
                     text = { Text(attachment.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         expanded = false
+                        onOpenPlayer()
                         viewModel.load(attachment)
                     },
                     leadingIcon = { MenuIcon(Res.drawable.ic_play) },
@@ -92,22 +99,33 @@ fun AudioMenu(viewModel: ScoreAudioViewModel) {
                 },
                 leadingIcon = { MenuIcon(Res.drawable.ic_add) },
             )
-            DropdownMenuItem(
-                text = { Text(strings.recordAudio) },
-                onClick = {
-                    expanded = false
-                    requestRecording()
-                },
-                leadingIcon = { MenuIcon(Res.drawable.ic_mic) },
-                enabled = state.microphoneAvailable == true,
-            )
+            if (state.isRecording) {
+                DropdownMenuItem(
+                    text = { Text(strings.stopRecording) },
+                    onClick = {
+                        expanded = false
+                        viewModel.stopRecording()
+                    },
+                    leadingIcon = { MenuIcon(Res.drawable.ic_stop) },
+                )
+            } else {
+                DropdownMenuItem(
+                    text = { Text(strings.startRecording) },
+                    onClick = {
+                        expanded = false
+                        requestRecording()
+                    },
+                    leadingIcon = { MenuIcon(Res.drawable.ic_mic) },
+                    enabled = state.microphoneAvailable == true,
+                )
+            }
         }
     }
 
-    state.recordingStart?.let { start ->
-        RecordingDialog(
-            start = start,
-            onSave = { viewModel.finishRecording(strings.recordingName(state.nextRecordingNumber)) },
+    state.finishedRecording?.let { length ->
+        RecordingFinishedDialog(
+            length = length,
+            onSave = { viewModel.saveRecording(strings.recordingName(state.nextRecordingNumber)) },
             onDiscard = viewModel::discardRecording,
         )
     }

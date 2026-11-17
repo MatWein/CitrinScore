@@ -138,24 +138,32 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
         }
     }
 
-    fun finishRecording(name: String) {
-        val ref = part.value ?: return
-        val active = recording ?: return
-        recording = null
-        _state.update { it.copy(recordingStart = null) }
+    fun stopRecording() {
+        val length = _state.value.recordingStart?.elapsedNow() ?: return
+        val active = takeRecording() ?: return
         viewModelScope.launch {
             reporting(AudioError.Save) {
                 active.finish()
-                append(ref, repository.addAttachment(ref, AttachmentKind.Audio, recordingFile, name))
+                _state.update { it.copy(finishedRecording = length) }
             }
-            recordingFile.delete(mustExist = false)
         }
     }
 
+    fun saveRecording(name: String) {
+        val ref = part.value ?: return
+        _state.update { it.copy(finishedRecording = null) }
+        viewModelScope.launch { storeRecording(ref, name) }
+    }
+
     fun discardRecording() {
-        recording?.cancel()
-        recording = null
-        _state.update { it.copy(recordingStart = null) }
+        _state.update { it.copy(finishedRecording = null) }
+        viewModelScope.launch { recordingFile.delete(mustExist = false) }
+    }
+
+    fun saveActiveRecording(name: String) {
+        val ref = part.value ?: return
+        val active = takeRecording() ?: return
+        viewModelScope.launch { storeRecording(ref, name, finishing = active) }
     }
 
     fun rename(attachment: Attachment, name: String) {
@@ -191,6 +199,21 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     private fun update(ref: PartRef, transform: (AudioState) -> AudioState) {
         if (part.value == ref) _state.update(transform)
+    }
+
+    private fun takeRecording(): AudioRecording? {
+        val active = recording ?: return null
+        recording = null
+        _state.update { it.copy(recordingStart = null) }
+        return active
+    }
+
+    private suspend fun storeRecording(ref: PartRef, name: String, finishing: AudioRecording? = null) {
+        reporting(AudioError.Save) {
+            finishing?.finish()
+            append(ref, repository.addAttachment(ref, AttachmentKind.Audio, recordingFile, name))
+        }
+        recordingFile.delete(mustExist = false)
     }
 
     private fun publishPosition(current: AudioPlayer) = _state.update { state ->

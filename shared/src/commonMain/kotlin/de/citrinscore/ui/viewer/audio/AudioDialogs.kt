@@ -1,53 +1,21 @@
 package de.citrinscore.ui.viewer.audio
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import de.citrinscore.i18n.LocalStrings
-import de.citrinscore.resources.Res
-import de.citrinscore.resources.ic_mic
 import de.citrinscore.ui.components.MessageDialog
 import de.citrinscore.ui.components.TextInputDialog
-import de.citrinscore.ui.theme.Spacing
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import org.jetbrains.compose.resources.painterResource
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
-
-private val ClockInterval = 200.milliseconds
 
 @Composable
-fun RecordingDialog(start: TimeSource.Monotonic.ValueTimeMark, onSave: () -> Unit, onDiscard: () -> Unit) {
+fun RecordingFinishedDialog(length: Duration, onSave: () -> Unit, onDiscard: () -> Unit) {
     val strings = LocalStrings.current
-    var elapsed by remember(start) { mutableStateOf(Duration.ZERO) }
-    LaunchedEffect(start) {
-        while (isActive) {
-            elapsed = start.elapsedNow()
-            delay(ClockInterval)
-        }
-    }
     AlertDialog(
         onDismissRequest = {},
         title = { Text(strings.recordingTitle) },
-        text = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
-                Icon(painterResource(Res.drawable.ic_mic), contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Text(elapsed.clock(), style = MaterialTheme.typography.headlineMedium)
-            }
-        },
+        text = { Text(strings.recordingLength(length.clock())) },
         confirmButton = { TextButton(onClick = onSave) { Text(strings.saveRecording) } },
         dismissButton = { TextButton(onClick = onDiscard) { Text(strings.discardRecording) } },
     )
