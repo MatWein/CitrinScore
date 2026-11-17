@@ -31,6 +31,7 @@ import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.settings.AppSettings
+import de.citrinscore.sync.librarySync
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.VerticalScrollIndicator
 import de.citrinscore.ui.theme.ContentWidth
@@ -95,6 +96,11 @@ fun SettingsScreen(
                             onError = { libraryError = true },
                             modifier = Modifier.fillMaxWidth(),
                         )
+                    }
+                    librarySync()?.let { sync ->
+                        SettingsSection(strings.settingsSync) {
+                            SyncSettings(settings.git, library, sync, onRemoteChange = { change(settings.copy(git = it)) })
+                        }
                     }
                 }
             }

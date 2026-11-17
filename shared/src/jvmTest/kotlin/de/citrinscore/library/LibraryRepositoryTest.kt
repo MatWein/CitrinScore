@@ -9,6 +9,8 @@ import de.citrinscore.score.PdfPage
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
+import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.shared
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScorePart
 import de.citrinscore.score.ScoreViewState
@@ -325,7 +327,26 @@ class LibraryRepositoryTest {
         val part = manifest.parts.single()
         assertEquals("", part.directory)
         assertEquals(ScoreContent.Images(listOf(expected)), part.content)
-        assertEquals(manifest, AppJson.decodeFromString<ScoreManifest>(File(score, CitScore.MANIFEST_FILE).readText()))
+        assertEquals(manifest.shared, AppJson.decodeFromString<ScoreManifest>(File(score, CitScore.MANIFEST_FILE).readText()))
+    }
+
+    @Test
+    fun `view state stays on the device and legacy view state is moved there`() = runTest {
+        val score = File(root, "Legacy.citscore").apply { mkdir() }
+        File(score, "score.musicxml").writeText(MusicXmlEngraverTest.score(measures = 1))
+        File(score, CitScore.MANIFEST_FILE).writeText(
+            """{"metadata":{"title":"Legacy"},"content":{"type":"musicxml","path":"score.musicxml"},"view":{"zoom":2,"x":0.5,"y":0.25},"createdAt":"2025-01-01T00:00:00Z"}""",
+        )
+        val file = PlatformFile(score)
+
+        val opened = repository.open(file)
+        repository.selectPart(PartRef(file, ""))
+
+        val shared = File(score, CitScore.MANIFEST_FILE).readText()
+        val device = AppJson.decodeFromString<ScoreDeviceState>(File(score, CitScore.DEVICE_STATE_FILE).readText())
+        assertFalse("lastOpenedAt" in shared || "view" in shared || "currentPart" in shared, shared)
+        assertEquals(ScoreDeviceState(now, "", mapOf("" to ScoreViewState(2f, 0.5f, 0.25f))), device)
+        assertEquals(opened.copy(currentPart = ""), repository.load(file))
     }
 
     @Test

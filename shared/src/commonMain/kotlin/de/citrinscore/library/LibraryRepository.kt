@@ -8,6 +8,10 @@ import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
+import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.deviceState
+import de.citrinscore.score.shared
+import de.citrinscore.score.withDeviceState
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreManifestSerializer
 import de.citrinscore.score.ScoreMetadata
@@ -276,11 +280,15 @@ class LibraryRepository(
     private suspend fun readManifest(score: PlatformFile) = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
 
     private suspend fun writeManifest(score: PlatformFile, manifest: ScoreManifest) {
-        (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest))
+        (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest.shared))
+        (score / CitScore.DEVICE_STATE_FILE).writeString(json.encodeToString(manifest.deviceState))
     }
 
-    private suspend fun manifest(score: PlatformFile): ScoreManifest? =
-        read(score / CitScore.MANIFEST_FILE) { readString() }?.let { decode(ScoreManifestSerializer, it) }
+    private suspend fun manifest(score: PlatformFile): ScoreManifest? {
+        val manifest = read(score / CitScore.MANIFEST_FILE) { readString() }?.let { decode(ScoreManifestSerializer, it) } ?: return null
+        val state = read(score / CitScore.DEVICE_STATE_FILE) { readString() }?.let { decode(ScoreDeviceState.serializer(), it) }
+        return state?.let(manifest::withDeviceState) ?: manifest
+    }
 
     private fun <T> decode(deserializer: DeserializationStrategy<T>, text: String): T? = try {
         json.decodeFromString(deserializer, text)

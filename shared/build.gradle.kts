@@ -22,6 +22,8 @@ val mp3spiVersion: String by project
 val exifInterfaceVersion: String by project
 val androidSvgVersion: String by project
 val jnaVersion: String by project
+val ktmidiVersion: String by project
+val jgitVersion: String by project
 val batikVersion: String by project
 val activityComposeVersion: String by project
 val androidCompileSdk: String by project
@@ -85,6 +87,8 @@ kotlin {
         }
         named("jvmAndroidMain").dependencies {
             compileOnly("net.java.dev.jna:jna:$jnaVersion")
+            implementation("dev.atsushieno:ktmidi:$ktmidiVersion")
+            implementation("org.eclipse.jgit:org.eclipse.jgit:$jgitVersion")
         }
         jvmMain.dependencies {
             implementation("net.java.dev.jna:jna:$jnaVersion")
@@ -98,6 +102,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(project(":verovio"))
+            implementation(project(":fluidsynth"))
             implementation("net.java.dev.jna:jna:$jnaVersion@aar")
             implementation("androidx.exifinterface:exifinterface:$exifInterfaceVersion")
             implementation("com.caverock:androidsvg-aar:$androidSvgVersion")
@@ -115,10 +120,10 @@ kotlin {
 }
 
 val verovioCmakeOptions: String by project
-val verovioSource: Directory = rootProject.layout.projectDirectory.dir("third_party/verovio")
-val verovioCmakeDirectory = layout.buildDirectory.dir("verovio/cmake")
-val verovioNativeDirectory = layout.buildDirectory.dir("verovio/native")
-val verovioResourcePrefix = run {
+val fluidsynthCmakeOptions: String by project
+val thirdParty: Directory = rootProject.layout.projectDirectory.dir("third_party")
+val verovioSource: Directory = thirdParty.dir("verovio")
+val nativeResourcePrefix = run {
     val os = System.getProperty("os.name").lowercase()
     val arch = when (val name = System.getProperty("os.arch")) {
         "amd64", "x86_64" -> "x86-64"
@@ -131,31 +136,53 @@ val verovioResourcePrefix = run {
     }
 }
 
-val configureVerovio by tasks.registering(Exec::class) {
-    val output = verovioNativeDirectory.get().dir(verovioResourcePrefix).asFile.absolutePath
-    inputs.dir(verovioSource.dir("cmake"))
-    inputs.property("options", verovioCmakeOptions)
-    outputs.file(verovioCmakeDirectory.map { it.file("CMakeCache.txt") })
-    commandLine(
-        listOf(
-            "cmake",
-            "-S", verovioSource.dir("cmake").asFile.absolutePath,
-            "-B", verovioCmakeDirectory.get().asFile.absolutePath,
-            "-DBUILD_AS_LIBRARY=ON",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$output",
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE=$output",
-            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$output",
-            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=$output",
-        ) + verovioCmakeOptions.split(","),
-    )
+fun registerNativeBuild(name: String, source: Directory, sources: List<String>, options: String, target: String): TaskProvider<Exec> {
+    val buildDirectory = layout.buildDirectory.dir("native/$name")
+    val configure = tasks.register<Exec>("configure$name") {
+        inputs.file(source.file("CMakeLists.txt"))
+        inputs.property("options", options)
+        outputs.file(buildDirectory.map { it.file("CMakeCache.txt") })
+        commandLine(
+            listOf("cmake", "-S", source.asFile.absolutePath, "-B", buildDirectory.get().asFile.absolutePath, "-DCMAKE_BUILD_TYPE=Release") +
+                options.split(","),
+        )
+    }
+    return tasks.register<Exec>("build$name") {
+        dependsOn(configure)
+        sources.forEach { inputs.dir(source.dir(it)) }
+        outputs.dir(buildDirectory)
+        commandLine(
+            "cmake", "--build", buildDirectory.get().asFile.absolutePath, "--config", "Release", "--target", target,
+            "--parallel", Runtime.getRuntime().availableProcessors().toString(),
+        )
+    }
 }
 
-val buildVerovio by tasks.registering(Exec::class) {
-    dependsOn(configureVerovio)
-    listOf("src", "include", "libmei", "tools").forEach { inputs.dir(verovioSource.dir(it)) }
-    outputs.dir(verovioNativeDirectory)
-    commandLine("cmake", "--build", verovioCmakeDirectory.get().asFile.absolutePath, "--config", "Release", "--target", "verovio", "--parallel", Runtime.getRuntime().availableProcessors().toString())
+val buildVerovio = registerNativeBuild(
+    name = "Verovio",
+    source = verovioSource.dir("cmake"),
+    sources = listOf("../src", "../include", "../libmei", "../tools"),
+    options = "-DBUILD_AS_LIBRARY=ON,$verovioCmakeOptions",
+    target = "verovio",
+)
+
+val buildFluidSynth = registerNativeBuild(
+    name = "FluidSynth",
+    source = thirdParty.dir("fluidsynth"),
+    sources = listOf("src", "include"),
+    options = fluidsynthCmakeOptions,
+    target = "libfluidsynth",
+)
+
+val nativeLibraries by tasks.registering(Sync::class) {
+    val fluidsynth = System.mapLibraryName("fluidsynth")
+    val fluidsynthWindows = "libfluidsynth-3.dll"
+    from(buildVerovio, buildFluidSynth)
+    include("**/${System.mapLibraryName("verovio")}", "**/$fluidsynth", "**/$fluidsynthWindows")
+    exclude("**/CMakeFiles/**")
+    eachFile { path = name.replace(fluidsynthWindows, fluidsynth) }
+    includeEmptyDirs = false
+    into(layout.buildDirectory.dir("native/libraries/$nativeResourcePrefix"))
 }
 
 val verovioResources by tasks.registering(Zip::class) {
@@ -166,17 +193,25 @@ val verovioResources by tasks.registering(Zip::class) {
         include("Leipzig.ttf")
     }
     archiveFileName = "verovio.zip"
-    destinationDirectory = layout.buildDirectory.dir("verovio/resources/files")
+    destinationDirectory = layout.buildDirectory.dir("native/archives")
+}
+
+val nativeResources by tasks.registering(Sync::class) {
+    from(verovioResources)
+    from(thirdParty.dir("generaluser-gs")) {
+        include("GeneralUser-GS.sf2")
+    }
+    into(layout.buildDirectory.dir("native/resources/files"))
 }
 
 kotlin.sourceSets.named("jvmMain") {
-    resources.srcDir(buildVerovio)
+    resources.srcDir(nativeLibraries.map { layout.buildDirectory.dir("native/libraries").get() })
 }
 
 compose.resources {
     publicResClass = true
     packageOfResClass = "de.citrinscore.resources"
-    customDirectory("jvmAndroidMain", verovioResources.map { layout.buildDirectory.dir("verovio/resources").get() })
+    customDirectory("jvmAndroidMain", nativeResources.map { layout.buildDirectory.dir("native/resources").get() })
 }
 
 tasks.named<Test>("jvmTest") {

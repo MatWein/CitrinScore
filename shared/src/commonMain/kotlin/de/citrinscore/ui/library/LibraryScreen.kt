@@ -48,6 +48,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +77,7 @@ import de.citrinscore.resources.ic_refresh
 import de.citrinscore.resources.ic_search
 import de.citrinscore.resources.ic_settings
 import de.citrinscore.resources.ic_sort
+import de.citrinscore.resources.ic_sync
 import de.citrinscore.resources.ic_upload_file
 import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
@@ -94,6 +97,7 @@ private val FabClearance = 96.dp
 private val TileMinWidth = 160.dp
 private val TilePadding = PaddingValues(Spacing.Medium)
 private val TileMenuSize = Spacing.Section
+private val WideToolbarWidth = 600.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +109,7 @@ fun LibraryScreen(
     onOpenScore: (PlatformFile) -> Unit,
     onEditScore: (PlatformFile) -> Unit,
     onOpenSettings: () -> Unit,
+    onSync: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val strings = LocalStrings.current
@@ -164,14 +169,16 @@ fun LibraryScreen(
                         IconAction(Res.drawable.ic_close, strings.closeSearch, onClick = { query = null })
                     }
                     SortMenu(sort, onSortChange)
-                    IconAction(Res.drawable.ic_refresh, strings.refresh, onClick = viewModel::refresh)
-                    IconAction(
-                        Res.drawable.ic_create_new_folder,
-                        strings.newFolder,
-                        onClick = { showNewFolderDialog = true },
-                        enabled = state.content != null,
+                    onSync?.let { IconAction(Res.drawable.ic_sync, strings.sync, onClick = it) }
+                    OverflowActions(
+                        listOf(
+                            ToolbarAction(Res.drawable.ic_refresh, strings.refresh, onClick = viewModel::refresh),
+                            ToolbarAction(Res.drawable.ic_create_new_folder, strings.newFolder, enabled = state.content != null) {
+                                showNewFolderDialog = true
+                            },
+                            ToolbarAction(Res.drawable.ic_settings, strings.settings, onClick = onOpenSettings),
+                        ),
                     )
-                    IconAction(Res.drawable.ic_settings, strings.settings, onClick = onOpenSettings)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
@@ -332,6 +339,34 @@ private fun SearchField(query: String, requestFocus: Boolean, onChange: (String)
         ),
         modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
     )
+}
+
+private class ToolbarAction(val icon: DrawableResource, val label: String, val enabled: Boolean = true, val onClick: () -> Unit)
+
+@Composable
+private fun OverflowActions(actions: List<ToolbarAction>) {
+    val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    if (width >= WideToolbarWidth) {
+        actions.forEach { IconAction(it.icon, it.label, onClick = it.onClick, enabled = it.enabled) }
+        return
+    }
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconAction(Res.drawable.ic_more_vert, LocalStrings.current.moreActions, onClick = { expanded = true })
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.label) },
+                    leadingIcon = { Icon(painterResource(action.icon), contentDescription = null) },
+                    enabled = action.enabled,
+                    onClick = {
+                        expanded = false
+                        action.onClick()
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

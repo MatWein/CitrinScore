@@ -28,7 +28,7 @@ compose.desktop {
             targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = rootProject.name
             packageVersion = project.version.toString()
-            modules("java.instrument", "jdk.security.auth", "jdk.unsupported", "jdk.xml.dom")
+            modules("java.instrument", "java.management", "java.security.jgss", "java.sql", "jdk.security.auth", "jdk.unsupported", "jdk.xml.dom")
 
             linux.iconFile = file("packaging/icon.png")
             windows.iconFile = file("packaging/icon.ico")

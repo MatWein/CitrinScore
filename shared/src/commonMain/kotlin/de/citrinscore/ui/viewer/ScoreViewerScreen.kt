@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -69,6 +70,11 @@ import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_check
 import de.citrinscore.resources.ic_queue_music
 import de.citrinscore.resources.ic_edit_note
+import de.citrinscore.resources.ic_music_note
+import de.citrinscore.score.musicxml.NotePositions
+import de.citrinscore.ui.viewer.playback.PlaybackCursor
+import de.citrinscore.ui.viewer.playback.PlaybackPanel
+import de.citrinscore.ui.viewer.playback.PlaybackViewModel
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.library.PartRef
 import de.citrinscore.ui.parts.partName
@@ -87,8 +93,8 @@ import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import de.citrinscore.ui.viewer.files.FilesMenu
 import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import kotlinx.coroutines.delay
-import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.flow.collectLatest
+import org.jetbrains.compose.resources.painterResource
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.roundToInt
@@ -96,6 +102,7 @@ import kotlin.math.roundToInt
 private const val SAVE_DELAY_MILLIS = 1000L
 private const val REFLOW_DELAY_MILLIS = 400L
 private const val PERCENT = 100
+private const val CURSOR_ALPHA = 0.25f
 private const val SUBTITLE_SEPARATOR = " · "
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
@@ -107,12 +114,13 @@ fun ScoreViewerScreen(
     audioViewModel: ScoreAudioViewModel,
     annotationViewModel: AnnotationViewModel,
     filesViewModel: ScoreFilesViewModel,
+    playbackViewModel: PlaybackViewModel,
     onClose: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
-    val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, onClose)
+    val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose)
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
 
@@ -146,6 +154,7 @@ private class ToolbarState(
     val audio: ScoreAudioViewModel,
     val annotations: AnnotationViewModel,
     val files: ScoreFilesViewModel,
+    val playback: PlaybackViewModel,
     val onClose: () -> Unit,
 )
 
@@ -162,6 +171,8 @@ private fun ViewerContent(
     val annotationViewModel = toolbar.annotations
     val audio by audioViewModel.state.collectAsStateWithLifecycle()
     val annotations by annotationViewModel.state.collectAsStateWithLifecycle()
+    val playbackViewModel = toolbar.playback
+    val playback by playbackViewModel.state.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     Box(
         modifier.onSizeChanged { size -> with(density) { viewModel.updateViewportSize(size.width.toDp().value, size.height.toDp().value) } },
@@ -175,6 +186,8 @@ private fun ViewerContent(
                 val render: PageRenderer = remember(state.part) { { page, region, size -> viewModel.render(state.part, page, region, size) } }
                 val anchors by viewModel.anchors.collectAsStateWithLifecycle()
                 val editing = annotations.isEditing && (!state.isReflowable || anchors != null)
+                val notes by viewModel.notes.collectAsStateWithLifecycle()
+                val cursor by playbackViewModel.cursor.collectAsStateWithLifecycle()
                 ScoreDocument(
                     pageSizes = state.pageSizes,
                     systemBreaks = systemBreaks,
@@ -189,6 +202,10 @@ private fun ViewerContent(
                         onTextTap = annotationViewModel::startText,
                         sizing = anchors?.staffSizing(),
                     ).takeIf { editing },
+                    highlight = playbackHighlight(cursor, notes),
+                    onTap = notes?.takeIf { playback.isOpen && !editing }?.let { positions ->
+                        { page, position -> positions.nearest(page, position)?.let(playbackViewModel::select) }
+                    },
                 )
                 PersistView(viewport, state.part, viewModel)
                 if (state.isReflowable) ReflowOnZoom(viewport, state.part, viewModel)
@@ -198,9 +215,11 @@ private fun ViewerContent(
             }
         }
         audio.player?.let { AudioPlayerCard(it, audioViewModel, Modifier.align(Alignment.BottomEnd).padding(PlayerMargin)) }
+        if (playback.isOpen) PlaybackPanel(playback, playbackViewModel, Modifier.align(Alignment.BottomCenter).padding(PlayerMargin))
     }
     AnnotationDialogs(annotations, annotationViewModel)
     OnAppBackground {
+        playbackViewModel.stop()
         audioViewModel.pause()
         audioViewModel.finishRecording(strings.recordingName(audio.nextRecordingNumber))
     }
@@ -280,6 +299,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
         navigationIcon = { BackAction(toolbar) },
         actions = {
             PartAction(toolbar)
+            PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
             FilesMenu(toolbar.files)
@@ -302,6 +322,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
         ) {
             BackAction(toolbar)
             PartAction(toolbar)
+            PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
             FilesMenu(toolbar.files)
@@ -348,6 +369,30 @@ private fun PartAction(toolbar: ToolbarState) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PlaybackAction(toolbar: ToolbarState) {
+    if (toolbar.ready?.isReflowable != true) return
+    IconAction(Res.drawable.ic_music_note, LocalStrings.current.playback, onClick = toolbar.playback::toggle, enabled = toolbar.viewport != null)
+}
+
+@Composable
+private fun playbackHighlight(cursor: PlaybackCursor?, notes: NotePositions?): ScoreHighlight? {
+    val dark = LocalDarkTheme.current
+    val colors = MaterialTheme.colorScheme
+    return remember(cursor, notes, dark, colors) {
+        if (cursor == null || notes == null) return@remember null
+        val region = notes.cursor(cursor.notes)
+        ScoreHighlight(
+            cursor = region,
+            notes = cursor.highlighted.mapNotNull(notes::note),
+            reveal = region.takeIf { cursor.follow },
+            cursorColor = colors.primary.copy(alpha = CURSOR_ALPHA),
+            noteColor = if (dark) colors.inversePrimary else colors.primary,
+            noteBlendMode = if (dark) BlendMode.Darken else BlendMode.Lighten,
+        )
     }
 }
 

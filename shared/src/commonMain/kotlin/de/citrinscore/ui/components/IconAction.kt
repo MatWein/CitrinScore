@@ -15,7 +15,9 @@ fun IconAction(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
-        Icon(painterResource(icon), contentDescription = label)
+    LabelTooltip(label) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+            Icon(painterResource(icon), contentDescription = label)
+        }
     }
 }

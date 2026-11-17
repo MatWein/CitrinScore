@@ -1,5 +1,6 @@
 package de.citrinscore.ui.components
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -8,6 +9,7 @@ import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 
 @Composable
 fun CitrinTextField(
@@ -18,16 +20,22 @@ fun CitrinTextField(
     singleLine: Boolean = false,
     minLines: Int = 1,
     error: String? = null,
+    enabled: Boolean = true,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier,
+        enabled = enabled,
         label = { Text(label) },
         supportingText = error?.let { { Text(it) } },
         isError = error != null,
         singleLine = singleLine,
         minLines = minLines,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
         colors = citrinTextFieldColors(),
     )
 }

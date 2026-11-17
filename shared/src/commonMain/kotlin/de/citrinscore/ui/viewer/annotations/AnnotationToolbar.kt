@@ -18,6 +18,7 @@ import de.citrinscore.resources.ic_ink_eraser
 import de.citrinscore.resources.ic_text_fields
 import de.citrinscore.resources.ic_undo
 import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.components.LabelTooltip
 import de.citrinscore.ui.components.MessageDialog
 import de.citrinscore.ui.components.TextInputDialog
 import de.citrinscore.ui.theme.Spacing
@@ -73,7 +74,9 @@ private fun ToolButton(
     selected: AnnotationTool,
     onSelect: (AnnotationTool) -> Unit,
 ) {
-    FilledTonalIconToggleButton(checked = tool == selected, onCheckedChange = { onSelect(tool) }) {
-        Icon(painterResource(icon), contentDescription = label)
+    LabelTooltip(label) {
+        FilledTonalIconToggleButton(checked = tool == selected, onCheckedChange = { onSelect(tool) }) {
+            Icon(painterResource(icon), contentDescription = label)
+        }
     }
 }

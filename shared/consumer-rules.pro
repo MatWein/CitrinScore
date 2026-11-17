@@ -1,3 +1,9 @@
 -keep class com.sun.jna.** { *; }
 -keep interface * extends com.sun.jna.Library { *; }
 -dontwarn java.awt.**
+-keep class * implements com.sun.jna.NativeMapped { <init>(); }
+-keep class * extends org.eclipse.jgit.nls.TranslationBundle { public <fields>; <init>(); }
+-dontwarn java.lang.ProcessHandle
+-dontwarn java.lang.management.**
+-dontwarn javax.management.**
+-dontwarn org.ietf.jgss.**

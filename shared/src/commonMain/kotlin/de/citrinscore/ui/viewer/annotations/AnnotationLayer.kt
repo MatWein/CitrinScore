@@ -30,6 +30,10 @@ import de.citrinscore.score.TextNote
 import de.citrinscore.score.musicxml.MeasureAnchors
 import de.citrinscore.score.render.PageLayout
 import de.citrinscore.ui.viewer.ScoreViewport
+import de.citrinscore.ui.viewer.pageAt
+import de.citrinscore.ui.viewer.pagePoint
+import de.citrinscore.ui.viewer.pagePosition
+import de.citrinscore.ui.viewer.screenPoint
 
 private const val STROKE_WIDTH_FRACTION = 0.003f
 private const val TEXT_SIZE_FRACTION = 0.02f
@@ -198,24 +202,6 @@ private fun DrawScope.drawInk(points: List<Offset>, width: Float, color: Color) 
     }
     drawPath(path, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
 }
-
-private class PagePoint(val page: Int, val position: Offset)
-
-private fun PageLayout.pageAt(screen: Offset, viewport: ScoreViewport): Int? {
-    val document = (screen + viewport.offset) / viewport.zoom
-    return pages.indexOfFirst { it.contains(document) }.takeIf { it >= 0 }
-}
-
-private fun PageLayout.pagePoint(screen: Offset, viewport: ScoreViewport): PagePoint? =
-    pageAt(screen, viewport)?.let { PagePoint(it, pagePosition(it, screen, viewport)) }
-
-private fun PageLayout.pagePosition(page: Int, screen: Offset, viewport: ScoreViewport): Offset {
-    val document = (screen + viewport.offset) / viewport.zoom
-    return Offset((document.x - pages[page].left) / scale, (document.y - pages[page].top) / scale)
-}
-
-private fun PageLayout.screenPoint(page: Int, point: Offset, zoom: Float, offset: Offset) =
-    Offset((pages[page].left + point.x * scale) * zoom - offset.x, (pages[page].top + point.y * scale) * zoom - offset.y)
 
 private fun PageLayout.pageWidth(page: Int) = pages[page].width / scale
 

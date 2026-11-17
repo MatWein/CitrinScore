@@ -10,4 +10,5 @@ data class AppSettings(
     val library: LibraryReference,
     val theme: ThemeMode = ThemeMode.System,
     val librarySort: LibrarySort = LibrarySort.RecentlyUsed,
+    val git: GitRemote? = null,
 )

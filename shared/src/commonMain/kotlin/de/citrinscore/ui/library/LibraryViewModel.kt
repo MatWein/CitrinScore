@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,15 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
+
+    fun reload() {
+        viewModelScope.launch {
+            val existing = _state.value.path.takeWhile { attempt { it.exists() } == true }.ifEmpty { _state.value.path.take(1) }
+            thumbnails.evictAll()
+            _state.update { it.copy(path = existing) }
+            refresh()
+        }
+    }
 
     fun refresh() {
         val folder = currentFolder

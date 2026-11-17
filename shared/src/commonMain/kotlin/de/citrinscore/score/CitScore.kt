@@ -6,6 +6,7 @@ import io.github.vinceglb.filekit.div
 object CitScore {
     const val EXTENSION = "citscore"
     const val MANIFEST_FILE = "manifest.json"
+    const val DEVICE_STATE_FILE = "device.json"
     const val THUMBNAIL_FILE = "thumbnail.jpg"
     const val ANNOTATIONS_FILE = "annotations.json"
     const val PAGES_DIRECTORY = "pages"

@@ -176,8 +176,10 @@ private fun BackButton(label: String?, compact: Boolean, onClick: () -> Unit) {
     val modifier = Modifier.alpha(if (visible) 1f else 0f)
     val icon = painterResource(Res.drawable.ic_arrow_back)
     if (compact) {
-        IconButton(onClick = onClick, enabled = visible, modifier = modifier) {
-            Icon(icon, contentDescription = label)
+        LabelTooltip(label) {
+            IconButton(onClick = onClick, enabled = visible, modifier = modifier) {
+                Icon(icon, contentDescription = label)
+            }
         }
     } else {
         TextButton(

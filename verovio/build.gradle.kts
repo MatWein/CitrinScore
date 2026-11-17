@@ -5,6 +5,7 @@ plugins {
 val androidCompileSdk: String by project
 val androidMinSdk: String by project
 val androidNdkVersion: String by project
+val androidCmakeVersion: String by project
 val androidAbis: String by project
 val verovioCmakeOptions: String by project
 
@@ -28,6 +29,7 @@ android {
 
     externalNativeBuild {
         cmake {
+            version = androidCmakeVersion
             path = rootProject.file("third_party/verovio/cmake/CMakeLists.txt")
         }
     }

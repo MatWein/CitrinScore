@@ -1,6 +1,7 @@
 package de.citrinscore.i18n
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import de.citrinscore.score.playback.Instrument
 
 interface Strings {
     val next: String
@@ -179,6 +180,49 @@ interface Strings {
     val annotationsFailedTitle: String
     val annotationsSaveFailed: String
     val scoreLoadFailed: String
+    val playback: String
+    val closePlayback: String
+    val listenMode: String
+    val playAlongMode: String
+    val startPlayAlong: String
+    val stopPlayAlong: String
+    val tempo: String
+    val playbackScoreFailed: String
+    val playbackSynthesizerFailed: String
+    val playbackMicrophoneFailed: String
+    val playAlongHint: String
+    fun tempoPercent(percent: Int): String
+    val instrument: String
+    val notatedInstrument: String
+    fun instrumentName(instrument: Instrument): String
+    val sync: String
+    val moreActions: String
+    val settingsSync: String
+    val syncSettingsHint: String
+    val gitUrl: String
+    val gitUsername: String
+    val gitToken: String
+    val connect: String
+    val disconnect: String
+    val syncCommitting: String
+    val syncDownloading: String
+    val syncMerging: String
+    val syncUploading: String
+    val syncUpToDate: String
+    val syncCancelled: String
+    val syncConflictsTitle: String
+    val syncConflictsText: String
+    val keepLocal: String
+    val keepRemote: String
+    val continueSync: String
+    val cancelSync: String
+    val syncStorageAccess: String
+    val syncLibraryLocation: String
+    val syncConnection: String
+    val syncRejected: String
+    val syncFailed: String
+    fun syncConnectedTo(url: String): String
+    fun syncCompleted(uploaded: Int, downloaded: Int): String
 }
 
 val LocalStrings = staticCompositionLocalOf { AppLanguage.English.strings }

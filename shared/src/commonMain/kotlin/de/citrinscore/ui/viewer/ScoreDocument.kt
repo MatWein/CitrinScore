@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.rememberScrollable2DState
 import androidx.compose.foundation.gestures.scrollable2D
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -25,6 +27,8 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -47,6 +51,7 @@ import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.roundToIntRect
 import androidx.compose.ui.unit.toOffset
 import de.citrinscore.score.ScoreAnnotations
+import de.citrinscore.score.musicxml.PageRegion
 import de.citrinscore.score.render.PageLayout
 import de.citrinscore.ui.viewer.annotations.AnnotationGesture
 import de.citrinscore.ui.viewer.annotations.AnnotationInput
@@ -60,6 +65,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
 
 private val Margin = 4.dp
+private val CursorCornerRadius = 4.dp
 private val PageGap = 8.dp
 private val WheelStep = 64.dp
 private const val SETTLE_MILLIS = 150L
@@ -98,6 +104,8 @@ fun ScoreDocument(
     annotations: ScoreAnnotations,
     annotationInput: AnnotationInput?,
     modifier: Modifier = Modifier,
+    highlight: ScoreHighlight? = null,
+    onTap: ((page: Int, position: Offset) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
@@ -109,6 +117,9 @@ fun ScoreDocument(
         SideEffect {
             viewport.setBounds(viewportSize, Size(layout.width, layout.height))
             viewport.breaks = breaks
+        }
+        LaunchedEffect(layout, highlight?.reveal) {
+            highlight?.reveal?.let { viewport.reveal(layout.documentRect(it.page, it.bounds)) }
         }
         val baseImages = remember(layout) { mutableStateMapOf<Int, ImageBitmap>() }
         var tiles by remember(layout) { mutableStateOf(emptyList<Tile>()) }
@@ -138,6 +149,7 @@ fun ScoreDocument(
             }
         }
 
+        val tapListener by rememberUpdatedState(onTap)
         val scrollState = rememberScrollable2DState { delta -> -viewport.scrollBy(-delta) }
         val wheelStep = with(density) { WheelStep.toPx() }
         val textMeasurer = rememberTextMeasurer()
@@ -151,7 +163,9 @@ fun ScoreDocument(
                 .wheelScroll(viewport, wheelStep)
                 .then(
                     if (annotationInput == null) {
-                        Modifier.mouseDrag(viewport).scrollable2D(scrollState)
+                        Modifier.mouseDrag(viewport).scrollable2D(scrollState).tap(layout, viewport, enabled = onTap != null) { page, position ->
+                            tapListener?.invoke(page, position)
+                        }
                     } else {
                         Modifier.annotationInput(annotationInput, layout, viewport, annotations, gesture, textMeasurer)
                     },
@@ -163,10 +177,37 @@ fun ScoreDocument(
                 baseImages[page]?.let { drawAt(it, layout.pages[page].scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
             }
             tiles.forEach { tile -> drawAt(tile.image, tile.documentRect.scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
+            highlight?.let { drawHighlight(it, layout, zoom, offset.toOffset()) }
             drawAnnotations(annotations, gesture, layout, zoom, offset.toOffset(), inkColor, textMeasurer, annotationInput?.sizing ?: layout.pageSizing())
         }
     }
 }
+
+class ScoreHighlight(
+    val cursor: PageRegion?,
+    val notes: List<PageRegion>,
+    val reveal: PageRegion?,
+    val cursorColor: Color,
+    val noteColor: Color,
+    val noteBlendMode: BlendMode,
+)
+
+private fun DrawScope.drawHighlight(highlight: ScoreHighlight, layout: PageLayout, zoom: Float, offset: Offset) {
+    val toScreen = { region: PageRegion -> layout.documentRect(region.page, region.bounds).scale(zoom).translate(-offset) }
+    highlight.cursor?.let { region ->
+        val bounds = toScreen(region)
+        drawRoundRect(highlight.cursorColor, bounds.topLeft, bounds.size, CornerRadius(CursorCornerRadius.toPx()))
+    }
+    highlight.notes.forEach { region ->
+        val bounds = toScreen(region)
+        drawOval(highlight.noteColor, bounds.topLeft, bounds.size, blendMode = highlight.noteBlendMode)
+    }
+}
+
+private fun Modifier.tap(layout: PageLayout, viewport: ScoreViewport, enabled: Boolean, onTap: (Int, Offset) -> Unit) =
+    if (!enabled) this else pointerInput(layout) {
+        detectTapGestures { position -> layout.pagePoint(position, viewport)?.let { onTap(it.page, it.position) } }
+    }
 
 private fun DrawScope.drawAt(image: ImageBitmap, target: IntRect, colorFilter: ColorFilter?) =
     drawImage(image, dstOffset = target.topLeft, dstSize = target.size, colorFilter = colorFilter)

@@ -1,54 +1,46 @@
 package de.citrinscore.score.musicxml
 
-import de.citrinscore.resources.Res
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.filesDir
-import io.github.vinceglb.filekit.path
+import de.citrinscore.util.extractResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.zip.CRC32
 import java.util.zip.ZipInputStream
 
 private const val RESOURCES_ARCHIVE = "files/verovio.zip"
 private const val RESOURCES_DIRECTORY = "verovio"
-private const val COMPLETE_MARKER = ".complete"
-private const val HEX_RADIX = 16
 private const val TEXT_FONT_FAMILY = "Leipzig"
 private const val TEXT_FONT_FILE = "$TEXT_FONT_FAMILY.ttf"
+private const val GLYPH_BOUNDS_FILE = "$TEXT_FONT_FAMILY.xml"
 
 private val extraction = Mutex()
 private var textFontRegistered = false
+private var glyphBounds: GlyphBounds? = null
 
 internal suspend fun verovioResourcePath(): String = extraction.withLock {
-    val archive = Res.readBytes(RESOURCES_ARCHIVE)
-    withContext(Dispatchers.IO) {
-        extract(archive).also { path ->
-            if (!textFontRegistered) {
-                registerTextFont(TEXT_FONT_FAMILY, File(path, TEXT_FONT_FILE))
-                textFontRegistered = true
-            }
-        }
+    val path = extractResource(RESOURCES_ARCHIVE, RESOURCES_DIRECTORY, ::unzip)
+    if (!textFontRegistered) {
+        withContext(Dispatchers.IO) { registerTextFont(TEXT_FONT_FAMILY, File(path, TEXT_FONT_FILE)) }
+        textFontRegistered = true
+    }
+    path.absolutePath
+}
+
+internal suspend fun verovioGlyphBounds(): GlyphBounds {
+    val path = verovioResourcePath()
+    return extraction.withLock {
+        glyphBounds ?: withContext(Dispatchers.IO) { GlyphBounds(File(path, GLYPH_BOUNDS_FILE)) }.also { glyphBounds = it }
     }
 }
 
-private fun extract(archive: ByteArray): String {
-    val parent = File(FileKit.filesDir.path, RESOURCES_DIRECTORY)
-    val version = CRC32().apply { update(archive) }.value.toString(HEX_RADIX)
-    val target = File(parent, version)
-    if (!File(target, COMPLETE_MARKER).exists()) {
-        parent.listFiles()?.forEach { it.deleteRecursively() }
-        ZipInputStream(archive.inputStream()).use { zip ->
-            generateSequence { zip.nextEntry }.filterNot { it.isDirectory }.forEach { entry ->
-                val file = File(target, entry.name)
-                require(file.canonicalPath.startsWith(target.canonicalPath + File.separator)) { "Invalid entry ${entry.name}" }
-                file.parentFile.mkdirs()
-                file.outputStream().use { zip.copyTo(it) }
-            }
+private fun unzip(archive: ByteArray, target: File) {
+    ZipInputStream(archive.inputStream()).use { zip ->
+        generateSequence { zip.nextEntry }.filterNot { it.isDirectory }.forEach { entry ->
+            val file = File(target, entry.name)
+            require(file.canonicalPath.startsWith(target.canonicalPath + File.separator)) { "Invalid entry ${entry.name}" }
+            file.parentFile.mkdirs()
+            file.outputStream().use { zip.copyTo(it) }
         }
-        File(target, COMPLETE_MARKER).createNewFile()
     }
-    return target.absolutePath
 }

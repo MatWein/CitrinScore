@@ -10,10 +10,16 @@ data class EngravingLayout(val pageWidth: Int, val pageHeight: Int) {
 
 data class StaffBox(val measure: Int, val staff: Int, val bounds: Rect, val space: Float, val contentLeft: Float = bounds.left)
 
-class EngravedPage(val svg: String, val staves: List<StaffBox>)
+data class NoteBox(val id: String, val measure: Int, val bounds: Rect)
+
+class EngravedPage(val svg: String, val staves: List<StaffBox>, val notes: List<NoteBox> = emptyList())
 
 interface MusicXmlEngraver : AutoCloseable {
     suspend fun engrave(layout: EngravingLayout): List<EngravedPage>
+
+    suspend fun perform(): ScorePerformance
+
+    suspend fun writtenPitches(notes: Collection<String>): Map<String, Int>
 }
 
 expect suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver

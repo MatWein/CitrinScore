@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import de.citrinscore.score.ScoreViewState
 
@@ -61,6 +62,14 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         scrollBy(Offset(0f, target - top))
     }
 
+    fun reveal(document: Rect) {
+        val bounds = Rect(document.left * zoom, document.top * zoom, document.right * zoom, document.bottom * zoom)
+        val visible = Rect(offset, viewportSize)
+        val x = if (bounds.left < visible.left || bounds.right > visible.right) bounds.center.x - viewportSize.width / 2 else offset.x
+        val y = if (bounds.top < visible.top || bounds.bottom > visible.bottom) bounds.top - viewportSize.height * REVEAL_MARGIN else offset.y
+        offset = clamp(Offset(x, y))
+    }
+
     fun zoomBy(factor: Float, focus: Offset = viewportCenter) = zoomTo(zoom * factor, focus)
 
     fun zoomTo(target: Float, focus: Offset = viewportCenter) {
@@ -86,5 +95,6 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         const val MAX_ZOOM = 5f
         const val ZOOM_STEP = 1.25f
         private const val BREAK_TOLERANCE = 1f
+        private const val REVEAL_MARGIN = 0.05f
     }
 }

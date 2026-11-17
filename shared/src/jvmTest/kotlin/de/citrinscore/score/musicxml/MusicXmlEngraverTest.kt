@@ -54,18 +54,65 @@ class MusicXmlEngraverTest {
     }
 
     @Test
+    fun `performances list every engraved note with its pitch`() = runTest {
+        openMusicXmlEngraver(score(measures = 2).encodeToByteArray(), compressed = false).use { engraver ->
+            val notes = engraver.engrave(EngravingLayout.Print).flatMap { it.notes }
+            val performance = engraver.perform()
+
+            assertEquals((0 until 8).map { it.toDouble() }, performance.events.map { it.quarter })
+            assertEquals(listOf(72, 74, 76, 77, 72, 74, 76, 77), performance.events.map { it.pitches.single() })
+            assertEquals(notes.map { it.id }.sorted(), performance.events.flatMap { event -> event.notes.map { it.id } }.sorted())
+            assertTrue(notes.all { it.bounds.width > 0f && it.bounds.height > 0f })
+            assertEquals(8.0, performance.end)
+        }
+    }
+
+    @Test
+    fun `tied notes are not played again`() = runTest {
+        val tied = score(
+            measures = 1,
+            notes = listOf(note("C", tie = "start"), note("C", tie = "stop"), note("E"), note("F")).joinToString(""),
+        )
+        openMusicXmlEngraver(tied.encodeToByteArray(), compressed = false).use { engraver ->
+            assertEquals(listOf(setOf(72), emptySet(), setOf(76), setOf(77)), engraver.perform().events.map { it.pitches })
+        }
+    }
+
+    @Test
+    fun `chord notes of transposing instruments sound at their transposed pitch`() = runTest {
+        val chord = note("C") + note("E").replace("<note>", "<note><chord/>") + listOf("D", "E", "F").joinToString("") { note(it) }
+        val clarinet = score(measures = 1, notes = chord, attributes = "<transpose><diatonic>-1</diatonic><chromatic>-2</chromatic></transpose>")
+        openMusicXmlEngraver(clarinet.encodeToByteArray(), compressed = false).use { engraver ->
+            val first = engraver.perform().events.first()
+            val written = engraver.writtenPitches(first.notes.map { it.id })
+
+            assertEquals(setOf(70, 74), first.pitches)
+            assertEquals(listOf(72, 76), first.notes.map { written.getValue(it.id) })
+            assertEquals(listOf(70, 74), first.notes.map { first.pitchOf(it.id, written) })
+        }
+    }
+
+    @Test
     fun `invalid scores are rejected`() = runTest {
         assertFailsWith<IllegalStateException> { openMusicXmlEngraver("no music".encodeToByteArray(), compressed = false) }
     }
 
     companion object {
-        fun score(measures: Int) = buildString {
+        fun note(step: String, tie: String? = null) = buildString {
+            append("<note><pitch><step>$step</step><octave>5</octave></pitch><duration>1</duration>")
+            tie?.let { append("""<tie type="$it"/>""") }
+            append("<type>quarter</type>")
+            tie?.let { append("""<notations><tied type="$it"/></notations>""") }
+            append("</note>")
+        }
+
+        fun score(measures: Int, notes: String = listOf("C", "D", "E", "F").joinToString("") { note(it) }, attributes: String = "") = buildString {
             append("""<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4.0">""")
             append("""<part-list><score-part id="P1"><part-name>Violine</part-name></score-part></part-list><part id="P1">""")
             repeat(measures) { index ->
                 append("""<measure number="${index + 1}">""")
-                if (index == 0) append("<attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>")
-                listOf("C", "D", "E", "F").forEach { step -> append("<note><pitch><step>$step</step><octave>5</octave></pitch><duration>1</duration><type>quarter</type></note>") }
+                if (index == 0) append("<attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef>$attributes</attributes>")
+                append(notes)
                 append("</measure>")
             }
             append("</part></score-partwise>")

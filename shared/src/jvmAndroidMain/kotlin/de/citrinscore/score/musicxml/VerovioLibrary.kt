@@ -29,6 +29,14 @@ internal interface VerovioLibrary : Library {
 
     fun renderToSVG(toolkit: Pointer, page: Int, xmlDeclaration: Boolean): String
 
+    fun renderToTimemap(toolkit: Pointer, options: String): String
+
+    fun renderToMIDI(toolkit: Pointer): String
+
+    fun getNotatedIdForElement(toolkit: Pointer, id: String): String
+
+    fun getMIDIValuesForElement(toolkit: Pointer, id: String): String
+
     fun getLog(toolkit: Pointer): String
 }
 

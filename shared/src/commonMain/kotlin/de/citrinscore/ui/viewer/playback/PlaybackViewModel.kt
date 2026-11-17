@@ -1,0 +1,222 @@
+package de.citrinscore.ui.viewer.playback
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import de.citrinscore.library.PartRef
+import de.citrinscore.score.audio.isMicrophoneAvailable
+import de.citrinscore.score.audio.microphoneSamples
+import de.citrinscore.score.musicxml.PerformanceEvent
+import de.citrinscore.score.musicxml.ScorePerformance
+import de.citrinscore.score.playback.Instrument
+import de.citrinscore.score.playback.NoteListener
+import de.citrinscore.score.playback.ScoreFollower
+import de.citrinscore.score.playback.ScoreSynthesizer
+import de.citrinscore.score.playback.openScoreSynthesizer
+import de.citrinscore.util.attempt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+private const val MICROPHONE_SAMPLE_RATE = 22050
+const val MIN_TEMPO = 0.25f
+const val MAX_TEMPO = 2f
+
+class PlaybackViewModel(
+    private val part: StateFlow<PartRef?>,
+    private val loadPerformance: suspend (PartRef) -> ScorePerformance?,
+    private val loadWrittenPitches: suspend (PartRef, Collection<String>) -> Map<String, Int>,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(PlaybackState())
+    val state: StateFlow<PlaybackState> = _state.asStateFlow()
+
+    private val _cursor = MutableStateFlow<PlaybackCursor?>(null)
+    val cursor: StateFlow<PlaybackCursor?> = _cursor.asStateFlow()
+
+    private var performance: ScorePerformance? = null
+    private var synthesizer: ScoreSynthesizer? = null
+    private var loading: Job? = null
+    private var running: Job? = null
+    private var previewing: Job? = null
+    private var event = 0
+
+    init {
+        viewModelScope.launch {
+            part.collectLatest {
+                stop()
+                release()
+                _cursor.value = null
+                _state.update { PlaybackState(tempo = it.tempo, microphoneAvailable = it.microphoneAvailable) }
+            }
+        }
+    }
+
+    fun toggle() {
+        if (_state.value.isOpen) close() else open()
+    }
+
+    fun close() {
+        stop()
+        _cursor.value = null
+        _state.update { it.copy(isOpen = false, error = null) }
+    }
+
+    fun selectMode(mode: PlaybackMode) {
+        if (_state.value.mode == mode) return
+        stop()
+        _state.update { it.copy(mode = mode, error = null) }
+    }
+
+    fun start() {
+        val current = performance?.takeIf { it.events.isNotEmpty() } ?: return
+        stop()
+        _state.update { it.copy(isRunning = true, error = null) }
+        running = viewModelScope.launch {
+            when (_state.value.mode) {
+                PlaybackMode.Listen -> listen(current)
+                PlaybackMode.PlayAlong -> playAlong(current)
+            }
+            running = null
+            _state.update { it.copy(isRunning = false) }
+            showStill()
+        }
+    }
+
+    fun stop() {
+        previewing?.cancel()
+        running?.cancel()
+        running = null
+        synthesizer?.let { synth -> viewModelScope.launch { synth.pause() } }
+        _state.update { it.copy(isRunning = false) }
+        showStill()
+    }
+
+    fun setTempo(tempo: Float) {
+        val clamped = tempo.coerceIn(MIN_TEMPO, MAX_TEMPO)
+        _state.update { it.copy(tempo = clamped) }
+        synthesizer?.setTempo(clamped)
+    }
+
+    fun setInstrument(instrument: Instrument?) {
+        if (_state.value.instrument == instrument) return
+        stop()
+        synthesizer?.close()
+        synthesizer = null
+        _state.update { it.copy(instrument = instrument) }
+    }
+
+    fun select(note: String) {
+        val current = performance ?: return
+        val start = current.startOf(note) ?: return
+        val wasRunning = running != null
+        stop()
+        event = current.eventAt(start)
+        showStill()
+        when {
+            wasRunning -> start()
+            _state.value.mode == PlaybackMode.Listen -> preview(current, current.events[event], note)
+        }
+    }
+
+    private fun open() {
+        _state.update { it.copy(isOpen = true, error = null) }
+        if (_state.value.microphoneAvailable == null) {
+            viewModelScope.launch { _state.update { it.copy(microphoneAvailable = isMicrophoneAvailable()) } }
+        }
+        if (performance != null) return showStill()
+        if (loading?.isActive == true) return
+        val ref = part.value ?: return
+        loading = viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            val loaded = loadPerformance(ref)
+            performance = loaded
+            event = 0
+            _state.update { it.copy(isLoading = false, error = if (loaded == null) PlaybackError.Score else null) }
+            showStill()
+        }
+    }
+
+    private suspend fun listen(current: ScorePerformance) {
+        val synth = synthesizer ?: openSynthesizer(current) ?: return
+        synth.setTempo(_state.value.tempo)
+        if (event >= current.events.lastIndex) event = 0
+        synth.play(current.events[event].quarter)
+        coroutineScope {
+            val tracking = launch {
+                synth.position.collect { position ->
+                    event = current.eventAt(position).coerceAtLeast(0)
+                    _cursor.value = PlaybackCursor(current.events[event].ids(), current.soundingAt(position).map { it.id }, follow = true)
+                }
+            }
+            synth.isPlaying.first { !it }
+            tracking.cancel()
+        }
+        event = 0
+    }
+
+    private suspend fun openSynthesizer(current: ScorePerformance): ScoreSynthesizer? {
+        _state.update { it.copy(isLoading = true) }
+        val opened = attempt { openScoreSynthesizer(current, _state.value.instrument) }
+        synthesizer = opened
+        _state.update { it.copy(isLoading = false, error = if (opened == null) PlaybackError.Synthesizer else null) }
+        return opened
+    }
+
+    private fun preview(current: ScorePerformance, shown: PerformanceEvent, note: String) {
+        val ref = part.value ?: return
+        previewing = viewModelScope.launch {
+            val written = if (shown.needsWrittenPitches) loadWrittenPitches(ref, shown.ids()) else emptyMap()
+            val pitch = shown.pitchOf(note, written) ?: return@launch
+            val synth = synthesizer ?: openSynthesizer(current) ?: return@launch
+            synth.sound(pitch)
+        }
+    }
+
+    private suspend fun playAlong(current: ScorePerformance) {
+        val follower = ScoreFollower(current.events, event)
+        if (follower.isFinished) return
+        val listener = NoteListener(MICROPHONE_SAMPLE_RATE)
+        event = follower.expected
+        _cursor.value = PlaybackCursor(current.events[event].ids(), emptyList(), follow = true)
+        microphoneSamples(MICROPHONE_SAMPLE_RATE)
+            .map(listener::listen)
+            .flowOn(Dispatchers.Default)
+            .catch { _state.update { it.copy(error = PlaybackError.Microphone) } }
+            .takeWhile { !follower.isFinished }
+            .collect { pitches ->
+                val hit = pitches.mapNotNull(follower::hear).lastOrNull() ?: return@collect
+                event = follower.expected.coerceAtMost(current.events.lastIndex)
+                _cursor.value = PlaybackCursor(current.events[event].ids(), current.events[hit].ids(), follow = true)
+            }
+        if (follower.isFinished) event = 0
+    }
+
+    private fun showStill() {
+        val current = performance?.takeIf { _state.value.isOpen } ?: return
+        val shown = current.events.getOrNull(event) ?: return
+        _cursor.value = PlaybackCursor(shown.ids(), emptyList(), follow = false)
+    }
+
+    private fun release() {
+        loading?.cancel()
+        synthesizer?.close()
+        synthesizer = null
+        performance = null
+        event = 0
+    }
+
+    private fun PerformanceEvent.ids() = notes.map { it.id }
+
+    override fun onCleared() = release()
+}

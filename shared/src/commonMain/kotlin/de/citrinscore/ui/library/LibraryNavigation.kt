@@ -2,6 +2,8 @@ package de.citrinscore.ui.library
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -11,11 +13,15 @@ import de.citrinscore.library.LibraryRepository
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.ui.editor.EditScoreScreen
 import de.citrinscore.ui.importer.ImportScreen
+import de.citrinscore.sync.librarySync
 import de.citrinscore.ui.settings.SettingsScreen
+import de.citrinscore.ui.sync.SyncDialog
+import de.citrinscore.ui.sync.SyncViewModel
 import de.citrinscore.ui.viewer.ScoreViewModel
 import de.citrinscore.ui.viewer.ScoreViewerScreen
 import de.citrinscore.ui.viewer.annotations.AnnotationViewModel
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
+import de.citrinscore.ui.viewer.playback.PlaybackViewModel
 import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
@@ -46,6 +52,7 @@ fun LibraryNavigation(
     val repository = remember { LibraryRepository() }
     val libraryViewModel = viewModel(key = library.path) { LibraryViewModel(library, repository) }
     val navController = rememberNavController()
+    val syncViewModel = librarySync()?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
 
     NavHost(navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
@@ -65,7 +72,12 @@ fun LibraryNavigation(
                     libraryViewModel.select(score)
                     navController.navigate(EditRoute)
                 },
+                onSync = syncViewModel?.let { sync -> settings.git?.let { remote -> { sync.start(remote, libraryViewModel::reload) } } },
             )
+            syncViewModel?.let { sync ->
+                val syncState by sync.state.collectAsStateWithLifecycle()
+                SyncDialog(syncState, sync)
+            }
         }
         composable<ImportRoute> {
             ImportScreen(
@@ -118,7 +130,8 @@ fun LibraryNavigation(
                 val audioViewModel = viewModel(key = "${score.path}/audio") { ScoreAudioViewModel(viewModel.part, repository) }
                 val annotationViewModel = viewModel(key = "${score.path}/annotations") { AnnotationViewModel(viewModel.part, repository, viewModel.anchors) }
                 val filesViewModel = viewModel(key = "${score.path}/files") { ScoreFilesViewModel(viewModel.part, repository) }
-                ScoreViewerScreen(viewModel, audioViewModel, annotationViewModel, filesViewModel, onClose = { close() })
+                val playbackViewModel = viewModel(key = "${score.path}/playback") { PlaybackViewModel(viewModel.part, viewModel::performance, viewModel::writtenPitches) }
+                ScoreViewerScreen(viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose = { close() })
             }
         }
     }
