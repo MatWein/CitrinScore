@@ -5,6 +5,7 @@ import de.citrinscore.score.render.BitmapPageSource
 import de.citrinscore.score.render.PageSource
 import de.citrinscore.score.render.contentCrop
 import de.citrinscore.score.render.openImageSource
+import de.citrinscore.score.render.openMusicXmlSource
 import de.citrinscore.score.render.openPageSource
 import de.citrinscore.score.render.openPdfSource
 import de.citrinscore.score.scan.ScanPage
@@ -57,10 +58,10 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     fun addFiles(files: List<PlatformFile>) {
         val current = _draft.value
         val type = current.type ?: return
-        if (type == ImportType.Pdf) {
-            val pdf = files.firstOrNull() ?: return
-            _draft.value = current.copy(files = listOf(pdf), previews = emptyMap(), failedPreviews = emptySet())
-            loadPreview(current.key, pdf, type)
+        if (type.singleFile) {
+            val file = files.firstOrNull() ?: return
+            _draft.value = current.copy(files = listOf(file), previews = emptyMap(), failedPreviews = emptySet())
+            loadPreview(current.key, file, type)
             return
         }
         val known = current.files.map { it.path }.toSet()
@@ -105,6 +106,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
             ImportType.Images -> PartSource.Images(draft.files, crops)
             ImportType.Pdf -> PartSource.Pdf(draft.files.single(), crops)
             ImportType.Scan -> scanSource(draft)
+            ImportType.MusicXml -> PartSource.MusicXml(draft.files.single())
             null -> error("No import type selected")
         }
     }
@@ -145,6 +147,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
         ImportType.Images -> openImageSource(file)
         ImportType.Scan -> openPageSource(file)
         ImportType.Pdf -> openPdfSource(file)
+        ImportType.MusicXml -> openMusicXmlSource(file)
     }
 
     private fun scanKeyPrefix(draft: PartDraft) = "${draft.key}/"

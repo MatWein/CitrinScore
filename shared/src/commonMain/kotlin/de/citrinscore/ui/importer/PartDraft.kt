@@ -22,6 +22,8 @@ data class PartDraft(
     val previewFailed get() = files.any { it.path in failedPreviews }
 
     val isComplete get() = files.isNotEmpty() && !isLoadingPreview && !previewFailed
+
+    val pageCount get() = pages.size.takeUnless { type == ImportType.MusicXml }
 }
 
 fun partNameTaken(name: String, otherNames: List<String>): Boolean {

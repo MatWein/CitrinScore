@@ -10,6 +10,7 @@ import de.citrinscore.i18n.Strings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_document_scanner
 import de.citrinscore.resources.ic_image
+import de.citrinscore.resources.ic_music_note
 import de.citrinscore.resources.ic_picture_as_pdf
 import de.citrinscore.ui.components.IconBadge
 import de.citrinscore.ui.components.Tile
@@ -53,16 +54,19 @@ private val ImportType.icon
         ImportType.Images -> Res.drawable.ic_image
         ImportType.Scan -> Res.drawable.ic_document_scanner
         ImportType.Pdf -> Res.drawable.ic_picture_as_pdf
+        ImportType.MusicXml -> Res.drawable.ic_music_note
     }
 
 internal fun ImportType.title(strings: Strings) = when (this) {
     ImportType.Images -> strings.importTypeImages
     ImportType.Scan -> strings.importTypeScan
     ImportType.Pdf -> strings.importTypePdf
+    ImportType.MusicXml -> strings.importTypeMusicXml
 }
 
 private fun ImportType.description(strings: Strings) = when (this) {
     ImportType.Images -> strings.importTypeImagesText
     ImportType.Scan -> if (scanUsesCamera) strings.importTypeScanCameraText else strings.importTypeScanFilesText
     ImportType.Pdf -> strings.importTypePdfText
+    ImportType.MusicXml -> strings.importTypeMusicXmlText
 }

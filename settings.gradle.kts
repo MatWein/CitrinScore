@@ -18,6 +18,7 @@ pluginManagement {
         kotlin("plugin.serialization") version kotlinVersion
         id("org.jetbrains.compose") version composeVersion
         id("com.android.application") version agpVersion
+        id("com.android.library") version agpVersion
         id("com.android.kotlin.multiplatform.library") version agpVersion
     }
 }
@@ -32,3 +33,4 @@ dependencyResolutionManagement {
 include(":shared")
 include(":androidApp")
 include(":desktopApp")
+include(":verovio")

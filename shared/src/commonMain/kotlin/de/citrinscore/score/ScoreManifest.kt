@@ -85,13 +85,20 @@ sealed interface ScoreContent {
     @Serializable
     @SerialName("pdf")
     data class Pdf(val path: String, @Serializable(with = PdfPagesSerializer::class) val pages: List<PdfPage>) : ScoreContent
+
+    @Serializable
+    @SerialName("musicxml")
+    data class MusicXml(val path: String) : ScoreContent
 }
 
-val ScoreContent.pageCount
+val ScoreContent.pageCount: Int?
     get() = when (this) {
         is ScoreContent.Images -> pages.size
         is ScoreContent.Pdf -> pages.size
+        is ScoreContent.MusicXml -> null
     }
+
+val ScoreContent.isReflowable get() = this is ScoreContent.MusicXml
 
 @Serializable
 data class PdfPage(val index: Int, val crop: PageCrop)

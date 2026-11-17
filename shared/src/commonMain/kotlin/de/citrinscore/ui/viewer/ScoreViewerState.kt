@@ -15,5 +15,8 @@ sealed interface ScoreViewerState {
         val part: PartRef,
         val pageSizes: List<Size>,
         val view: ScoreViewState?,
-    ) : ScoreViewerState
+        val reflowScale: Float?,
+    ) : ScoreViewerState {
+        val isReflowable get() = reflowScale != null
+    }
 }

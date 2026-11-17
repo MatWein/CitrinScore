@@ -29,6 +29,7 @@ fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEdito
     val strings = LocalStrings.current
     val (title, subtitle) = when (draft.type) {
         ImportType.Pdf -> strings.importPdfTitle to strings.importPdfSubtitle
+        ImportType.MusicXml -> strings.importMusicXmlTitle to strings.importMusicXmlSubtitle
         ImportType.Scan -> strings.importScanTitle to strings.importScanSubtitle
         ImportType.Images, null -> strings.importFilesTitle to strings.importFilesSubtitle
     }
@@ -50,16 +51,17 @@ fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEdito
 @Composable
 private fun FileList(draft: PartDraft, editor: PartDraftEditor, modifier: Modifier) {
     val strings = LocalStrings.current
-    val isPdf = draft.type == ImportType.Pdf
+    val singleFile = draft.type?.singleFile == true
     val picker = rememberFilePickerLauncher(
-        type = FileKitType.File(draft.type?.extensions.orEmpty()),
-        mode = FileKitMode.Multiple(maxItems = if (isPdf) 1 else null),
+        type = draft.type?.pickerExtensions?.let { FileKitType.File(it) } ?: FileKitType.File(),
+        mode = FileKitMode.Multiple(maxItems = if (singleFile) 1 else null),
     ) { picked ->
         picked?.let(editor::addFiles)
     }
     val scanLauncher = rememberScanLauncher(editor::addFiles)
     val (addLabel, onAddClick) = when (draft.type) {
         ImportType.Pdf -> strings.choosePdf to picker::launch
+        ImportType.MusicXml -> strings.chooseMusicXml to picker::launch
         ImportType.Scan -> (if (scanUsesCamera) strings.takePhoto else strings.addScans) to scanLauncher
         ImportType.Images, null -> strings.addImages to picker::launch
     }
@@ -69,7 +71,7 @@ private fun FileList(draft: PartDraft, editor: PartDraftEditor, modifier: Modifi
             NumberedRow(
                 position = index + 1,
                 name = file.name,
-                reorderable = !isPdf,
+                reorderable = !singleFile,
                 onMoveUp = { editor.moveFile(index, index - 1) }.takeIf { index > 0 },
                 onMoveDown = { editor.moveFile(index, index + 1) }.takeIf { index < draft.files.lastIndex },
                 onRemove = { editor.removeFile(index) },

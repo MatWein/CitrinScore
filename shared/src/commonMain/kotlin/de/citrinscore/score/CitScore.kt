@@ -11,6 +11,8 @@ object CitScore {
     const val PAGES_DIRECTORY = "pages"
     const val PDF_FILE = "score.pdf"
     const val PARTS_DIRECTORY = "parts"
+    const val MUSICXML_FILE_NAME = "score"
+    const val COMPRESSED_MUSICXML_EXTENSION = "mxl"
     const val SCAN_EXTENSION = "png"
     const val RECORDING_EXTENSION = "wav"
     val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")

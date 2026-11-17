@@ -14,6 +14,7 @@ import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScorePart
 import de.citrinscore.score.ScoreThumbnail
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.isReflowable
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.contentCrop
 import de.citrinscore.score.render.openImageSource
@@ -159,7 +160,7 @@ class LibraryRepository(
         try {
             root.createDirectories()
             val content = writeContent(root, part.source)
-            return ScorePart(directory, part.name, content, systemBreaks = systemBreaks(root, content))
+            return ScorePart(directory, part.name, content, systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(root, it) })
         } catch (e: Exception) {
             root.delete(mustExist = false, recursively = true)
             throw e
@@ -174,6 +175,11 @@ class LibraryRepository(
         is PartSource.Pdf -> {
             (root / CitScore.PDF_FILE) write source.file
             ScoreContent.Pdf(CitScore.PDF_FILE, source.crops.mapIndexed(::PdfPage))
+        }
+        is PartSource.MusicXml -> {
+            val name = "${CitScore.MUSICXML_FILE_NAME}.${source.file.extension.lowercase()}"
+            (root / name) write source.file
+            ScoreContent.MusicXml(name)
         }
     }
 
@@ -209,6 +215,7 @@ class LibraryRepository(
                     current.pages[page.index]
                 },
             )
+            is ScoreContent.MusicXml -> throw IllegalArgumentException("The pages of a MusicXML part cannot be edited")
         }
         if (content == part.content) return part
         removedImages(part.content, content).forEach { CitScore.resolve(root, it.path).delete(mustExist = false) }
@@ -253,7 +260,7 @@ class LibraryRepository(
 
     private suspend fun ScoreContent.withCrops(root: PlatformFile): ScoreContent = when (this) {
         is ScoreContent.Images -> copy(pages = pages.map { page -> page.crop?.let { page } ?: page.copy(crop = imageCrop(CitScore.resolve(root, page.path))) })
-        is ScoreContent.Pdf -> this
+        is ScoreContent.Pdf, is ScoreContent.MusicXml -> this
     }
 
     private suspend fun imageCrop(image: PlatformFile) = openImageSource(image).use { it.contentCrop(0) }

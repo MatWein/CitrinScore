@@ -10,10 +10,15 @@ The shared code base is prepared for iOS.
 
 - **Library** – browse a folder of your choice, organise scores in sub folders, search and sort them, delete scores and
   folders.
-- **Editing** – reorder, remove or add pages after the import and change title, composer and description.
+- **Parts** – a score can hold several parts, for example one per instrument, each imported from its own images, PDF or
+  MusicXML file. The viewer switches between them and remembers the last one.
+- **Editing** – add, rename, reorder or remove parts, reorder, remove or add pages and change title, composer and
+  description.
 - **Import wizard**
   - **Images** (PNG, JPG, WebP, BMP, SVG): one or more pages, reorderable, rendered as vectors for SVG.
   - **PDF**: a single document, rendered page by page.
+  - **MusicXML** (`.musicxml`, `.xml`, `.mxl`): engraved with Verovio and laid out to fit the screen. Zooming reflows the
+    music instead of scaling it.
   - **Scan**: take photos with the camera on Android/iOS, or pick scanned images and PDFs on desktop. Pages are converted
     to clean black and white with an adaptive threshold that can be tuned with a slider.
   - White margins are cropped automatically, previews show the result before importing.
@@ -38,7 +43,7 @@ The shared code base is prepared for iOS.
 |---|---|
 | Android 8.0 (API 26) and newer | supported |
 | Linux, Windows, macOS (JVM desktop) | supported |
-| iOS | shared code compiles, no app project yet |
+| iOS | shared code compiles, no app project yet, no MusicXML |
 
 ## Score format
 
@@ -52,6 +57,7 @@ Etude.citscore/
     ├── annotations.json     drawings and text notes, in page coordinates
     ├── pages/001.png        original images (image and scan imports)
     ├── score.pdf            original document (PDF imports)
+    ├── score.musicxml       original file (MusicXML imports, also .xml or .mxl)
     ├── audio/               audio attachments (WAV, MP3)
     └── files/               other attached files
 ```
@@ -65,7 +71,10 @@ Unknown keys in `manifest.json` are ignored, missing optional values are recompu
 Requirements:
 
 - JDK 17 or newer to start Gradle. Gradle provisions JDK 25 for the build automatically.
-- Android SDK with platform 37 for the Android app (configure `sdk.dir` in `local.properties` or `ANDROID_HOME`).
+- Android SDK with platform 37 and the NDK version from `gradle.properties` for the Android app (configure `sdk.dir` in
+  `local.properties` or `ANDROID_HOME`).
+- CMake and a C++20 compiler to build Verovio for the desktop.
+- The Verovio sources, checked out as a git submodule: `git submodule update --init`.
 
 All versions are defined in [`gradle.properties`](gradle.properties).
 
@@ -85,6 +94,7 @@ The release build of the Android app is signed with the debug key for local test
 |---|---|
 | `shared` | UI, view models, rendering, import and storage for all platforms |
 | `androidApp` | Android entry point |
+| `verovio` | Android library that builds the native Verovio engraver with the NDK |
 | `desktopApp` | Desktop entry point and packaging |
 | `branding` | App icon source and the script that generates all platform icons |
 
@@ -93,7 +103,8 @@ Source sets in `shared`:
 | Source set | Platforms | Used for |
 |---|---|---|
 | `commonMain` | all | almost everything |
-| `skikoMain` | desktop, iOS | Skia based image and SVG rendering |
+| `skikoMain` | desktop, iOS | Skia based image rendering |
+| `jvmAndroidMain` | desktop, Android | Verovio binding through JNA |
 | `mobileMain` | Android, iOS | camera capture |
 | `androidMain`, `jvmMain`, `iosMain` | one each | PDF rendering, audio, platform integration |
 
@@ -104,6 +115,8 @@ Source sets in `shared`:
 - [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) for the manifest and settings
 - [Apache PDFBox](https://pdfbox.apache.org/) for PDF rendering on desktop
 - [AndroidSVG](https://github.com/BigBadaboom/androidsvg) for SVG rendering on Android
+- [Apache Batik](https://xmlgraphics.apache.org/batik/) for SVG rendering on desktop
+- [Verovio](https://www.verovio.org/) for engraving MusicXML, called through [JNA](https://github.com/java-native-access/jna)
 - [JLayer and MP3SPI](https://github.com/pdudits/soundlibs) for MP3 playback on desktop
 
 Audio playback and recording use the platform APIs (Java Sound, Android MediaPlayer/AudioRecord, AVFoundation).

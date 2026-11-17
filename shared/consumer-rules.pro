@@ -1,0 +1,3 @@
+-keep class com.sun.jna.** { *; }
+-keep interface * extends com.sun.jna.Library { *; }
+-dontwarn java.awt.**

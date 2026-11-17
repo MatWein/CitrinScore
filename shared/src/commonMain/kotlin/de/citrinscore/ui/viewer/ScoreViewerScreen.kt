@@ -52,6 +52,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.keepScreenOn
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +71,7 @@ import de.citrinscore.resources.ic_queue_music
 import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.library.PartRef
+import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.ui.parts.partName
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.LocalDarkTheme
@@ -91,6 +94,7 @@ import kotlin.math.ln
 import kotlin.math.roundToInt
 
 private const val SAVE_DELAY_MILLIS = 1000L
+private const val REFLOW_DELAY_MILLIS = 400L
 private const val PERCENT = 100
 private const val SUBTITLE_SEPARATOR = " · "
 private val ZoomSliderWidth = 320.dp
@@ -158,29 +162,35 @@ private fun ViewerContent(
     val annotationViewModel = toolbar.annotations
     val audio by audioViewModel.state.collectAsStateWithLifecycle()
     val annotations by annotationViewModel.state.collectAsStateWithLifecycle()
-    Box(modifier, contentAlignment = Alignment.Center) {
+    val density = LocalDensity.current
+    Box(
+        modifier.onSizeChanged { size -> with(density) { viewModel.updateViewportSize(size.width.toDp().value, size.height.toDp().value) } },
+        contentAlignment = Alignment.Center,
+    ) {
         when (state) {
             ScoreViewerState.Loading -> CircularProgressIndicator()
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
                 val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
                 val render: PageRenderer = remember(state.part) { { page, region, size -> viewModel.render(state.part, page, region, size) } }
+                val editing = annotations.isEditing && !state.isReflowable
                 ScoreDocument(
                     pageSizes = state.pageSizes,
                     systemBreaks = systemBreaks,
                     viewport = viewport,
                     render = render,
                     paperColors = paperColors(),
-                    annotations = annotations.annotations,
+                    annotations = if (state.isReflowable) ScoreAnnotations() else annotations.annotations,
                     annotationInput = AnnotationInput(
                         tool = annotations.tool,
                         onStrokes = annotationViewModel::addStrokes,
                         onErase = annotationViewModel::erase,
                         onTextTap = annotationViewModel::startText,
-                    ).takeIf { annotations.isEditing },
+                    ).takeIf { editing },
                 )
                 PersistView(viewport, state.part, viewModel)
-                if (annotations.isEditing) {
+                if (state.isReflowable) ReflowOnZoom(viewport, state.part, viewModel)
+                if (editing) {
                     AnnotationToolbar(annotations, annotationViewModel, Modifier.align(Alignment.TopCenter).padding(Spacing.Large))
                 }
             }
@@ -234,6 +244,17 @@ private fun PersistView(viewport: ScoreViewport, part: PartRef, viewModel: Score
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveView(part, viewport.view) }
     DisposableEffect(viewport) { onDispose { viewModel.saveView(part, viewport.view) } }
+}
+
+@Composable
+private fun ReflowOnZoom(viewport: ScoreViewport, part: PartRef, viewModel: ScoreViewModel) {
+    LaunchedEffect(viewport) {
+        snapshotFlow { viewport.zoom }.collectLatest { zoom ->
+            if (zoom == 1f) return@collectLatest
+            delay(REFLOW_DELAY_MILLIS)
+            viewModel.reflow(part, zoom, viewport.view)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -334,7 +355,7 @@ private fun AnnotationAction(toolbar: ToolbarState) {
         Res.drawable.ic_edit_note,
         LocalStrings.current.annotate,
         onClick = toolbar.annotations::toggleEditing,
-        enabled = toolbar.viewport != null,
+        enabled = toolbar.viewport != null && toolbar.ready?.isReflowable == false,
     )
 }
 
@@ -362,26 +383,27 @@ private fun ZoomAction(toolbar: ToolbarState) {
     Box {
         IconAction(Res.drawable.ic_zoom_in, LocalStrings.current.zoom, onClick = { expanded = true }, enabled = toolbar.viewport != null)
         DropdownMenu(expanded = expanded && toolbar.viewport != null, onDismissRequest = { expanded = false }) {
-            toolbar.viewport?.let { ZoomSlider(it) }
+            toolbar.viewport?.let { ZoomSlider(it, toolbar.ready?.reflowScale ?: 1f) }
         }
     }
 }
 
 @Composable
-private fun ZoomSlider(viewport: ScoreViewport) {
+private fun ZoomSlider(viewport: ScoreViewport, baseScale: Float) {
+    val zoom = baseScale * viewport.zoom
     Row(
         modifier = Modifier.width(ZoomSliderWidth).padding(horizontal = Spacing.Large),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.Medium),
     ) {
         Slider(
-            value = ln(viewport.zoom),
-            onValueChange = { viewport.zoomTo(exp(it)) },
+            value = ln(zoom),
+            onValueChange = { viewport.zoomTo(exp(it) / baseScale) },
             valueRange = ln(ScoreViewport.MIN_ZOOM)..ln(ScoreViewport.MAX_ZOOM),
             modifier = Modifier.weight(1f),
         )
         Text(
-            LocalStrings.current.zoomPercent((viewport.zoom * PERCENT).roundToInt()),
+            LocalStrings.current.zoomPercent((zoom * PERCENT).roundToInt()),
             style = MaterialTheme.typography.labelLarge,
             textAlign = TextAlign.End,
             modifier = Modifier.widthIn(min = ZoomLabelWidth),

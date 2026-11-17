@@ -1,6 +1,7 @@
 package de.citrinscore.ui.editor
 
 import de.citrinscore.library.validateName
+import de.citrinscore.ui.importer.ImportType
 import de.citrinscore.ui.importer.PartDraft
 import de.citrinscore.ui.importer.partNameTaken
 import de.citrinscore.ui.pages.PreviewPage
@@ -27,8 +28,8 @@ sealed interface EditablePart {
     data class Existing(
         val directory: String,
         override val name: String,
-        val isPdf: Boolean,
-        val pageCount: Int,
+        val type: ImportType,
+        val pageCount: Int?,
         val pages: List<EditablePage>? = null,
     ) : EditablePart
 
@@ -40,9 +41,13 @@ sealed interface EditablePart {
 data class PagesDraft(
     val directory: String,
     val name: String,
-    val canAddPages: Boolean,
+    val type: ImportType,
     val pages: List<EditablePage>,
-)
+) {
+    val canEditPages get() = type != ImportType.MusicXml
+
+    val canAddPages get() = type == ImportType.Images
+}
 
 data class EditScoreState(
     val step: EditStep = EditStep.Details,
@@ -76,8 +81,8 @@ data class EditScoreState(
         EditStep.Details -> isLoaded && titleError == null
         EditStep.Type -> draft.type != null
         EditStep.Files -> draft.isComplete && !partNameTaken(draft.name, otherPartNames())
-        EditStep.Pages -> pagesDraft != null && pagesDraft.pages.isNotEmpty() && !isLoadingPreview && !previewFailed &&
-            !partNameTaken(pagesDraft.name, otherPartNames())
+        EditStep.Pages -> pagesDraft != null && !partNameTaken(pagesDraft.name, otherPartNames()) &&
+            (!pagesDraft.canEditPages || pagesDraft.pages.isNotEmpty() && !isLoadingPreview && !previewFailed)
         EditStep.Parts -> !isSaving && parts.isNotEmpty()
     }
 }

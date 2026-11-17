@@ -67,4 +67,4 @@ fun ImportScreen(
 }
 
 private fun PartDraft.row(strings: Strings, index: Int) =
-    PartRowModel(strings.partName(name.trim(), index), strings.partSummary(type?.title(strings).orEmpty(), pages.size))
+    PartRowModel(strings.partName(name.trim(), index), strings.partSummary(type?.title(strings).orEmpty(), pageCount))

@@ -7,6 +7,7 @@ val androidCompileSdk: String by project
 val androidTargetSdk: String by project
 val androidMinSdk: String by project
 val androidVersionCode: String by project
+val androidAbis: String by project
 
 android {
     namespace = "${project.group}.android"
@@ -18,6 +19,9 @@ android {
         targetSdk = androidTargetSdk.toInt()
         versionCode = androidVersionCode.toInt()
         versionName = project.version.toString()
+        ndk {
+            abiFilters += androidAbis.split(",")
+        }
     }
 
     buildTypes {

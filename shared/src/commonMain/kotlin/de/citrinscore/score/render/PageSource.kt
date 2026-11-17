@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.extension
+import io.github.vinceglb.filekit.readBytes
 
 interface PageSource : AutoCloseable {
     val pageSizes: List<Size>
@@ -28,6 +29,8 @@ internal fun orientedPageSize(width: Float, height: Float, rotationDegrees: Int)
 
 expect suspend fun openRasterImageSource(file: PlatformFile): PageSource
 
-expect suspend fun openSvgSource(file: PlatformFile): PageSource
+suspend fun openSvgSource(file: PlatformFile): PageSource = openSvgSource(file.readBytes())
+
+expect suspend fun openSvgSource(bytes: ByteArray): PageSource
 
 expect suspend fun openPdfSource(file: PlatformFile): PageSource

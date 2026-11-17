@@ -19,6 +19,8 @@ import de.citrinscore.score.render.contentCrop
 import de.citrinscore.score.render.openImageSource
 import de.citrinscore.score.render.openPdfSource
 import de.citrinscore.serialization.AppJson
+import de.citrinscore.score.musicxml.MusicXmlEngraverTest
+import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.test.runTest
 import java.awt.Color
@@ -427,6 +429,21 @@ class LibraryRepositoryTest {
 
         assertNull(repository.load(file).currentPart)
         assertFalse(File(score, added.directory).exists())
+    }
+
+    @Test
+    fun `musicxml parts keep the original file and are engraved for the thumbnail`() = runTest {
+        FileKit.init(appId = "citrinscore-test", filesDir = File(root, ".files"))
+        val musicXml = File(root, "Walzer.MXL").apply { writeBytes(MusicXmlEngraverTest.mxl(MusicXmlEngraverTest.score(measures = 2))) }
+
+        repository.importScore(PlatformFile(root), ScoreMetadata("Walzer"), listOf(NewPart("Klavier", PartSource.MusicXml(PlatformFile(musicXml)))))
+
+        val score = File(root, "Walzer.citscore")
+        val part = repository.load(PlatformFile(score)).parts.single()
+        assertEquals(ScoreContent.MusicXml("score.mxl"), part.content)
+        assertNull(part.systemBreaks)
+        assertContentEquals(musicXml.readBytes(), File(score, "${part.directory}/score.mxl").readBytes())
+        assertNotNull(repository.thumbnail(PlatformFile(score)))
     }
 
     private suspend fun importImages(metadata: ScoreMetadata, vararg images: File) {

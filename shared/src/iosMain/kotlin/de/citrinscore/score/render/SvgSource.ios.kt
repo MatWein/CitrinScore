@@ -5,8 +5,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
-import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Bitmap
@@ -22,11 +20,8 @@ import org.jetbrains.skia.Rect as SkiaRect
 
 private const val CSS_DPI = 96f
 
-actual suspend fun openSvgSource(file: PlatformFile): PageSource {
-    val bytes = file.readBytes()
-    return withContext(Dispatchers.Default) {
-        SkiaSvgSource(Data.makeFromBytes(bytes).use(::SVGDOM))
-    }
+actual suspend fun openSvgSource(bytes: ByteArray): PageSource = withContext(Dispatchers.Default) {
+    SkiaSvgSource(Data.makeFromBytes(bytes).use(::SVGDOM))
 }
 
 private class SkiaSvgSource(private val dom: SVGDOM) : PageSource {

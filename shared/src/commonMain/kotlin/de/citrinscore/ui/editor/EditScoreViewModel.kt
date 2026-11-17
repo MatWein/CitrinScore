@@ -10,7 +10,6 @@ import de.citrinscore.library.PageEdit
 import de.citrinscore.library.PartEdit
 import de.citrinscore.library.PartRef
 import de.citrinscore.score.PageCrop
-import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.pageCount
@@ -19,6 +18,7 @@ import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.openImageSource
 import de.citrinscore.ui.importer.PartDraft
 import de.citrinscore.ui.importer.PartDraftEditor
+import de.citrinscore.ui.importer.importType
 import de.citrinscore.ui.pages.PreviewPage
 import de.citrinscore.ui.pages.previewPage
 import de.citrinscore.ui.pages.previewSize
@@ -56,7 +56,7 @@ class EditScoreViewModel(
                 it.copy(
                     isLoaded = true,
                     parts = loadedManifest.parts.map { part ->
-                        EditablePart.Existing(part.directory, part.name, part.content is ScoreContent.Pdf, part.content.pageCount)
+                        EditablePart.Existing(part.directory, part.name, part.content.importType, part.content.pageCount)
                     },
                     title = loadedManifest.metadata.title,
                     composer = loadedManifest.metadata.composer,
@@ -85,11 +85,11 @@ class EditScoreViewModel(
                 _state.update { it.copy(step = EditStep.Files, editingPart = index) }
             }
             is EditablePart.Existing -> {
-                val pages = part.pages ?: (0 until part.pageCount).map(EditablePage::Existing)
+                val pages = part.pages ?: (0 until (part.pageCount ?: 0)).map(EditablePage::Existing)
                 _state.update {
-                    it.copy(step = EditStep.Pages, editingPart = index, pagesDraft = PagesDraft(part.directory, part.name, !part.isPdf, pages))
+                    it.copy(step = EditStep.Pages, editingPart = index, pagesDraft = PagesDraft(part.directory, part.name, part.type, pages))
                 }
-                loadExistingPreviews(part.directory)
+                if (part.pageCount != null) loadExistingPreviews(part.directory)
             }
         }
     }
@@ -142,7 +142,7 @@ class EditScoreViewModel(
             EditStep.Pages -> {
                 val pages = current.pagesDraft ?: return
                 val part = current.editingPart?.let { current.parts[it] } as? EditablePart.Existing ?: return
-                commit(part.copy(name = pages.name, pages = pages.pages))
+                commit(part.copy(name = pages.name, pages = pages.pages.takeIf { pages.canEditPages }))
             }
             EditStep.Parts -> save(current, onSaved)
         }
@@ -160,7 +160,7 @@ class EditScoreViewModel(
     private fun loadExistingPreviews(directory: String) {
         val part = manifest?.part(directory) ?: return
         val state = _state.value
-        val missing = (0 until part.content.pageCount).filter { index ->
+        val missing = (0 until (part.content.pageCount ?: 0)).filter { index ->
             val key = previewKey(directory, EditablePage.Existing(index))
             key !in state.previews && key !in state.failedPreviews
         }

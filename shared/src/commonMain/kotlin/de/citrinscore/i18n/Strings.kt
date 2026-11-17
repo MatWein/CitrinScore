@@ -84,6 +84,8 @@ interface Strings {
     val importTypePdf: String
     val importTypePdfText: String
     val importTypeScan: String
+    val importTypeMusicXml: String
+    val importTypeMusicXmlText: String
     val importTypeScanCameraText: String
     val importTypeScanFilesText: String
     val noCameraAvailable: String
@@ -94,6 +96,9 @@ interface Strings {
     val importPdfTitle: String
     val importPdfSubtitle: String
     val choosePdf: String
+    val importMusicXmlTitle: String
+    val importMusicXmlSubtitle: String
+    val chooseMusicXml: String
     val importScanTitle: String
     val importScanSubtitle: String
     val takePhoto: String
@@ -117,6 +122,8 @@ interface Strings {
     val editPagesTitle: String
     val editPagesSubtitle: String
     val editDetailsTitle: String
+    val editPartTitle: String
+    val editPartSubtitle: String
     val editDetailsSubtitle: String
     val save: String
     fun pageNumber(number: Int): String

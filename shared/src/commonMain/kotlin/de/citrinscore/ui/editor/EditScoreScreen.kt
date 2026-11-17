@@ -103,11 +103,8 @@ fun EditScoreScreen(
 
 private fun EditablePart.row(strings: Strings, index: Int): PartRowModel {
     val summary = when (this) {
-        is EditablePart.Existing -> strings.partSummary(
-            if (isPdf) strings.importTypePdf else strings.importTypeImages,
-            pages?.size ?: pageCount,
-        )
-        is EditablePart.New -> strings.partSummary(draft.type?.title(strings).orEmpty(), draft.pages.size)
+        is EditablePart.Existing -> strings.partSummary(type.title(strings), pages?.size ?: pageCount)
+        is EditablePart.New -> strings.partSummary(draft.type?.title(strings).orEmpty(), draft.pageCount)
     }
     return PartRowModel(strings.partName(name.trim(), index), summary)
 }
@@ -119,8 +116,10 @@ private fun EditPagesStep(state: EditScoreState, viewModel: EditScoreViewModel) 
     val picker = rememberFilePickerLauncher(FileKitType.File(ImportType.Images.extensions), FileKitMode.Multiple()) { files ->
         files?.let(viewModel::addImages)
     }
-    WizardStep(strings.editPagesTitle, strings.editPagesSubtitle) {
+    val (title, subtitle) = if (draft.canEditPages) strings.editPagesTitle to strings.editPagesSubtitle else strings.editPartTitle to strings.editPartSubtitle
+    WizardStep(title, subtitle) {
         PartNameField(draft.name, partNameTaken(draft.name, state.otherPartNames()), viewModel::updatePartName)
+        if (!draft.canEditPages) return@WizardStep
         PagesLayout(
             list = { modifier ->
                 Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {

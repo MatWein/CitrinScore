@@ -11,17 +11,13 @@ import androidx.compose.ui.unit.IntSize
 import com.caverock.androidsvg.PreserveAspectRatio
 import com.caverock.androidsvg.RenderOptions
 import com.caverock.androidsvg.SVG
-import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val FILL_VIEWPORT = "100%"
 
-actual suspend fun openSvgSource(file: PlatformFile): PageSource {
-    val bytes = file.readBytes()
-    return withContext(Dispatchers.Default) { AndroidSvgSource(SVG.getFromInputStream(bytes.inputStream())) }
-}
+actual suspend fun openSvgSource(bytes: ByteArray): PageSource =
+    withContext(Dispatchers.Default) { AndroidSvgSource(SVG.getFromInputStream(bytes.inputStream())) }
 
 private class AndroidSvgSource(private val svg: SVG) : PageSource {
     private val viewBox = svg.documentViewBox ?: RectF(0f, 0f, svg.documentWidth, svg.documentHeight)
