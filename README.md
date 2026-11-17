@@ -6,6 +6,23 @@ plain folders on your own storage, so there is no account, no cloud and no lock-
 The app is built with Kotlin Multiplatform and Compose Multiplatform and runs on Android, Linux, Windows and macOS.
 The shared code base is prepared for iOS.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/library.png" width="200" alt="Library"><br>Library</td>
+    <td align="center"><img src="docs/screenshots/musicxml.png" width="200" alt="MusicXML score with audio player"><br>MusicXML with audio player</td>
+    <td align="center"><img src="docs/screenshots/playback.png" width="200" alt="Playback"><br>Playback</td>
+    <td align="center"><img src="docs/screenshots/parts.png" width="200" alt="Parts"><br>Parts</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/annotations.png" width="200" alt="Notes on a PDF score"><br>Notes on a PDF score</td>
+    <td align="center"><img src="docs/screenshots/import.png" width="200" alt="Import wizard"><br>Import wizard</td>
+    <td align="center"><img src="docs/screenshots/settings.png" width="200" alt="Settings"><br>Settings</td>
+    <td align="center"><img src="docs/screenshots/dark.png" width="200" alt="Dark theme"><br>Dark theme</td>
+  </tr>
+</table>
+
 ## Features
 
 - **Library** – browse a folder of your choice, organise scores in sub folders, search and sort them, delete scores and
@@ -38,8 +55,8 @@ The shared code base is prepared for iOS.
   - Follows the app theme: in the dark theme the score is recoloured to the theme's paper and text colours.
   - The screen stays on while a score is open.
   - Zoom level and position are remembered per score.
-- **Audio attachments** – attach WAV or MP3 files or record with the microphone and play them back in a small player
-  while reading the score.
+- **Audio attachments** – attach WAV or MP3 files or record with the microphone and play them back in a slim bar at the
+  bottom of the score while reading it.
 - **File attachments** – keep any related file with a score, for example MuseScore or MusicXML files, and save it again
   with "Save as".
 - **Synchronization** – keep the whole library in a Git repository (for example on GitHub, GitLab or Gitea) and
