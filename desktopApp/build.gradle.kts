@@ -35,7 +35,12 @@ compose.desktop {
             modules("java.instrument", "java.management", "java.security.jgss", "java.sql", "jdk.security.auth", "jdk.unsupported", "jdk.xml.dom")
 
             linux.iconFile = file("packaging/icon.png")
-            windows.iconFile = file("packaging/icon.ico")
+            windows {
+                iconFile = file("packaging/icon.ico")
+                menu = true
+                shortcut = true
+                upgradeUuid = "bc46cebd-3747-4492-bb3d-63996ce758ae"
+            }
             macOS.iconFile = file("packaging/icon.icns")
         }
     }
