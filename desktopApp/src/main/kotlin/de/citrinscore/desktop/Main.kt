@@ -19,11 +19,13 @@ import java.awt.Dimension
 import java.io.File
 
 private const val SETTINGS_DIRECTORY = ".citrinscore"
+private const val HOME_PROPERTY = "citrinscore.home"
 private val MinimumWindowSize = Dimension(300, 600)
 private val InitialWindowSize = DpSize(1280.dp, 800.dp)
 
 fun main() {
-    FileKit.init(appId = AppInfo.ID, filesDir = File(System.getProperty("user.home"), SETTINGS_DIRECTORY))
+    val filesDir = System.getProperty(HOME_PROPERTY)?.let(::File) ?: File(System.getProperty("user.home"), SETTINGS_DIRECTORY)
+    FileKit.init(appId = AppInfo.ID, filesDir = filesDir)
     application(exitProcessOnExit = false) {
         Window(
             onCloseRequest = ::exitApplication,

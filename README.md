@@ -104,6 +104,9 @@ All versions are defined in [`gradle.properties`](gradle.properties).
 | Build the Android app | `./gradlew :androidApp:assembleRelease` |
 | Run the tests | `./gradlew :shared:jvmTest` |
 
+The desktop app keeps its settings and extracted resources in `~/.citrinscore`. Start it with
+`-Dcitrinscore.home=/absolute/path` to use another directory, for example a separate test library during development.
+
 The release build of the Android app is signed with the debug key for local testing. Replace the signing configuration in
 [`androidApp/build.gradle.kts`](androidApp/build.gradle.kts) before publishing to a store.
 
