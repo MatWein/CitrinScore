@@ -14,6 +14,7 @@ import de.citrinscore.settings.AppSettings
 import de.citrinscore.ui.editor.EditScoreScreen
 import de.citrinscore.ui.importer.ImportScreen
 import de.citrinscore.sync.librarySync
+import de.citrinscore.ui.settings.AboutScreen
 import de.citrinscore.ui.settings.SettingsScreen
 import de.citrinscore.ui.sync.SyncDialog
 import de.citrinscore.ui.sync.SyncViewModel
@@ -41,6 +42,9 @@ internal data object SettingsRoute
 
 @Serializable
 internal data object EditRoute
+
+@Serializable
+internal data object AboutRoute
 
 @Composable
 fun LibraryNavigation(
@@ -114,8 +118,12 @@ fun LibraryNavigation(
                 library = library,
                 onSettingsChange = onSettingsChange,
                 onLibraryChange = onLibraryChange,
+                onOpenAbout = { navController.navigate(AboutRoute) },
                 onClose = { navController.popBackStack() },
             )
+        }
+        composable<AboutRoute> {
+            AboutScreen(onClose = { navController.popBackStack() })
         }
         composable<ScoreRoute> {
             val score = libraryViewModel.selectedScore

@@ -1,3 +1,4 @@
+import java.time.LocalDate
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
@@ -28,6 +29,31 @@ val batikVersion: String by project
 val activityComposeVersion: String by project
 val androidCompileSdk: String by project
 val androidMinSdk: String by project
+val appAuthor: String by project
+val appSourceUrl: String by project
+
+val generateAppInfo by tasks.registering {
+    val appPackage = project.group.toString()
+    val properties = mapOf(
+        "NAME" to rootProject.name,
+        "ID" to appPackage,
+        "VERSION" to project.version.toString(),
+        "AUTHOR" to appAuthor,
+        "SOURCE_URL" to appSourceUrl,
+    )
+    val output = layout.buildDirectory.dir("generated/appInfo/kotlin")
+    inputs.properties(properties)
+    outputs.dir(output)
+    outputs.upToDateWhen { false }
+    doLast {
+        val values = properties + ("BUILD_DATE" to LocalDate.now().toString())
+        val constants = values.entries.joinToString("\n") { (name, value) -> "    const val $name = \"$value\"" }
+        output.get().file("${appPackage.replace('.', '/')}/AppInfo.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("package $appPackage\n\nobject AppInfo {\n$constants\n}\n")
+        }
+    }
+}
 
 kotlin {
     android {
@@ -71,6 +97,9 @@ kotlin {
     }
 
     sourceSets {
+        commonMain {
+            kotlin.srcDir(generateAppInfo)
+        }
         commonMain.dependencies {
             api("org.jetbrains.compose.runtime:runtime:$composeVersion")
             api("org.jetbrains.compose.foundation:foundation:$composeVersion")

@@ -201,6 +201,15 @@ interface Strings {
     val sync: String
     val moreActions: String
     val settingsSync: String
+    val settingsAbout: String
+    val aboutTitle: String
+    fun appVersion(version: String): String
+    fun buildDate(date: String): String
+    fun createdBy(author: String): String
+    val sourceCode: String
+    val license: String
+    val licenseText: String
+    val openSourceLibraries: String
     val syncSettingsHint: String
     val gitUrl: String
     val gitUsername: String

@@ -1,13 +1,16 @@
 package de.citrinscore.ui.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,16 +30,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import de.citrinscore.AppInfo
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
+import de.citrinscore.resources.app_icon
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.sync.librarySync
 import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.components.IconBadgeSize
+import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.VerticalScrollIndicator
 import de.citrinscore.ui.theme.ContentWidth
 import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +53,7 @@ fun SettingsScreen(
     library: PlatformFile,
     onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
     onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
+    onOpenAbout: () -> Unit,
     onClose: () -> Unit,
 ) {
     val strings = LocalStrings.current
@@ -102,6 +111,9 @@ fun SettingsScreen(
                             SyncSettings(settings.git, library, sync, onRemoteChange = { change(settings.copy(git = it)) })
                         }
                     }
+                    SettingsSection(strings.settingsAbout) {
+                        AboutTile(onOpenAbout, Modifier.fillMaxWidth())
+                    }
                 }
             }
             VerticalScrollIndicator(scrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = Spacing.ExtraSmall))
@@ -110,9 +122,25 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         content()
     }
 }
+
+@Composable
+private fun AboutTile(onClick: () -> Unit, modifier: Modifier) {
+    val strings = LocalStrings.current
+    Tile(modifier, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Page)) {
+            Image(painterResource(Res.drawable.app_icon), contentDescription = null, modifier = Modifier.size(IconBadgeSize.Large))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
+                Text(AppInfo.NAME, style = MaterialTheme.typography.headlineSmall)
+                Text(strings.appVersion(AppInfo.VERSION), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(strings.aboutTitle, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
