@@ -24,7 +24,7 @@ private val InitialWindowSize = DpSize(1280.dp, 800.dp)
 
 fun main() {
     FileKit.init(appId = AppInfo.ID, filesDir = File(System.getProperty("user.home"), SETTINGS_DIRECTORY))
-    application {
+    application(exitProcessOnExit = false) {
         Window(
             onCloseRequest = ::exitApplication,
             title = AppInfo.NAME,
