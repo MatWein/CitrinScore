@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -50,6 +52,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.keepScreenOn
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,9 +64,12 @@ import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
+import de.citrinscore.resources.ic_check
+import de.citrinscore.resources.ic_queue_music
 import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_zoom_in
-import de.citrinscore.score.ScoreMetadata
+import de.citrinscore.library.PartRef
+import de.citrinscore.ui.parts.partName
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.LocalDarkTheme
 import de.citrinscore.ui.theme.Spacing
@@ -78,6 +84,7 @@ import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import de.citrinscore.ui.viewer.files.FilesMenu
 import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.exp
 import kotlin.math.ln
@@ -85,6 +92,7 @@ import kotlin.math.roundToInt
 
 private const val SAVE_DELAY_MILLIS = 1000L
 private const val PERCENT = 100
+private const val SUBTITLE_SEPARATOR = " · "
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
 private val PlayerMargin = Spacing.Large
@@ -100,7 +108,7 @@ fun ScoreViewerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
-    val toolbar = ToolbarState(ready?.metadata, viewport, audioViewModel, annotationViewModel, filesViewModel, onClose)
+    val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, onClose)
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
 
@@ -128,8 +136,9 @@ fun ScoreViewerScreen(
 }
 
 private class ToolbarState(
-    val metadata: ScoreMetadata?,
+    val ready: ScoreViewerState.Ready?,
     val viewport: ScoreViewport?,
+    val score: ScoreViewModel,
     val audio: ScoreAudioViewModel,
     val annotations: AnnotationViewModel,
     val files: ScoreFilesViewModel,
@@ -155,11 +164,12 @@ private fun ViewerContent(
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
                 val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
+                val render: PageRenderer = remember(state.part) { { page, region, size -> viewModel.render(state.part, page, region, size) } }
                 ScoreDocument(
                     pageSizes = state.pageSizes,
                     systemBreaks = systemBreaks,
                     viewport = viewport,
-                    render = viewModel::render,
+                    render = render,
                     paperColors = paperColors(),
                     annotations = annotations.annotations,
                     annotationInput = AnnotationInput(
@@ -169,7 +179,7 @@ private fun ViewerContent(
                         onTextTap = annotationViewModel::startText,
                     ).takeIf { annotations.isEditing },
                 )
-                PersistView(viewport, viewModel)
+                PersistView(viewport, state.part, viewModel)
                 if (annotations.isEditing) {
                     AnnotationToolbar(annotations, annotationViewModel, Modifier.align(Alignment.TopCenter).padding(Spacing.Large))
                 }
@@ -215,15 +225,15 @@ private fun paperColors(): PaperColors? {
 }
 
 @Composable
-private fun PersistView(viewport: ScoreViewport, viewModel: ScoreViewModel) {
+private fun PersistView(viewport: ScoreViewport, part: PartRef, viewModel: ScoreViewModel) {
     LaunchedEffect(viewport) {
         snapshotFlow { viewport.zoom to viewport.offset }.collectLatest {
             delay(SAVE_DELAY_MILLIS)
-            viewModel.saveView(viewport.view)
+            viewModel.saveView(part, viewport.view)
         }
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveView(viewport.view) }
-    DisposableEffect(viewport) { onDispose { viewModel.saveView(viewport.view) } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveView(part, viewport.view) }
+    DisposableEffect(viewport) { onDispose { viewModel.saveView(part, viewport.view) } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -232,10 +242,10 @@ private fun TopToolbar(toolbar: ToolbarState) {
     TopAppBar(
         title = {
             Column {
-                Text(toolbar.metadata?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                toolbar.metadata?.composer?.takeIf { it.isNotEmpty() }?.let { composer ->
+                Text(toolbar.ready?.metadata?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                toolbar.subtitle()?.let { subtitle ->
                     Text(
-                        composer,
+                        subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -246,6 +256,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
         },
         navigationIcon = { BackAction(toolbar) },
         actions = {
+            PartAction(toolbar)
             AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
             FilesMenu(toolbar.files)
@@ -267,6 +278,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             verticalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
             BackAction(toolbar)
+            PartAction(toolbar)
             AnnotationAction(toolbar)
             AudioMenu(toolbar.audio)
             FilesMenu(toolbar.files)
@@ -279,6 +291,41 @@ private fun SideToolbar(toolbar: ToolbarState) {
 @Composable
 private fun BackAction(toolbar: ToolbarState) {
     IconAction(Res.drawable.ic_arrow_back, LocalStrings.current.back, onClick = toolbar.onClose)
+}
+
+@Composable
+private fun ToolbarState.subtitle(): String? {
+    val ready = ready ?: return null
+    val strings = LocalStrings.current
+    val partName = ready.parts.takeIf { it.size > 1 }?.let { parts ->
+        val index = parts.indexOfFirst { it.directory == ready.part.directory }
+        strings.partName(parts[index].name, index)
+    }
+    return listOf(ready.metadata.composer, partName.orEmpty()).filter { it.isNotEmpty() }.joinToString(SUBTITLE_SEPARATOR).ifEmpty { null }
+}
+
+@Composable
+private fun PartAction(toolbar: ToolbarState) {
+    val ready = toolbar.ready?.takeIf { it.parts.size > 1 } ?: return
+    val strings = LocalStrings.current
+    val audio by toolbar.audio.state.collectAsStateWithLifecycle()
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true }, enabled = audio.recordingStart == null)
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ready.parts.forEachIndexed { index, part ->
+                val selected = part.directory == ready.part.directory
+                DropdownMenuItem(
+                    text = { Text(strings.partName(part.name, index), fontWeight = if (selected) FontWeight.Bold else null) },
+                    leadingIcon = { if (selected) Icon(painterResource(Res.drawable.ic_check), contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        toolbar.score.selectPart(part.directory)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -10,6 +10,7 @@ import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
+import de.citrinscore.score.ScorePart
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.TextNote
 import de.citrinscore.score.render.PdfSourceTest
@@ -98,12 +99,15 @@ class LibraryRepositoryTest {
         assertEquals(metadata, manifest.metadata)
         assertEquals(now, manifest.createdAt)
         assertNull(manifest.lastOpenedAt)
-        val pages = (manifest.content as ScoreContent.Images).pages
+        val part = manifest.parts.single()
+        assertTrue(part.directory.startsWith("${CitScore.PARTS_DIRECTORY}/"))
+        val pages = (part.content as ScoreContent.Images).pages
         assertEquals(listOf("pages/001.jpg", "pages/002.png"), pages.map { it.path })
         assertEquals(listOf(PageCrop(0f, 0f, 1200f, 1700f), PageCrop(0f, 0f, 800f, 1100f)), pages.map { it.crop })
-        assertEquals(listOf(emptyList(), emptyList<Float>()), manifest.systemBreaks)
-        assertContentEquals(second.readBytes(), File(score, "pages/001.jpg").readBytes())
-        assertContentEquals(first.readBytes(), File(score, "pages/002.png").readBytes())
+        assertEquals(listOf(emptyList(), emptyList<Float>()), part.systemBreaks)
+        val partDirectory = File(score, part.directory)
+        assertContentEquals(second.readBytes(), File(partDirectory, "pages/001.jpg").readBytes())
+        assertContentEquals(first.readBytes(), File(partDirectory, "pages/002.png").readBytes())
     }
 
     @Test
@@ -127,7 +131,7 @@ class LibraryRepositoryTest {
         importImages(ScoreMetadata(title = "Etude"), page)
 
         val manifest = repository.open(PlatformFile(File(root, "Etude.citscore")))
-        assertEquals(360f, assertNotNull(manifest.systemBreaks).single().single(), absoluteTolerance = 0.5f)
+        assertEquals(360f, assertNotNull(manifest.parts.single().systemBreaks).single().single(), absoluteTolerance = 0.5f)
     }
 
     @Test
@@ -135,10 +139,14 @@ class LibraryRepositoryTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
         val score = PlatformFile(File(root, "Etude.citscore"))
         val opened = repository.open(score)
+        val part = opened.parts.single()
 
-        repository.saveSystemBreaks(score, listOf(listOf(4f)))
+        repository.saveSystemBreaks(PartRef(score, part.directory), listOf(listOf(4f)))
 
-        assertEquals(opened.copy(systemBreaks = listOf(listOf(4f))), repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt))
+        assertEquals(
+            opened.updatePart(part.directory) { it.copy(systemBreaks = listOf(listOf(4f))) },
+            repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt),
+        )
     }
 
     @Test
@@ -146,31 +154,31 @@ class LibraryRepositoryTest {
         val scan = File(root, "scan.png").also { ImageIO.write(sheet(400, 500, 100, 100, 300, 400), "png", it) }.readBytes()
         val crop = PageCrop(90f, 90f, 310f, 410f)
 
-        repository.importScans(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(scan, scan), listOf(crop, crop))
+        repository.importScore(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(NewPart("", PartSource.Scans(listOf(scan, scan), listOf(crop, crop)))))
 
         val score = File(root, "Etude.citscore")
-        val manifest = repository.open(PlatformFile(score))
-        assertEquals(ScoreContent.Images(listOf(ImagePage("pages/001.png", crop), ImagePage("pages/002.png", crop))), manifest.content)
-        assertContentEquals(scan, File(score, "pages/002.png").readBytes())
+        val part = repository.open(PlatformFile(score)).parts.single()
+        assertEquals(ScoreContent.Images(listOf(ImagePage("pages/001.png", crop), ImagePage("pages/002.png", crop))), part.content)
+        assertContentEquals(scan, File(score, "${part.directory}/pages/002.png").readBytes())
     }
 
     @Test
     fun `audio attachments are copied, renamed and deleted`() = runTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
-        val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = firstPart("Etude")
         val source = File(root, "take.wav").apply { writeBytes(byteArrayOf(1, 2, 3)) }
 
-        val attachment = repository.addAttachment(score, AttachmentKind.Audio, PlatformFile(source), "Take")
-        repository.renameAttachment(score, AttachmentKind.Audio, attachment, "Final take")
+        val attachment = repository.addAttachment(part, AttachmentKind.Audio, PlatformFile(source), "Take")
+        repository.renameAttachment(part, AttachmentKind.Audio, attachment, "Final take")
 
         val renamed = attachment.copy(name = "Final take")
-        assertEquals(listOf(renamed), repository.attachments(score, AttachmentKind.Audio))
-        val stored = File(File(root, "Etude.citscore"), attachment.path)
+        assertEquals(listOf(renamed), repository.attachments(part, AttachmentKind.Audio))
+        val stored = File(File(root, "Etude.citscore/${part.directory}"), attachment.path)
         assertContentEquals(source.readBytes(), stored.readBytes())
 
-        repository.deleteAttachment(score, AttachmentKind.Audio, renamed)
+        repository.deleteAttachment(part, AttachmentKind.Audio, renamed)
 
-        assertEquals(emptyList(), repository.attachments(score, AttachmentKind.Audio))
+        assertEquals(emptyList(), repository.attachments(part, AttachmentKind.Audio))
         assertFalse(stored.exists())
     }
 
@@ -181,80 +189,87 @@ class LibraryRepositoryTest {
         val third = image("c.png", "png", width = 300, height = 420)
         importImages(ScoreMetadata(title = "Etude"), first, second)
         val score = PlatformFile(File(root, "Etude.citscore"))
-        val audio = repository.addAttachment(score, AttachmentKind.Audio, PlatformFile(first), "Take")
-        val before = repository.load(score).content as ScoreContent.Images
+        val part = firstPart("Etude")
+        val audio = repository.addAttachment(part, AttachmentKind.Audio, PlatformFile(first), "Take")
+        val before = repository.load(score).parts.single().content as ScoreContent.Images
 
         val renamed = repository.updateScore(
             folder = PlatformFile(root),
             score = score,
             metadata = ScoreMetadata(title = "Studie", composer = "Czerny"),
-            pages = listOf(PageEdit.Add(PlatformFile(third), PageCrop(0f, 0f, 300f, 420f)), PageEdit.Keep(1)),
+            edits = listOf(
+                PartEdit.Keep(part.directory, "Violine", listOf(PageEdit.Add(PlatformFile(third), PageCrop(0f, 0f, 300f, 420f)), PageEdit.Keep(1))),
+            ),
         )
 
         assertFalse(File(root, "Etude.citscore").exists())
-        val directory = File(root, "Studie.citscore")
+        val directory = File(root, "Studie.citscore/${part.directory}")
         assertTrue(directory.exists())
         val manifest = repository.load(renamed)
         assertEquals(ScoreMetadata(title = "Studie", composer = "Czerny"), manifest.metadata)
-        assertEquals(listOf(audio), manifest.audio)
-        val pages = (manifest.content as ScoreContent.Images).pages
+        val edited = manifest.parts.single()
+        assertEquals("Violine", edited.name)
+        assertEquals(listOf(audio), edited.audio)
+        val pages = (edited.content as ScoreContent.Images).pages
         assertEquals(listOf(PageCrop(0f, 0f, 300f, 420f), before.pages[1].crop), pages.map { it.crop })
         assertEquals(before.pages[1], pages[1])
         assertContentEquals(third.readBytes(), File(directory, pages[0].path).readBytes())
         assertFalse(File(directory, before.pages[0].path).exists())
-        assertEquals(2, manifest.systemBreaks?.size)
+        assertEquals(2, edited.systemBreaks?.size)
     }
 
     @Test
     fun `editing a pdf score reorders and removes pages`() = runTest {
         val pdf = PdfSourceTest.samplePdf(root)
         val crops = openPdfSource(PlatformFile(pdf)).use { source -> source.pageSizes.indices.map { source.contentCrop(it) } }
-        repository.importPdf(PlatformFile(root), ScoreMetadata(title = "Sonate"), PlatformFile(pdf), crops)
+        importPdf("Sonate", pdf, crops)
         val score = PlatformFile(File(root, "Sonate.citscore"))
+        val part = firstPart("Sonate")
 
-        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Sonate"), listOf(PageEdit.Keep(1)))
+        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Sonate"), listOf(PartEdit.Keep(part.directory, "", listOf(PageEdit.Keep(1)))))
 
-        val manifest = repository.load(score)
-        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, listOf(PdfPage(1, crops[1]))), manifest.content)
-        ScoreRenderers.open(score, manifest.content).use { renderer -> assertEquals(listOf(crops[1].size), renderer.pageSizes) }
+        val content = repository.load(score).parts.single().content
+        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, listOf(PdfPage(1, crops[1]))), content)
+        ScoreRenderers.open(part.root, content).use { renderer -> assertEquals(listOf(crops[1].size), renderer.pageSizes) }
     }
 
     @Test
     fun `annotations are stored next to the manifest and follow edited pages`() = runTest {
         importImages(ScoreMetadata(title = "Etude"), image("a.png", "png", 100, 140), image("b.png", "png", 100, 140))
         val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = firstPart("Etude")
         val onFirst = InkStroke(page = 0, points = listOf(1f, 2f, 3f, 4f), width = 0.5f)
         val onSecond = TextNote(page = 1, x = 10f, y = 20f, text = "p", size = 3f)
 
-        assertEquals(ScoreAnnotations(), repository.annotations(score))
-        repository.saveAnnotations(score, ScoreAnnotations(listOf(onFirst), listOf(onSecond)))
-        assertTrue(File(root, "Etude.citscore/${CitScore.ANNOTATIONS_FILE}").exists())
+        assertEquals(ScoreAnnotations(), repository.annotations(part))
+        repository.saveAnnotations(part, ScoreAnnotations(listOf(onFirst), listOf(onSecond)))
+        assertTrue(File(root, "Etude.citscore/${part.directory}/${CitScore.ANNOTATIONS_FILE}").exists())
 
-        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Etude"), listOf(PageEdit.Keep(1)))
+        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Etude"), listOf(PartEdit.Keep(part.directory, "", listOf(PageEdit.Keep(1)))))
 
-        assertEquals(ScoreAnnotations(texts = listOf(onSecond.copy(page = 0))), repository.annotations(score))
+        assertEquals(ScoreAnnotations(texts = listOf(onSecond.copy(page = 0))), repository.annotations(part))
     }
 
     @Test
     fun `any file can be attached and exported again`() = runTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
-        val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = firstPart("Etude")
         val musescore = File(root, "Etude.mscz").apply { writeBytes(byteArrayOf(9, 8, 7)) }
         val withoutExtension = File(root, "LIESMICH").apply { writeText("notes") }
 
-        val first = repository.addAttachment(score, AttachmentKind.File, PlatformFile(musescore), musescore.name)
-        val second = repository.addAttachment(score, AttachmentKind.File, PlatformFile(withoutExtension), withoutExtension.name)
+        val first = repository.addAttachment(part, AttachmentKind.File, PlatformFile(musescore), musescore.name)
+        val second = repository.addAttachment(part, AttachmentKind.File, PlatformFile(withoutExtension), withoutExtension.name)
 
-        assertEquals(listOf("Etude.mscz", "LIESMICH"), repository.attachments(score, AttachmentKind.File).map { it.name })
-        assertEquals(emptyList(), repository.attachments(score, AttachmentKind.Audio))
+        assertEquals(listOf("Etude.mscz", "LIESMICH"), repository.attachments(part, AttachmentKind.File).map { it.name })
+        assertEquals(emptyList(), repository.attachments(part, AttachmentKind.Audio))
         val exported = File(root, "export.mscz")
-        repository.exportAttachment(score, first, PlatformFile(exported))
+        repository.exportAttachment(part, first, PlatformFile(exported))
         assertContentEquals(musescore.readBytes(), exported.readBytes())
 
-        repository.deleteAttachment(score, AttachmentKind.File, second)
+        repository.deleteAttachment(part, AttachmentKind.File, second)
 
-        assertEquals(listOf(first), repository.attachments(score, AttachmentKind.File))
-        assertFalse(File(File(root, "Etude.citscore"), second.path).exists())
+        assertEquals(listOf(first), repository.attachments(part, AttachmentKind.File))
+        assertFalse(File(File(root, "Etude.citscore/${part.directory}"), second.path).exists())
     }
 
     @Test
@@ -305,7 +320,9 @@ class LibraryRepositoryTest {
         val manifest = repository.open(PlatformFile(score))
 
         val expected = ImagePage("pages/001.png", PageCrop(190f, 290f, 810f, 1110f))
-        assertEquals(ScoreContent.Images(listOf(expected)), manifest.content)
+        val part = manifest.parts.single()
+        assertEquals("", part.directory)
+        assertEquals(ScoreContent.Images(listOf(expected)), part.content)
         assertEquals(manifest, AppJson.decodeFromString<ScoreManifest>(File(score, CitScore.MANIFEST_FILE).readText()))
     }
 
@@ -314,10 +331,14 @@ class LibraryRepositoryTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
         val score = PlatformFile(File(root, "Etude.citscore"))
         val opened = repository.open(score)
+        val part = opened.parts.single()
 
-        repository.saveView(score, ScoreViewState(zoom = 1.5f, x = 0.25f, y = 0.5f))
+        repository.saveView(PartRef(score, part.directory), ScoreViewState(zoom = 1.5f, x = 0.25f, y = 0.5f))
 
-        assertEquals(opened.copy(view = ScoreViewState(1.5f, 0.25f, 0.5f)), repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt))
+        assertEquals(
+            opened.updatePart(part.directory) { it.copy(view = ScoreViewState(1.5f, 0.25f, 0.5f)) },
+            repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt),
+        )
     }
 
     @Test
@@ -325,14 +346,14 @@ class LibraryRepositoryTest {
         val pdf = PdfSourceTest.samplePdf(root)
         val crops = openPdfSource(PlatformFile(pdf)).use { source -> source.pageSizes.indices.map { source.contentCrop(it) } }
 
-        repository.importPdf(PlatformFile(root), ScoreMetadata(title = "Sonate"), PlatformFile(pdf), crops)
+        importPdf("Sonate", pdf, crops)
 
         val score = File(root, "Sonate.citscore")
-        assertContentEquals(pdf.readBytes(), File(score, CitScore.PDF_FILE).readBytes())
-        val manifest = repository.open(PlatformFile(score))
-        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, crops.mapIndexed(::PdfPage)), manifest.content)
+        val part = repository.open(PlatformFile(score)).parts.single()
+        assertContentEquals(pdf.readBytes(), File(score, "${part.directory}/${CitScore.PDF_FILE}").readBytes())
+        assertEquals(ScoreContent.Pdf(CitScore.PDF_FILE, crops.mapIndexed(::PdfPage)), part.content)
         assertNotNull(repository.thumbnail(PlatformFile(score)))
-        ScoreRenderers.open(PlatformFile(score), manifest.content).use { renderer ->
+        ScoreRenderers.open(PartRef(PlatformFile(score), part.directory).root, part.content).use { renderer ->
             assertEquals(crops.map { it.size }, renderer.pageSizes)
         }
     }
@@ -355,14 +376,75 @@ class LibraryRepositoryTest {
     fun `failed imports leave no partial score behind`() = runTest {
         val notAnImage = File(root, "broken.png").apply { writeText("not an image") }
 
-        runCatching { repository.importImages(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(PlatformFile(notAnImage)), listOf(PageCrop(0f, 0f, 1f, 1f))) }
+        val part = NewPart("", PartSource.Images(listOf(PlatformFile(notAnImage)), listOf(PageCrop(0f, 0f, 1f, 1f))))
+        runCatching { repository.importScore(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(part)) }
 
         assertFalse(File(root, "Etude.citscore").exists())
     }
 
+    @Test
+    fun `scores store every part in its own directory and take the thumbnail from the first`() = runTest {
+        val violin = image("violin.png", "png", width = 1200, height = 600, color = Color.RED)
+        val piano = image("piano.png", "png", width = 1200, height = 600, color = Color.BLUE)
+
+        repository.importScore(PlatformFile(root), ScoreMetadata("Sonate"), listOf(imagePart("Violine", violin), imagePart("Klavier", piano)))
+
+        val score = File(root, "Sonate.citscore")
+        val parts = repository.load(PlatformFile(score)).parts
+        assertEquals(listOf("Violine", "Klavier"), parts.map { it.name })
+        assertEquals(2, parts.map { it.directory }.toSet().size)
+        assertContentEquals(violin.readBytes(), File(score, "${parts[0].directory}/pages/001.png").readBytes())
+        assertContentEquals(piano.readBytes(), File(score, "${parts[1].directory}/pages/001.png").readBytes())
+        val thumbnail = ImageIO.read(assertNotNull(repository.thumbnail(PlatformFile(score))).inputStream())
+        assertColorNear(Color.RED, Color(thumbnail.getRGB(100, 80)))
+    }
+
+    @Test
+    fun `editing parts adds, reorders, renames and deletes them`() = runTest {
+        val score = File(root, "Legacy.citscore").apply { mkdir() }
+        File(score, "pages").mkdir()
+        ImageIO.write(sheet(100, 140, 10, 10, 90, 130), "png", File(score, "pages/001.png"))
+        File(score, CitScore.ANNOTATIONS_FILE).writeText("{}")
+        File(score, CitScore.MANIFEST_FILE).writeText(
+            """{"metadata":{"title":"Legacy"},"content":{"type":"images","pages":["pages/001.png"]},"createdAt":"2025-01-01T00:00:00Z"}""",
+        )
+        val folder = PlatformFile(root)
+        val file = PlatformFile(score)
+        repository.updateScore(folder, file, ScoreMetadata("Legacy"), listOf(PartEdit.Keep("", "Violine"), PartEdit.Add(imagePart("Klavier", image("p.png", "png", 50, 70)))))
+        val added = repository.load(file).parts[1]
+        repository.selectPart(PartRef(file, added.directory))
+
+        repository.updateScore(folder, file, ScoreMetadata("Legacy"), listOf(PartEdit.Keep(added.directory, "Piano"), PartEdit.Add(imagePart("Flöte", image("f.png", "png", 50, 70)))))
+
+        val manifest = repository.load(file)
+        assertEquals(listOf("Piano", "Flöte"), manifest.parts.map { it.name })
+        assertEquals(added.directory, manifest.currentPart)
+        assertFalse(File(score, "pages").exists())
+        assertFalse(File(score, CitScore.ANNOTATIONS_FILE).exists())
+        assertTrue(File(score, added.directory).exists())
+
+        repository.updateScore(folder, file, ScoreMetadata("Legacy"), listOf(PartEdit.Keep(manifest.parts[1].directory, "Flöte")))
+
+        assertNull(repository.load(file).currentPart)
+        assertFalse(File(score, added.directory).exists())
+    }
+
     private suspend fun importImages(metadata: ScoreMetadata, vararg images: File) {
+        repository.importScore(PlatformFile(root), metadata, listOf(imagePart("", *images)))
+    }
+
+    private suspend fun imagePart(name: String, vararg images: File): NewPart {
         val files = images.map(::PlatformFile)
-        repository.importImages(PlatformFile(root), metadata, files, files.map { file -> openImageSource(file).use { it.contentCrop(0) } })
+        return NewPart(name, PartSource.Images(files, files.map { file -> openImageSource(file).use { it.contentCrop(0) } }))
+    }
+
+    private suspend fun importPdf(title: String, pdf: File, crops: List<PageCrop>) {
+        repository.importScore(PlatformFile(root), ScoreMetadata(title), listOf(NewPart("", PartSource.Pdf(PlatformFile(pdf), crops))))
+    }
+
+    private suspend fun firstPart(title: String): PartRef {
+        val score = PlatformFile(File(root, "$title.citscore"))
+        return PartRef(score, repository.load(score).parts.first().directory)
     }
 
     private suspend fun importAt(title: String, time: Instant) {
@@ -375,7 +457,7 @@ class LibraryRepositoryTest {
     private fun score(title: String, createdAt: String, lastOpenedAt: String) {
         val manifest = ScoreManifest(
             metadata = ScoreMetadata(title),
-            content = ScoreContent.Images(emptyList()),
+            parts = listOf(ScorePart("", "", ScoreContent.Images(emptyList()))),
             createdAt = Instant.parse(createdAt),
             lastOpenedAt = Instant.parse(lastOpenedAt),
         )

@@ -55,7 +55,7 @@ private val ImportType.icon
         ImportType.Pdf -> Res.drawable.ic_picture_as_pdf
     }
 
-private fun ImportType.title(strings: Strings) = when (this) {
+internal fun ImportType.title(strings: Strings) = when (this) {
     ImportType.Images -> strings.importTypeImages
     ImportType.Scan -> strings.importTypeScan
     ImportType.Pdf -> strings.importTypePdf

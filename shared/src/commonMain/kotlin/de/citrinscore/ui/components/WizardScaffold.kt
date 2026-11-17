@@ -65,6 +65,7 @@ fun <S : Enum<S>> WizardScaffold(
     nextEnabled: Boolean,
     onNext: () -> Unit,
     contentMaxWidth: (S) -> Dp = { ContentWidth.Regular },
+    stepIndex: Int = step.ordinal,
     content: @Composable (S) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -77,7 +78,7 @@ fun <S : Enum<S>> WizardScaffold(
             .padding(vertical = Spacing.Large),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        StepIndicator(step.ordinal, stepCount)
+        StepIndicator(stepIndex, stepCount)
         AnimatedContent(
             targetState = step,
             modifier = Modifier.weight(1f).fillMaxWidth(),

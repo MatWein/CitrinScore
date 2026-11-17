@@ -6,12 +6,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.library.PartRef
+import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.render.ScoreRenderer
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,44 +31,67 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val _systemBreaks = MutableStateFlow(emptyList<List<Float>>())
     val systemBreaks: StateFlow<List<List<Float>>> = _systemBreaks.asStateFlow()
 
-    private var renderer: ScoreRenderer? = null
-    private var savedView: ScoreViewState? = null
+    private val _part = MutableStateFlow<PartRef?>(null)
+    val part: StateFlow<PartRef?> = _part.asStateFlow()
+
+    private val renderers = mutableMapOf<String, ScoreRenderer>()
+    private var manifest: ScoreManifest? = null
+    private var detection: Job? = null
 
     init {
         viewModelScope.launch {
-            _state.value = attempt {
-                val manifest = repository.open(score)
-                val opened = ScoreRenderers.open(score, manifest.content)
-                renderer = opened
-                savedView = manifest.view
-                manifest.systemBreaks?.takeIf { it.size == opened.pageSizes.size }?.let { _systemBreaks.value = it }
-                ScoreViewerState.Ready(manifest.metadata, opened.pageSizes, manifest.view)
-            } ?: ScoreViewerState.Failed
-            renderer?.takeIf { _systemBreaks.value.isEmpty() }?.let { detectSystemBreaks(it) }
+            val opened = attempt { repository.open(score) } ?: return@launch run { _state.value = ScoreViewerState.Failed }
+            manifest = opened
+            val current = opened.currentPart?.takeIf { directory -> opened.parts.any { it.directory == directory } }
+            show(current ?: opened.parts.first().directory)
         }
     }
 
-    private suspend fun detectSystemBreaks(renderer: ScoreRenderer) {
+    fun selectPart(directory: String) {
+        if (_part.value?.directory == directory) return
+        viewModelScope.launch {
+            show(directory)
+            attempt { repository.selectPart(PartRef(score, directory)) }
+        }
+    }
+
+    suspend fun render(part: PartRef, page: Int, region: Rect, size: IntSize): ImageBitmap? =
+        attempt { renderers[part.directory]?.render(page, region, size) }
+
+    fun saveView(part: PartRef, view: ScoreViewState?) {
+        val current = manifest ?: return
+        if (view == null || current.part(part.directory).view == view) return
+        manifest = current.updatePart(part.directory) { it.copy(view = view) }
+        viewModelScope.launch {
+            withContext(NonCancellable) { attempt { repository.saveView(part, view) } }
+        }
+    }
+
+    private suspend fun show(directory: String) {
+        val current = manifest ?: return
+        val part = current.part(directory)
+        val ref = PartRef(score, directory)
+        detection?.cancel()
+        val renderer = attempt { renderers.getOrPut(directory) { ScoreRenderers.open(ref.root, part.content) } }
+            ?: return run { _state.value = ScoreViewerState.Failed }
+        val breaks = part.systemBreaks?.takeIf { it.size == renderer.pageSizes.size }
+        _systemBreaks.value = breaks.orEmpty()
+        _part.value = ref
+        _state.value = ScoreViewerState.Ready(current.metadata, current.parts, ref, renderer.pageSizes, part.view)
+        if (breaks == null) detection = viewModelScope.launch { detectSystemBreaks(ref, renderer) }
+    }
+
+    private suspend fun detectSystemBreaks(part: PartRef, renderer: ScoreRenderer) {
         for (page in renderer.pageSizes.indices) {
             val breaks = attempt { renderer.systemBreaks(page) } ?: return
             _systemBreaks.update { it + listOf(breaks) }
         }
-        attempt { repository.saveSystemBreaks(score, _systemBreaks.value) }
-    }
-
-    suspend fun render(page: Int, region: Rect, size: IntSize): ImageBitmap? = attempt { renderer?.render(page, region, size) }
-
-    fun saveView(view: ScoreViewState?) {
-        if (view == null || view == savedView) return
-        savedView = view
-        viewModelScope.launch {
-            withContext(NonCancellable) {
-                attempt { repository.saveView(score, view) } ?: run { savedView = null }
-            }
-        }
+        val detected = _systemBreaks.value
+        manifest = manifest?.updatePart(part.directory) { it.copy(systemBreaks = detected) }
+        attempt { repository.saveSystemBreaks(part, detected) }
     }
 
     override fun onCleared() {
-        renderer?.close()
+        renderers.values.forEach { it.close() }
     }
 }

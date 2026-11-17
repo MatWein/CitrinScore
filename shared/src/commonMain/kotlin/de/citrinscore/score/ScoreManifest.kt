@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.buildJsonObject
@@ -18,19 +19,42 @@ import kotlin.time.Instant
 @Serializable
 data class ScoreManifest(
     val metadata: ScoreMetadata,
-    val content: ScoreContent,
+    val parts: List<ScorePart>,
     val createdAt: Instant,
     val lastOpenedAt: Instant? = null,
-    val view: ScoreViewState? = null,
-    val systemBreaks: List<List<Float>>? = null,
-    val audio: List<Attachment> = emptyList(),
-    val files: List<Attachment> = emptyList(),
+    val currentPart: String? = null,
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
 ) {
     val lastActivity get() = lastOpenedAt ?: createdAt
 
+    fun part(directory: String) = parts.first { it.directory == directory }
+
+    fun updatePart(directory: String, transform: (ScorePart) -> ScorePart) =
+        copy(parts = parts.map { if (it.directory == directory) transform(it) else it })
+
     companion object {
         const val CURRENT_FORMAT_VERSION = 1
+    }
+}
+
+@Serializable
+data class ScorePart(
+    val directory: String,
+    val name: String,
+    val content: ScoreContent,
+    val view: ScoreViewState? = null,
+    val systemBreaks: List<List<Float>>? = null,
+    val audio: List<Attachment> = emptyList(),
+    val files: List<Attachment> = emptyList(),
+) {
+    fun attachments(kind: AttachmentKind) = when (kind) {
+        AttachmentKind.Audio -> audio
+        AttachmentKind.File -> files
+    }
+
+    fun withAttachments(kind: AttachmentKind, attachments: List<Attachment>) = when (kind) {
+        AttachmentKind.Audio -> copy(audio = attachments)
+        AttachmentKind.File -> copy(files = attachments)
     }
 }
 
@@ -63,6 +87,12 @@ sealed interface ScoreContent {
     data class Pdf(val path: String, @Serializable(with = PdfPagesSerializer::class) val pages: List<PdfPage>) : ScoreContent
 }
 
+val ScoreContent.pageCount
+    get() = when (this) {
+        is ScoreContent.Images -> pages.size
+        is ScoreContent.Pdf -> pages.size
+    }
+
 @Serializable
 data class PdfPage(val index: Int, val crop: PageCrop)
 
@@ -94,4 +124,25 @@ private object PdfPagesSerializer : JsonTransformingSerializer<List<PdfPage>>(Li
 private object ImagePageSerializer : JsonTransformingSerializer<ImagePage>(ImagePage.serializer()) {
     override fun transformDeserialize(element: JsonElement): JsonElement =
         if (element is JsonPrimitive) buildJsonObject { put("path", element) } else element
+}
+
+object ScoreManifestSerializer : JsonTransformingSerializer<ScoreManifest>(ScoreManifest.serializer()) {
+    private val singlePartKeys = listOf(
+        ScorePart::content.name,
+        ScorePart::view.name,
+        ScorePart::systemBreaks.name,
+        ScorePart::audio.name,
+        ScorePart::files.name,
+    )
+
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        val manifest = element.jsonObject
+        if (ScoreManifest::parts.name in manifest) return manifest
+        val part = buildJsonObject {
+            put(ScorePart::directory.name, "")
+            put(ScorePart::name.name, "")
+            singlePartKeys.forEach { key -> manifest[key]?.let { put(key, it) } }
+        }
+        return JsonObject(manifest - singlePartKeys.toSet() + (ScoreManifest::parts.name to JsonArray(listOf(part))))
+    }
 }

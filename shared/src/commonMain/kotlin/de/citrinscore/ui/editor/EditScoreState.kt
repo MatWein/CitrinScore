@@ -1,11 +1,13 @@
 package de.citrinscore.ui.editor
 
 import de.citrinscore.library.validateName
+import de.citrinscore.ui.importer.PartDraft
+import de.citrinscore.ui.importer.partNameTaken
 import de.citrinscore.ui.pages.PreviewPage
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 
-enum class EditStep { Pages, Details }
+enum class EditStep { Details, Type, Files, Pages, Parts }
 
 sealed interface EditablePage {
     val key: String
@@ -19,12 +21,36 @@ sealed interface EditablePage {
     }
 }
 
+sealed interface EditablePart {
+    val name: String
+
+    data class Existing(
+        val directory: String,
+        override val name: String,
+        val isPdf: Boolean,
+        val pageCount: Int,
+        val pages: List<EditablePage>? = null,
+    ) : EditablePart
+
+    data class New(val draft: PartDraft) : EditablePart {
+        override val name get() = draft.name
+    }
+}
+
+data class PagesDraft(
+    val directory: String,
+    val name: String,
+    val canAddPages: Boolean,
+    val pages: List<EditablePage>,
+)
+
 data class EditScoreState(
-    val step: EditStep = EditStep.Pages,
+    val step: EditStep = EditStep.Details,
     val isLoaded: Boolean = false,
     val loadFailed: Boolean = false,
-    val canAddPages: Boolean = false,
-    val pages: List<EditablePage> = emptyList(),
+    val parts: List<EditablePart> = emptyList(),
+    val editingPart: Int? = null,
+    val pagesDraft: PagesDraft? = null,
     val previews: Map<String, PreviewPage> = emptyMap(),
     val failedPreviews: Set<String> = emptySet(),
     val title: String = "",
@@ -36,15 +62,24 @@ data class EditScoreState(
 ) {
     val titleError get() = validateName(title, takenTitles)
 
-    val previewPages get() = pages.mapNotNull { previews[it.key] }
+    fun otherPartNames() = parts.filterIndexed { index, _ -> index != editingPart }.map { it.name }
 
-    val isLoadingPreview get() = pages.any { it.key !in previews && it.key !in failedPreviews }
+    private val draftPreviewKeys get() = pagesDraft?.let { draft -> draft.pages.map { previewKey(draft.directory, it) } }.orEmpty()
 
-    val previewFailed get() = pages.any { it.key in failedPreviews }
+    val previewPages get() = draftPreviewKeys.mapNotNull { previews[it] }
 
-    val canAdvance
-        get() = when (step) {
-            EditStep.Pages -> isLoaded && pages.isNotEmpty() && !isLoadingPreview && !previewFailed
-            EditStep.Details -> !isSaving && titleError == null
-        }
+    val isLoadingPreview get() = draftPreviewKeys.any { it !in previews && it !in failedPreviews }
+
+    val previewFailed get() = draftPreviewKeys.any { it in failedPreviews }
+
+    fun canAdvance(draft: PartDraft) = when (step) {
+        EditStep.Details -> isLoaded && titleError == null
+        EditStep.Type -> draft.type != null
+        EditStep.Files -> draft.isComplete && !partNameTaken(draft.name, otherPartNames())
+        EditStep.Pages -> pagesDraft != null && pagesDraft.pages.isNotEmpty() && !isLoadingPreview && !previewFailed &&
+            !partNameTaken(pagesDraft.name, otherPartNames())
+        EditStep.Parts -> !isSaving && parts.isNotEmpty()
+    }
 }
+
+fun previewKey(directory: String, page: EditablePage) = "$directory/${page.key}"

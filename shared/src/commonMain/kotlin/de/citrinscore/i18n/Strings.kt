@@ -121,6 +121,14 @@ interface Strings {
     val save: String
     fun pageNumber(number: Int): String
     val editLoadFailed: String
+    val parts: String
+    fun partNumber(number: Int): String
+    val partNameLabel: String
+    val partNameExists: String
+    val importPartsSubtitle: String
+    val editPartsSubtitle: String
+    val addPart: String
+    fun pageCount(count: Int): String
     val editSaveFailed: String
 
     val zoom: String

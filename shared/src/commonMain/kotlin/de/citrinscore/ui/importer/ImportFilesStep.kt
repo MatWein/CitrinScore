@@ -11,13 +11,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.score.scan.ScanThresholdRange
+import de.citrinscore.ui.components.AddButton
+import de.citrinscore.ui.components.NumberedRow
 import de.citrinscore.ui.components.WizardStep
-import de.citrinscore.ui.pages.AddPagesButton
 import de.citrinscore.ui.pages.PagePreview
-import de.citrinscore.ui.pages.PageRow
 import de.citrinscore.ui.pages.PagesLayout
+import de.citrinscore.ui.parts.PartNameField
 import de.citrinscore.ui.theme.Spacing
-import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -25,26 +25,21 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
 
 @Composable
-fun ImportFilesStep(
-    state: ImportState,
-    onAdd: (List<PlatformFile>) -> Unit,
-    onMove: (from: Int, to: Int) -> Unit,
-    onRemove: (Int) -> Unit,
-    onScanThresholdChange: (Float) -> Unit,
-) {
+fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEditor) {
     val strings = LocalStrings.current
-    val (title, subtitle) = when (state.type) {
+    val (title, subtitle) = when (draft.type) {
         ImportType.Pdf -> strings.importPdfTitle to strings.importPdfSubtitle
         ImportType.Scan -> strings.importScanTitle to strings.importScanSubtitle
         ImportType.Images, null -> strings.importFilesTitle to strings.importFilesSubtitle
     }
     WizardStep(title, subtitle) {
+        PartNameField(draft.name, nameTaken, editor::updateName)
         PagesLayout(
-            list = { modifier -> FileList(state, onAdd, onMove, onRemove, modifier) },
+            list = { modifier -> FileList(draft, editor, modifier) },
             preview = { modifier ->
-                if (state.files.isNotEmpty()) {
-                    PagePreview(state.pages, state.isLoadingPreview, state.previewFailed, modifier) {
-                        if (state.type == ImportType.Scan) ScanThresholdSlider(state.scanThreshold, onScanThresholdChange)
+                if (draft.files.isNotEmpty()) {
+                    PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, modifier) {
+                        if (draft.type == ImportType.Scan) ScanThresholdSlider(draft.scanThreshold, editor::updateScanThreshold)
                     }
                 }
             },
@@ -53,41 +48,35 @@ fun ImportFilesStep(
 }
 
 @Composable
-private fun FileList(
-    state: ImportState,
-    onAdd: (List<PlatformFile>) -> Unit,
-    onMove: (from: Int, to: Int) -> Unit,
-    onRemove: (Int) -> Unit,
-    modifier: Modifier,
-) {
+private fun FileList(draft: PartDraft, editor: PartDraftEditor, modifier: Modifier) {
     val strings = LocalStrings.current
-    val isPdf = state.type == ImportType.Pdf
+    val isPdf = draft.type == ImportType.Pdf
     val picker = rememberFilePickerLauncher(
-        type = FileKitType.File(state.type?.extensions.orEmpty()),
+        type = FileKitType.File(draft.type?.extensions.orEmpty()),
         mode = FileKitMode.Multiple(maxItems = if (isPdf) 1 else null),
     ) { picked ->
-        picked?.let(onAdd)
+        picked?.let(editor::addFiles)
     }
-    val scanLauncher = rememberScanLauncher(onAdd)
-    val (addLabel, onAddClick) = when (state.type) {
+    val scanLauncher = rememberScanLauncher(editor::addFiles)
+    val (addLabel, onAddClick) = when (draft.type) {
         ImportType.Pdf -> strings.choosePdf to picker::launch
         ImportType.Scan -> (if (scanUsesCamera) strings.takePhoto else strings.addScans) to scanLauncher
         ImportType.Images, null -> strings.addImages to picker::launch
     }
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-        state.files.forEachIndexed { index, file ->
-            PageRow(
+        draft.files.forEachIndexed { index, file ->
+            NumberedRow(
                 position = index + 1,
                 name = file.name,
-                failed = file.path in state.failedPreviews,
                 reorderable = !isPdf,
-                onMoveUp = { onMove(index, index - 1) }.takeIf { index > 0 },
-                onMoveDown = { onMove(index, index + 1) }.takeIf { index < state.files.lastIndex },
-                onRemove = { onRemove(index) },
+                onMoveUp = { editor.moveFile(index, index - 1) }.takeIf { index > 0 },
+                onMoveDown = { editor.moveFile(index, index + 1) }.takeIf { index < draft.files.lastIndex },
+                onRemove = { editor.removeFile(index) },
+                failed = file.path in draft.failedPreviews,
             )
         }
-        AddPagesButton(addLabel, onAddClick)
+        AddButton(addLabel, onAddClick)
     }
 }
 

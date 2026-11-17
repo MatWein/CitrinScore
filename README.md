@@ -42,18 +42,21 @@ The shared code base is prepared for iOS.
 
 ## Score format
 
-Every score is a directory with the suffix `.citscore`, so it can be copied, synced and backed up like any other folder:
+Every score is a directory with the suffix `.citscore`, so it can be copied, synced and backed up like any other folder. A score holds one or more parts, for example one per instrument, each in its own directory:
 
 ```
 Etude.citscore/
-├── manifest.json     metadata, page list with crop boxes, view state, staff system positions, audio attachments
-├── annotations.json  drawings and text notes, in page coordinates
-├── thumbnail.jpg     preview used by the library
-├── pages/001.png     original images (image and scan imports)
-├── score.pdf         original document (PDF imports)
-├── audio/            audio attachments (WAV, MP3)
-└── files/            other attached files
+├── manifest.json            metadata and the parts with their page lists, crop boxes, view state, staff system positions and attachments
+├── thumbnail.jpg            preview of the first part used by the library
+└── parts/<id>/
+    ├── annotations.json     drawings and text notes, in page coordinates
+    ├── pages/001.png        original images (image and scan imports)
+    ├── score.pdf            original document (PDF imports)
+    ├── audio/               audio attachments (WAV, MP3)
+    └── files/               other attached files
 ```
+
+Scores created before parts existed keep their single part directly in the score directory.
 
 Unknown keys in `manifest.json` are ignored, missing optional values are recomputed when a score is opened.
 

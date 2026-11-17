@@ -3,20 +3,22 @@ package de.citrinscore.ui.viewer.annotations
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.library.PartRef
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.TextNote
 import de.citrinscore.util.attempt
-import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class AnnotationViewModel(private val score: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
+class AnnotationViewModel(private val part: StateFlow<PartRef?>, private val repository: LibraryRepository) : ViewModel() {
 
     private val _state = MutableStateFlow(AnnotationState())
     val state: StateFlow<AnnotationState> = _state.asStateFlow()
@@ -26,7 +28,11 @@ class AnnotationViewModel(private val score: PlatformFile, private val repositor
 
     init {
         viewModelScope.launch {
-            attempt { repository.annotations(score) }?.let { annotations -> _state.update { it.copy(annotations = annotations) } }
+            part.filterNotNull().collectLatest { ref ->
+                history.clear()
+                _state.update { it.copy(annotations = ScoreAnnotations(), draft = null, canUndo = false) }
+                attempt { repository.annotations(ref) }?.let { annotations -> _state.update { it.copy(annotations = annotations) } }
+            }
         }
     }
 
@@ -74,9 +80,10 @@ class AnnotationViewModel(private val score: PlatformFile, private val repositor
     }
 
     private fun save(annotations: ScoreAnnotations) {
+        val ref = part.value ?: return
         viewModelScope.launch {
             saving.withLock {
-                attempt { repository.saveAnnotations(score, annotations) } ?: _state.update { it.copy(saveFailed = true) }
+                attempt { repository.saveAnnotations(ref, annotations) } ?: _state.update { it.copy(saveFailed = true) }
             }
         }
     }

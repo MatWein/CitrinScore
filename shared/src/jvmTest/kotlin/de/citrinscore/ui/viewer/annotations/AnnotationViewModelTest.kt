@@ -1,6 +1,7 @@
 package de.citrinscore.ui.viewer.annotations
 
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.library.PartRef
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.TextNote
@@ -8,12 +9,14 @@ import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -31,6 +34,7 @@ class AnnotationViewModelTest {
 
     private val score = Files.createTempDirectory("citrinscore-annotations").toFile()
     private val repository = LibraryRepository()
+    private val part = PartRef(PlatformFile(score), "")
     private val stroke = InkStroke(page = 0, points = listOf(1f, 1f, 5f, 5f), width = 1f)
 
     @BeforeTest
@@ -46,7 +50,7 @@ class AnnotationViewModelTest {
 
     @Test
     fun `strokes, texts and erasing are saved and can be undone`() = runTest {
-        val viewModel = AnnotationViewModel(PlatformFile(score), repository)
+        val viewModel = AnnotationViewModel(MutableStateFlow(part), repository)
 
         viewModel.addStrokes(listOf(stroke))
         viewModel.startText(TextDraft(page = 1, x = 2f, y = 3f, size = 4f, original = null))
@@ -67,7 +71,7 @@ class AnnotationViewModelTest {
 
     @Test
     fun `clearing the text of a note removes it`() = runTest {
-        val viewModel = AnnotationViewModel(PlatformFile(score), repository)
+        val viewModel = AnnotationViewModel(MutableStateFlow(part), repository)
         viewModel.startText(TextDraft(page = 0, x = 0f, y = 0f, size = 1f, original = null))
         viewModel.commitText("mf")
         val note = viewModel.state.value.annotations.texts.single()
@@ -78,7 +82,24 @@ class AnnotationViewModelTest {
         assertSaved(ScoreAnnotations())
     }
 
+    @Test
+    fun `switching the part shows its annotations and starts a new history`() = runTest {
+        val other = PartRef(PlatformFile(score), "parts/other")
+        File(score, other.directory).mkdirs()
+        repository.saveAnnotations(other, ScoreAnnotations(strokes = listOf(stroke)))
+        val selected = MutableStateFlow(part)
+        val viewModel = AnnotationViewModel(selected, repository)
+        viewModel.addStrokes(listOf(stroke.copy(page = 1)))
+
+        selected.value = other
+
+        withContext(Dispatchers.Default) {
+            withTimeout(SAVE_TIMEOUT) { while (viewModel.state.value.annotations.strokes != listOf(stroke)) delay(POLL_INTERVAL) }
+        }
+        assertFalse(viewModel.state.value.canUndo)
+    }
+
     private suspend fun assertSaved(expected: ScoreAnnotations) = withContext(Dispatchers.Default) {
-        withTimeout(SAVE_TIMEOUT) { while (repository.annotations(PlatformFile(score)) != expected) delay(POLL_INTERVAL) }
+        withTimeout(SAVE_TIMEOUT) { while (repository.annotations(part) != expected) delay(POLL_INTERVAL) }
     }
 }
