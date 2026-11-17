@@ -71,7 +71,6 @@ import de.citrinscore.resources.ic_queue_music
 import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.library.PartRef
-import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.ui.parts.partName
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.LocalDarkTheme
@@ -80,6 +79,7 @@ import de.citrinscore.ui.viewer.annotations.AnnotationDialogs
 import de.citrinscore.ui.viewer.annotations.AnnotationInput
 import de.citrinscore.ui.viewer.annotations.AnnotationToolbar
 import de.citrinscore.ui.viewer.annotations.AnnotationViewModel
+import de.citrinscore.ui.viewer.annotations.staffSizing
 import de.citrinscore.ui.viewer.audio.AudioMenu
 import de.citrinscore.ui.viewer.audio.AudioPlayerCard
 import de.citrinscore.ui.viewer.audio.OnAppBackground
@@ -173,19 +173,21 @@ private fun ViewerContent(
             is ScoreViewerState.Ready -> if (viewport != null) {
                 val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
                 val render: PageRenderer = remember(state.part) { { page, region, size -> viewModel.render(state.part, page, region, size) } }
-                val editing = annotations.isEditing && !state.isReflowable
+                val anchors by viewModel.anchors.collectAsStateWithLifecycle()
+                val editing = annotations.isEditing && (!state.isReflowable || anchors != null)
                 ScoreDocument(
                     pageSizes = state.pageSizes,
                     systemBreaks = systemBreaks,
                     viewport = viewport,
                     render = render,
                     paperColors = paperColors(),
-                    annotations = if (state.isReflowable) ScoreAnnotations() else annotations.annotations,
+                    annotations = annotations.annotations,
                     annotationInput = AnnotationInput(
                         tool = annotations.tool,
                         onStrokes = annotationViewModel::addStrokes,
                         onErase = annotationViewModel::erase,
                         onTextTap = annotationViewModel::startText,
+                        sizing = anchors?.staffSizing(),
                     ).takeIf { editing },
                 )
                 PersistView(viewport, state.part, viewModel)
@@ -355,7 +357,7 @@ private fun AnnotationAction(toolbar: ToolbarState) {
         Res.drawable.ic_edit_note,
         LocalStrings.current.annotate,
         onClick = toolbar.annotations::toggleEditing,
-        enabled = toolbar.viewport != null && toolbar.ready?.isReflowable == false,
+        enabled = toolbar.viewport != null,
     )
 }
 

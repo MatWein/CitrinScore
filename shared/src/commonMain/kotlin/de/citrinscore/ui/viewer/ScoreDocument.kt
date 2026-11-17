@@ -53,6 +53,7 @@ import de.citrinscore.ui.viewer.annotations.AnnotationInput
 import de.citrinscore.ui.viewer.annotations.annotationColor
 import de.citrinscore.ui.viewer.annotations.annotationInput
 import de.citrinscore.ui.viewer.annotations.drawAnnotations
+import de.citrinscore.ui.viewer.annotations.pageSizing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -162,7 +163,7 @@ fun ScoreDocument(
                 baseImages[page]?.let { drawAt(it, layout.pages[page].scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
             }
             tiles.forEach { tile -> drawAt(tile.image, tile.documentRect.scale(zoom).roundToIntRect().translate(-offset), colorFilter) }
-            drawAnnotations(annotations, gesture, layout, zoom, offset.toOffset(), inkColor, textMeasurer)
+            drawAnnotations(annotations, gesture, layout, zoom, offset.toOffset(), inkColor, textMeasurer, annotationInput?.sizing ?: layout.pageSizing())
         }
     }
 }

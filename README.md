@@ -27,7 +27,8 @@ The shared code base is prepared for iOS.
   - Sharp rendering at every zoom level: only the visible area is re-rendered at the current resolution.
   - Previous/next page buttons that page by staff systems, so a partly visible system moves to the top instead of being cut.
   - Keyboard and Bluetooth page turner support (Page Up/Down, arrow keys, space, +/-).
-  - Notes on the score: draw with finger, stylus or mouse and place text, with eraser and undo.
+  - Notes on the score: draw with finger, stylus or mouse and place text, with eraser and undo. On MusicXML parts notes
+    stick to their measures when the music reflows.
   - Follows the app theme: in the dark theme the score is recoloured to the theme's paper and text colours.
   - The screen stays on while a score is open.
   - Zoom level and position are remembered per score.
@@ -54,7 +55,7 @@ Etude.citscore/
 ├── manifest.json            metadata and the parts with their page lists, crop boxes, view state, staff system positions and attachments
 ├── thumbnail.jpg            preview of the first part used by the library
 └── parts/<id>/
-    ├── annotations.json     drawings and text notes, in page coordinates
+    ├── annotations.json     drawings and text notes, in page coordinates or anchored to measures for MusicXML
     ├── pages/001.png        original images (image and scan imports)
     ├── score.pdf            original document (PDF imports)
     ├── score.musicxml       original file (MusicXML imports, also .xml or .mxl)

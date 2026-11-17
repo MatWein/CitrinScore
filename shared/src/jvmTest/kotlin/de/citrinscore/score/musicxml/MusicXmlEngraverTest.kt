@@ -33,8 +33,14 @@ class MusicXmlEngraverTest {
             val wide = engraver.engrave(EngravingLayout(pageWidth = 2100, pageHeight = 2970))
             val narrow = engraver.engrave(EngravingLayout(pageWidth = 700, pageHeight = 1000))
 
-            assertTrue(wide.all { it.startsWith("<svg") && "class=\"note\"" in it })
+            assertTrue(wide.all { it.svg.startsWith("<svg") && "class=\"note\"" in it.svg })
             assertTrue(narrow.size > wide.size)
+            listOf(wide, narrow).forEach { pages ->
+                assertEquals((0 until 40).toList(), pages.flatMap { page -> page.staves.map { it.measure } })
+                pages.forEach { page ->
+                    assertTrue(page.staves.all { it.staff == 0 && it.bounds.width > 0f && it.space > 0f && it.bounds.height == it.space * 4 })
+                }
+            }
         }
     }
 

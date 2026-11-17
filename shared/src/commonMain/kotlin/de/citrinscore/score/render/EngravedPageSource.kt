@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import de.citrinscore.score.CitScore
+import de.citrinscore.score.musicxml.EngravedPage
 import de.citrinscore.score.musicxml.EngravingLayout
 import de.citrinscore.score.musicxml.MusicXmlEngraver
 import de.citrinscore.score.musicxml.openMusicXmlEngraver
@@ -19,10 +20,10 @@ class EngravedPageSource(private val pages: List<PageSource>) : PageSource {
     override fun close() = pages.forEach(PageSource::close)
 }
 
-suspend fun MusicXmlEngraver.engravedSource(layout: EngravingLayout): PageSource {
+suspend fun List<EngravedPage>.pageSource(): PageSource {
     val pages = mutableListOf<PageSource>()
     try {
-        engrave(layout).forEach { svg -> pages += openSvgSource(svg.encodeToByteArray()) }
+        forEach { page -> pages += openSvgSource(page.svg.encodeToByteArray()) }
     } catch (e: Exception) {
         pages.forEach(PageSource::close)
         throw e
@@ -33,4 +34,4 @@ suspend fun MusicXmlEngraver.engravedSource(layout: EngravingLayout): PageSource
 suspend fun openMusicXmlEngraver(file: PlatformFile): MusicXmlEngraver =
     openMusicXmlEngraver(file.readBytes(), file.extension.equals(CitScore.COMPRESSED_MUSICXML_EXTENSION, ignoreCase = true))
 
-suspend fun openMusicXmlSource(file: PlatformFile): PageSource = openMusicXmlEngraver(file).use { it.engravedSource(EngravingLayout.Print) }
+suspend fun openMusicXmlSource(file: PlatformFile): PageSource = openMusicXmlEngraver(file).use { it.engrave(EngravingLayout.Print) }.pageSource()

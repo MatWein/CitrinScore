@@ -2,6 +2,8 @@ package de.citrinscore.score.musicxml
 
 import com.sun.jna.Pointer
 import de.citrinscore.util.GuardedResource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -27,13 +29,23 @@ actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): M
 }
 
 private class VerovioEngraver(private val toolkit: GuardedResource<Pointer>) : MusicXmlEngraver {
-    override suspend fun engrave(layout: EngravingLayout): List<String> = toolkit.use { handle ->
-        Verovio.call {
-            setOptions(handle, options(layout))
-            redoLayout(handle, "{}")
-            val pages = (1..getPageCount(handle)).map { page -> renderToSVG(handle, page, false) }
-            getLog(handle)
-            pages
+    override suspend fun engrave(layout: EngravingLayout): List<EngravedPage> {
+        val pages = toolkit.use { handle ->
+            Verovio.call {
+                setOptions(handle, options(layout))
+                redoLayout(handle, "{}")
+                val pages = (1..getPageCount(handle)).map { page -> renderToSVG(handle, page, false) }
+                getLog(handle)
+                pages
+            }
+        }
+        return withContext(Dispatchers.Default) {
+            var firstMeasure = 0
+            pages.map { svg ->
+                val staves = staffBoxes(svg, firstMeasure)
+                firstMeasure = (staves.maxOfOrNull { it.measure } ?: (firstMeasure - 1)) + 1
+                EngravedPage(svg, staves)
+            }
         }
     }
 

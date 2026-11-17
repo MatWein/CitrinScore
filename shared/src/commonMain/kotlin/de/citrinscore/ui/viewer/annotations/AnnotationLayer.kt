@@ -27,11 +27,14 @@ import androidx.compose.ui.unit.dp
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.TextNote
+import de.citrinscore.score.musicxml.MeasureAnchors
 import de.citrinscore.score.render.PageLayout
 import de.citrinscore.ui.viewer.ScoreViewport
 
 private const val STROKE_WIDTH_FRACTION = 0.003f
 private const val TEXT_SIZE_FRACTION = 0.02f
+private const val STROKE_WIDTH_SPACES = 0.35f
+private const val TEXT_SIZE_SPACES = 2.4f
 private val EraserRadius = 16.dp
 private val InkColor = Color(0xFF1E5AA8)
 
@@ -40,6 +43,16 @@ class AnnotationInput(
     val onStrokes: (List<InkStroke>) -> Unit,
     val onErase: (strokes: Set<InkStroke>, texts: Set<TextNote>) -> Unit,
     val onTextTap: (TextDraft) -> Unit,
+    val sizing: AnnotationSizing? = null,
+)
+
+class AnnotationSizing(val strokeWidth: (page: Int) -> Float, val textSize: (page: Int) -> Float)
+
+fun PageLayout.pageSizing() = AnnotationSizing({ pageWidth(it) * STROKE_WIDTH_FRACTION }, { pageWidth(it) * TEXT_SIZE_FRACTION })
+
+fun MeasureAnchors.staffSizing() = AnnotationSizing(
+    strokeWidth = { (staffSpace(it) ?: 0f) * STROKE_WIDTH_SPACES },
+    textSize = { (staffSpace(it) ?: 0f) * TEXT_SIZE_SPACES },
 )
 
 class InkPiece(val page: Int, val points: List<Offset>)
@@ -92,6 +105,7 @@ fun Modifier.annotationInput(
     awaitEachGesture {
         val down = awaitFirstDown()
         val start = layout.pagePoint(down.position, viewport) ?: return@awaitEachGesture
+        val sizing = input.sizing ?: layout.pageSizing()
         down.consume()
         when (input.tool) {
             AnnotationTool.Pen -> {
@@ -111,7 +125,7 @@ fun Modifier.annotationInput(
                     change.consume()
                 }
                 if (completed) {
-                    val width = layout.pageWidth(start.page) * STROKE_WIDTH_FRACTION
+                    val width = sizing.strokeWidth(start.page)
                     input.onStrokes(gesture.pieces.map { piece -> InkStroke(piece.page, piece.points.flatMap { listOf(it.x, it.y) }, width) })
                 }
                 gesture.clear()
@@ -135,7 +149,7 @@ fun Modifier.annotationInput(
                 waitForUpOrCancellation()?.let { up ->
                     up.consume()
                     val existing = annotations.texts.firstOrNull { it.page == start.page && textMeasurer.bounds(it, this).contains(start.position) }
-                    val size = layout.pageWidth(start.page) * TEXT_SIZE_FRACTION
+                    val size = sizing.textSize(start.page)
                     input.onTextTap(TextDraft(start.page, start.position.x, start.position.y, size, existing))
                 }
             }
@@ -151,6 +165,7 @@ fun DrawScope.drawAnnotations(
     offset: Offset,
     color: Color,
     textMeasurer: TextMeasurer,
+    sizing: AnnotationSizing,
 ) {
     val factor = layout.scale * zoom
     val toScreen = { page: Int, point: Offset -> layout.screenPoint(page, point, zoom, offset) }
@@ -158,7 +173,7 @@ fun DrawScope.drawAnnotations(
         drawInk(stroke.positions().map { toScreen(stroke.page, it) }, stroke.width * factor, color)
     }
     gesture.pieces.firstOrNull()?.let { first ->
-        val width = layout.pageWidth(first.page) * STROKE_WIDTH_FRACTION * factor
+        val width = sizing.strokeWidth(first.page) * factor
         gesture.pieces.forEach { piece -> drawInk(piece.points.map { toScreen(piece.page, it) }, width, color) }
     }
     annotations.texts.filterNot { it in gesture.erasedTexts }.forEach { note ->
