@@ -130,6 +130,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     fun startRecording() {
         if (recording != null) return
+        closePlayer()
         viewModelScope.launch {
             reporting(AudioError.Recording) {
                 recording = startAudioRecording(recordingFile)

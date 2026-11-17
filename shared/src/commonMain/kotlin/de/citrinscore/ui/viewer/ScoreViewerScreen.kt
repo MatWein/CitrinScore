@@ -73,7 +73,7 @@ import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.score.musicxml.NotePositions
 import de.citrinscore.ui.viewer.playback.PlaybackCursor
-import de.citrinscore.ui.viewer.playback.PlaybackPanel
+import de.citrinscore.ui.viewer.playback.PlaybackBar
 import de.citrinscore.ui.viewer.playback.PlaybackViewModel
 import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.library.PartRef
@@ -87,7 +87,8 @@ import de.citrinscore.ui.viewer.annotations.AnnotationToolbar
 import de.citrinscore.ui.viewer.annotations.AnnotationViewModel
 import de.citrinscore.ui.viewer.annotations.staffSizing
 import de.citrinscore.ui.viewer.audio.AudioMenu
-import de.citrinscore.ui.viewer.audio.AudioPlayerCard
+import de.citrinscore.ui.viewer.audio.AudioPlayerBar
+import de.citrinscore.ui.viewer.audio.RecordingBar
 import de.citrinscore.ui.viewer.audio.OnAppBackground
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import de.citrinscore.ui.viewer.files.FilesMenu
@@ -106,7 +107,6 @@ private const val CURSOR_ALPHA = 0.25f
 private const val SUBTITLE_SEPARATOR = " · "
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
-private val PlayerMargin = Spacing.Large
 
 @Composable
 fun ScoreViewerScreen(
@@ -214,8 +214,14 @@ private fun ViewerContent(
                 }
             }
         }
-        audio.player?.let { AudioPlayerCard(it, audioViewModel, Modifier.align(Alignment.BottomEnd).padding(PlayerMargin)) }
-        if (playback.isOpen) PlaybackPanel(playback, playbackViewModel, Modifier.align(Alignment.BottomCenter).padding(PlayerMargin))
+        val barModifier = Modifier.align(Alignment.BottomCenter)
+        val player = audio.player
+        val recordingStart = audio.recordingStart
+        when {
+            recordingStart != null -> RecordingBar(recordingStart, audioViewModel::stopRecording, barModifier)
+            player != null -> AudioPlayerBar(player, audioViewModel, barModifier)
+            playback.isOpen -> PlaybackBar(playback, playbackViewModel, barModifier)
+        }
     }
     AnnotationDialogs(annotations, annotationViewModel)
     OnAppBackground {
@@ -301,7 +307,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio, onOpenPlayer = toolbar.playback::close)
+            AudioMenu(toolbar.audio, onOpenBar = toolbar.playback::close)
             FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
@@ -324,7 +330,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio, onOpenPlayer = toolbar.playback::close)
+            AudioMenu(toolbar.audio, onOpenBar = toolbar.playback::close)
             FilesMenu(toolbar.files)
             PageActions(toolbar)
             ZoomAction(toolbar)
@@ -375,6 +381,7 @@ private fun PartAction(toolbar: ToolbarState) {
 @Composable
 private fun PlaybackAction(toolbar: ToolbarState) {
     if (toolbar.ready?.isReflowable != true) return
+    val audio by toolbar.audio.state.collectAsStateWithLifecycle()
     IconAction(
         Res.drawable.ic_music_note,
         LocalStrings.current.playback,
@@ -382,7 +389,7 @@ private fun PlaybackAction(toolbar: ToolbarState) {
             toolbar.audio.closePlayer()
             toolbar.playback.toggle()
         },
-        enabled = toolbar.viewport != null,
+        enabled = toolbar.viewport != null && !audio.isRecording,
     )
 }
 

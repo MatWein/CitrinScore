@@ -39,7 +39,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenPlayer: () -> Unit) {
+fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenBar: () -> Unit) {
     val strings = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
@@ -48,16 +48,14 @@ fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenPlayer: () -> Unit) {
     val picker = rememberFilePickerLauncher(FileKitType.File(CitScore.AUDIO_EXTENSIONS), FileKitMode.Multiple()) { files ->
         files?.let(viewModel::addFiles)
     }
-    val requestRecording = rememberMicrophoneAccess(viewModel::startRecording)
+    val requestRecording = rememberMicrophoneAccess {
+        onOpenBar()
+        viewModel.startRecording()
+    }
     LaunchedEffect(expanded) { if (expanded) viewModel.checkMicrophone() }
 
     Box {
-        IconAction(
-            Res.drawable.ic_headphones,
-            if (state.isRecording) strings.recordingActive else strings.audio,
-            onClick = { expanded = true },
-            badge = state.isRecording,
-        )
+        IconAction(Res.drawable.ic_headphones, strings.audio, onClick = { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (state.attachments.isEmpty()) {
                 Text(
@@ -72,9 +70,10 @@ fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenPlayer: () -> Unit) {
                     text = { Text(attachment.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         expanded = false
-                        onOpenPlayer()
+                        onOpenBar()
                         viewModel.load(attachment)
                     },
+                    enabled = !state.isRecording,
                     leadingIcon = { MenuIcon(Res.drawable.ic_play) },
                     trailingIcon = {
                         Row {
