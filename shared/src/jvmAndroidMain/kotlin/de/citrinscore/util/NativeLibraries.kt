@@ -11,7 +11,6 @@ internal inline fun <T> loadNativeLibrary(name: String, load: () -> T): T {
     return try {
         load().also { nativeLogger.info("Loaded native library {}", name) }
     } catch (e: LinkageError) {
-        nativeLogger.error("Loading native library {} failed", name, e)
-        throw e
+        throw IllegalStateException("Loading native library $name failed", e)
     }
 }

@@ -180,7 +180,7 @@ val buildVerovio = registerNativeBuild(
     name = "Verovio",
     source = verovioSource.dir("cmake"),
     sources = listOf("../src", "../include", "../libmei", "../tools"),
-    options = "-DBUILD_AS_LIBRARY=ON,$verovioCmakeOptions",
+    options = "-DBUILD_AS_LIBRARY=ON,-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON,$verovioCmakeOptions",
     target = "verovio",
 )
 
