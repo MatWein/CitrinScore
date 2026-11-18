@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -142,7 +143,7 @@ fun ScoreViewerScreen(
             Column(Modifier.fillMaxSize()) {
                 TopToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).windowInsetsPadding(insets))
+                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(insets))
             }
         }
     }
