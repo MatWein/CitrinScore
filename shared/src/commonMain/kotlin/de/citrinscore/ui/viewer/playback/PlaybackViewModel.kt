@@ -119,10 +119,20 @@ class PlaybackViewModel(
     fun select(note: String) {
         val current = performance ?: return
         val start = current.startOf(note) ?: return
+        moveTo(current, current.eventAt(start), note, reveal = false)
+    }
+
+    fun step(offset: Int) {
+        val current = performance?.takeIf { _state.value.isOpen && it.events.isNotEmpty() } ?: return
+        val target = (event + offset).coerceIn(0, current.events.lastIndex)
+        moveTo(current, target, current.events[target].notes.first().id, reveal = true)
+    }
+
+    private fun moveTo(current: ScorePerformance, index: Int, note: String, reveal: Boolean) {
         val wasRunning = running != null
         stop()
-        event = current.eventAt(start)
-        showStill()
+        event = index
+        showStill(reveal)
         when {
             wasRunning -> start()
             _state.value.mode == PlaybackMode.Listen -> preview(current, current.events[event], note)
@@ -202,10 +212,10 @@ class PlaybackViewModel(
         if (follower.isFinished) event = 0
     }
 
-    private fun showStill() {
+    private fun showStill(reveal: Boolean = false) {
         val current = performance?.takeIf { _state.value.isOpen } ?: return
         val shown = current.events.getOrNull(event) ?: return
-        _cursor.value = PlaybackCursor(shown.ids(), emptyList(), follow = false)
+        _cursor.value = PlaybackCursor(shown.ids(), emptyList(), follow = reveal)
     }
 
     private fun release() {

@@ -121,6 +121,7 @@ fun ScoreViewerScreen(
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
     val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose)
+    val playback by playbackViewModel.state.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
 
@@ -129,7 +130,7 @@ fun ScoreViewerScreen(
             .fillMaxSize()
             .background(paperColors()?.paper ?: Color.White)
             .keepScreenOn()
-            .keyboardNavigation(viewport, focusRequester),
+            .keyboardNavigation(viewport, focusRequester, if (playback.isOpen) playbackViewModel::step else null),
     ) {
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize()) {
@@ -231,10 +232,10 @@ private fun ViewerContent(
     }
 }
 
-private fun Modifier.keyboardNavigation(viewport: ScoreViewport?, focusRequester: FocusRequester) = this
+private fun Modifier.keyboardNavigation(viewport: ScoreViewport?, focusRequester: FocusRequester, step: ((Int) -> Unit)?) = this
     .focusRequester(focusRequester)
     .focusable()
-    .onPreviewKeyEvent { event -> viewport?.handleKey(event) == true }
+    .onPreviewKeyEvent { event -> event.stepPlayback(step) || viewport?.handleKey(event) == true }
     .pointerInput(focusRequester) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -242,11 +243,23 @@ private fun Modifier.keyboardNavigation(viewport: ScoreViewport?, focusRequester
         }
     }
 
+private fun KeyEvent.stepPlayback(step: ((Int) -> Unit)?): Boolean {
+    if (step == null || type != KeyEventType.KeyDown) return false
+    step(
+        when (key) {
+            Key.DirectionRight -> 1
+            Key.DirectionLeft -> -1
+            else -> return false
+        },
+    )
+    return true
+}
+
 private fun ScoreViewport.handleKey(event: KeyEvent): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
     when (event.key) {
-        Key.PageDown, Key.DirectionDown, Key.DirectionRight, Key.Spacebar -> nextPage()
-        Key.PageUp, Key.DirectionUp, Key.DirectionLeft -> previousPage()
+        Key.PageDown, Key.DirectionDown, Key.Spacebar -> nextPage()
+        Key.PageUp, Key.DirectionUp -> previousPage()
         Key.Plus, Key.Equals, Key.NumPadAdd -> zoomBy(ScoreViewport.ZOOM_STEP)
         Key.Minus, Key.NumPadSubtract -> zoomBy(1 / ScoreViewport.ZOOM_STEP)
         else -> return false
