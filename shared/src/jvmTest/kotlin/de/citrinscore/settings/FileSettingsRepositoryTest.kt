@@ -9,6 +9,7 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class FileSettingsRepositoryTest {
@@ -55,6 +56,40 @@ class FileSettingsRepositoryTest {
 
         assertEquals(LibraryLocation.Folder("/music", ""), settings?.library)
         assertEquals(ThemeMode.System, settings?.theme)
+    }
+
+    @Test
+    fun `the access token is stored encrypted and loaded again`() = runTest {
+        val settings = AppSettings(AppLanguage.English, LibraryLocation.App, git = GitRemote("https://example.org/library.git", "secret-token"))
+
+        repository.save(settings)
+
+        assertFalse("secret-token" in root.resolve("config/settings.json").readText())
+        assertEquals(settings, FileSettingsRepository(directory).load())
+    }
+
+    @Test
+    fun `a plain access token from older settings is encrypted when loaded`() = runTest {
+        root.resolve("config").mkdirs()
+        (directory / "settings.json").writeString(
+            """{"language":"English","library":{},"git":{"url":"https://example.org/library.git","token":"secret-token"}}""",
+        )
+
+        assertEquals("secret-token", repository.load()?.git?.token)
+        assertFalse("secret-token" in root.resolve("config/settings.json").readText())
+    }
+
+    @Test
+    fun `settings stay usable when the token cannot be decrypted and only the remote is dropped`() = runTest {
+        root.resolve("config").mkdirs()
+        (directory / "settings.json").writeString(
+            """{"language":"English","library":{},"git":{"url":"https://example.org/library.git","token":"aes-gcm:broken"}}""",
+        )
+
+        val settings = repository.load()
+
+        assertEquals(LibraryLocation.App, settings?.library)
+        assertNull(settings?.git)
     }
 
     @Test

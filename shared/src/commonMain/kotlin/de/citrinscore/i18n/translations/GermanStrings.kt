@@ -264,7 +264,7 @@ object GermanStrings : Strings {
     override val showLicenses = "Lizenzen anzeigen"
     override val website = "Website"
     override val viewLicense = "Lizenz anzeigen"
-    override val syncSettingsHint = "Die komplette Bibliothek wird als Git-Repository mit diesem Remote abgeglichen. Der Token wird unverschlüsselt in den Einstellungen gespeichert."
+    override val syncSettingsHint = "Die komplette Bibliothek wird als Git-Repository mit diesem Remote abgeglichen."
     override val gitUrl = "Repository-URL (HTTPS)"
     override val gitUsername = "Benutzername (optional)"
     override val gitToken = "Zugriffstoken"

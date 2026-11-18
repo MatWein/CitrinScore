@@ -1,6 +1,7 @@
 package de.citrinscore.settings
 
 import de.citrinscore.serialization.AppJson
+import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.div
@@ -18,16 +19,22 @@ class FileSettingsRepository(
 
     override suspend fun load(): AppSettings? {
         if (!file.exists()) return null
-        return try {
+        val stored = try {
             json.decodeFromString<AppSettings>(file.readString())
         } catch (_: IllegalArgumentException) {
-            null
+            return null
         }
+        val remote = stored.git ?: return stored
+        val token = attempt { TokenCipher.decrypt(remote.token) }
+        val settings = stored.copy(git = token?.let { remote.copy(token = it) })
+        if (!TokenCipher.isEncrypted(remote.token)) attempt { save(settings) }
+        return settings
     }
 
     override suspend fun save(settings: AppSettings) {
         directory.createDirectories()
-        file.writeString(json.encodeToString(settings))
+        val stored = settings.git?.let { settings.copy(git = it.copy(token = TokenCipher.encrypt(it.token))) } ?: settings
+        file.writeString(json.encodeToString(stored))
     }
 
     private companion object {
