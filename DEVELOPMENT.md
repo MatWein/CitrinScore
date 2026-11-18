@@ -117,15 +117,19 @@ version (`1.2.3` → `10203`).
 
 ## Releases
 
-The [Package](.github/workflows/package.yml) workflow on GitHub Actions builds the `.deb`, `.rpm`, portable `.tar.gz`
-and Arch Linux package, the Windows `.msi`, the macOS `.dmg` and the signed Android `.apk`. Start it manually to build
-selected platforms, or push a tag to create a release:
+Two workflows on GitHub Actions build the `.deb`, `.rpm`, portable `.tar.gz` and Arch Linux package, the Windows `.msi`,
+the macOS `.dmg` and the signed Android `.apk`:
 
-1. Set the new `version` in [`gradle.properties`](gradle.properties) and commit it.
-2. Push a tag with the same version: `git tag v1.2.3 && git push origin v1.2.3`.
-3. The workflow builds everything and creates a draft release with all packages. Check the generated notes and publish it.
+- [Build](.github/workflows/build.yml) only builds the packages and keeps them as workflow artifacts for seven days.
+  Start it manually and choose a platform or all of them.
+- [Release](.github/workflows/release.yml) is started manually as well. If there is no tag for the current `version`
+  yet, it builds all packages, creates the tag `v<version>` and a draft release with the packages. Check the generated
+  notes and publish it.
 
-The Android job needs these repository secrets:
+To release a new version, set the new `version` in [`gradle.properties`](gradle.properties), push it to `master` and
+start the Release workflow.
+
+Building the Android app needs these repository secrets:
 
 | Secret | Value |
 |---|---|
