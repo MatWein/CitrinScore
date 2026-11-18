@@ -68,7 +68,14 @@ data class ScoreMetadata(
 )
 
 @Serializable
-data class Attachment(val path: String, val name: String)
+data class Attachment(val path: String, val name: String) {
+    val extension get() = path.substringAfterLast(EXTENSION_SEPARATOR, "")
+
+    val baseName get() = name.takeUnless { extension.isNotEmpty() && it.endsWith("$EXTENSION_SEPARATOR$extension", ignoreCase = true) }
+        ?: name.dropLast(extension.length + 1)
+}
+
+private const val EXTENSION_SEPARATOR = '.'
 
 enum class AttachmentKind(val directory: String) {
     Audio("audio"),

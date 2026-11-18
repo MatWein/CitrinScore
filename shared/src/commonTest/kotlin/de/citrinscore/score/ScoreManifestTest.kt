@@ -54,4 +54,11 @@ class ScoreManifestTest {
         assertEquals(listOf(expected), manifest.parts)
         assertEquals(Instant.parse("2026-02-01T00:00:00Z"), manifest.lastOpenedAt)
     }
+
+    @Test
+    fun `attachments are saved under their name with the stored extension`() {
+        assertEquals("Aufnahme 1" to "m4a", Attachment("audio/1.m4a", "Aufnahme 1").let { it.baseName to it.extension })
+        assertEquals("Fingersatz" to "pdf", Attachment("files/2.pdf", "Fingersatz.PDF").let { it.baseName to it.extension })
+        assertEquals("notes" to "", Attachment("files/3", "notes").let { it.baseName to it.extension })
+    }
 }

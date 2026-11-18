@@ -195,6 +195,11 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
         }
     }
 
+    fun export(attachment: Attachment, target: PlatformFile) {
+        val ref = part.value ?: return
+        viewModelScope.launch { reporting(AudioError.Save) { repository.exportAttachment(ref, attachment, target) } }
+    }
+
     fun delete(attachment: Attachment) {
         val ref = part.value ?: return
         if (_state.value.player?.attachment?.path == attachment.path) closePlayer()

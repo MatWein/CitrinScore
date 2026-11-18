@@ -29,33 +29,22 @@ import de.citrinscore.ui.components.ConfirmDeleteDialog
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.MessageDialog
 import de.citrinscore.ui.theme.Spacing
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
-import io.github.vinceglb.filekit.dialogs.compose.rememberFileSaverLauncher
 import org.jetbrains.compose.resources.painterResource
-
-private const val EXTENSION_SEPARATOR = '.'
 
 @Composable
 fun FilesMenu(viewModel: ScoreFilesViewModel) {
     val strings = LocalStrings.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
-    var exporting by remember { mutableStateOf<Attachment?>(null) }
     var deleting by remember { mutableStateOf<Attachment?>(null) }
     val picker = rememberFilePickerLauncher(FileKitType.File(), FileKitMode.Multiple()) { files -> files?.let(viewModel::add) }
-    val saver = rememberFileSaverLauncher(FileKitDialogSettings.createDefault()) { target ->
-        val attachment = exporting
-        exporting = null
-        if (target != null && attachment != null) viewModel.export(attachment, target)
-    }
+    val save = rememberAttachmentSaver(viewModel::export)
     val export = { attachment: Attachment ->
         expanded = false
-        exporting = attachment
-        val extension = attachment.name.substringAfterLast(EXTENSION_SEPARATOR, "").ifEmpty { null }
-        saver.launch(suggestedName = attachment.name.substringBeforeLast(EXTENSION_SEPARATOR), defaultExtension = extension)
+        save(attachment)
     }
 
     Box {

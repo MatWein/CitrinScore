@@ -22,6 +22,7 @@ import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_add
 import de.citrinscore.resources.ic_delete
+import de.citrinscore.resources.ic_download
 import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_headphones
 import de.citrinscore.resources.ic_mic
@@ -32,6 +33,7 @@ import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.Spacing
+import de.citrinscore.ui.viewer.files.rememberAttachmentSaver
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -45,6 +47,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenBar: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<Attachment?>(null) }
     var deleting by remember { mutableStateOf<Attachment?>(null) }
+    val save = rememberAttachmentSaver(viewModel::export)
     val picker = rememberFilePickerLauncher(FileKitType.File(CitScore.AUDIO_EXTENSIONS), FileKitMode.Multiple()) { files ->
         files?.let(viewModel::addFiles)
     }
@@ -80,6 +83,10 @@ fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenBar: () -> Unit) {
                             IconAction(Res.drawable.ic_edit, strings.rename, onClick = {
                                 expanded = false
                                 renaming = attachment
+                            })
+                            IconAction(Res.drawable.ic_download, strings.saveAs, onClick = {
+                                expanded = false
+                                save(attachment)
                             })
                             IconAction(Res.drawable.ic_delete, strings.delete, onClick = {
                                 expanded = false
