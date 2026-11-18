@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,8 +22,10 @@ fun <T> TileGrid(
     tile: @Composable (item: T, modifier: Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier) {
-        val fitting = ((maxWidth + spacing) / (minTileWidth + spacing)).toInt()
-        val columns = fitting.coerceIn(1, items.size.coerceAtLeast(1))
+        val count = items.size.coerceAtLeast(1)
+        val fitting = ((maxWidth + spacing) / (minTileWidth + spacing)).toInt().coerceIn(1, count)
+        val rows = (count + fitting - 1) / fitting
+        val columns = (count + rows - 1) / rows
         Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
             items.chunked(columns).forEach { row ->
                 Row(
@@ -32,7 +33,6 @@ fun <T> TileGrid(
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                 ) {
                     row.forEach { item -> tile(item, Modifier.weight(1f).fillMaxHeight()) }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }

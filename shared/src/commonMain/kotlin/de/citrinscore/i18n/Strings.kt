@@ -11,12 +11,18 @@ interface Strings {
 
     val welcomeTitle: String
     val welcomeSubtitle: String
-    val featureLibraryTitle: String
-    val featureLibraryText: String
+    val featureImportTitle: String
+    val featureImportText: String
+    val featureScanTitle: String
+    val featureScanText: String
     val featureNotesTitle: String
     val featureNotesText: String
     val featurePlaybackTitle: String
     val featurePlaybackText: String
+    val featureRecordingTitle: String
+    val featureRecordingText: String
+    val featureSyncTitle: String
+    val featureSyncText: String
 
     val languageTitle: String
     val languageSubtitle: String

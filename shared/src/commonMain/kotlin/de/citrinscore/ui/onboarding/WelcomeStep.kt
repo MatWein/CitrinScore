@@ -10,9 +10,13 @@ import androidx.compose.ui.unit.dp
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.app_icon
+import de.citrinscore.resources.ic_document_scanner
 import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_library_music
+import de.citrinscore.resources.ic_mic
 import de.citrinscore.resources.ic_play
+import de.citrinscore.resources.ic_sync
+import de.citrinscore.sync.librarySync
 import de.citrinscore.ui.components.IconBadge
 import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.TileGrid
@@ -28,10 +32,13 @@ private data class Feature(val icon: DrawableResource, val title: String, val te
 @Composable
 fun WelcomeStep() {
     val strings = LocalStrings.current
-    val features = listOf(
-        Feature(Res.drawable.ic_library_music, strings.featureLibraryTitle, strings.featureLibraryText),
+    val features = listOfNotNull(
+        Feature(Res.drawable.ic_library_music, strings.featureImportTitle, strings.featureImportText),
+        Feature(Res.drawable.ic_document_scanner, strings.featureScanTitle, strings.featureScanText),
         Feature(Res.drawable.ic_edit_note, strings.featureNotesTitle, strings.featureNotesText),
         Feature(Res.drawable.ic_play, strings.featurePlaybackTitle, strings.featurePlaybackText),
+        Feature(Res.drawable.ic_mic, strings.featureRecordingTitle, strings.featureRecordingText),
+        Feature(Res.drawable.ic_sync, strings.featureSyncTitle, strings.featureSyncText).takeIf { librarySync() != null },
     )
 
     WizardStep(
