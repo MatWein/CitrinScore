@@ -1,5 +1,8 @@
 package de.citrinscore.score.playback
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class Instrument(val program: Int) {
     Piano(0),
     Organ(19),

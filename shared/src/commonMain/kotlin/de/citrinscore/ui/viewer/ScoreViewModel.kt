@@ -12,6 +12,7 @@ import de.citrinscore.score.CitScore
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScorePart
+import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.isReflowable
 import de.citrinscore.score.musicxml.EngravedPage
@@ -126,6 +127,17 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         if (scorePart.view == stored) return
         manifest = current.updatePart(part.directory) { it.copy(view = stored) }
         persistView(part, stored)
+    }
+
+    fun playback(part: PartRef): PlaybackPreferences? = manifest?.part(part.directory)?.playback
+
+    fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
+        val current = manifest ?: return
+        if (current.part(part.directory).playback == playback) return
+        manifest = current.updatePart(part.directory) { it.copy(playback = playback) }
+        viewModelScope.launch {
+            withContext(NonCancellable) { attempt { repository.savePlayback(part, playback) } }
+        }
     }
 
     private fun persistView(part: PartRef, view: ScoreViewState) {

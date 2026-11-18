@@ -14,6 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import de.citrinscore.score.playback.Instrument
 import kotlin.time.Instant
 
 @Serializable
@@ -43,6 +44,7 @@ data class ScorePart(
     val name: String,
     val content: ScoreContent,
     val view: ScoreViewState? = null,
+    val playback: PlaybackPreferences? = null,
     val systemBreaks: List<List<Float>>? = null,
     val audio: List<Attachment> = emptyList(),
     val files: List<Attachment> = emptyList(),
@@ -75,6 +77,9 @@ enum class AttachmentKind(val directory: String) {
 
 @Serializable
 data class ScoreViewState(val zoom: Float, val x: Float, val y: Float)
+
+@Serializable
+data class PlaybackPreferences(val tempo: Float = 1f, val instrument: Instrument? = null)
 
 @Serializable
 sealed interface ScoreContent {

@@ -151,7 +151,7 @@ fun LibraryNavigation(
                 val audioViewModel = viewModel(key = "${score.path}/audio") { ScoreAudioViewModel(viewModel.part, repository) }
                 val annotationViewModel = viewModel(key = "${score.path}/annotations") { AnnotationViewModel(viewModel.part, repository, viewModel.anchors) }
                 val filesViewModel = viewModel(key = "${score.path}/files") { ScoreFilesViewModel(viewModel.part, repository) }
-                val playbackViewModel = viewModel(key = "${score.path}/playback") { PlaybackViewModel(viewModel.part, viewModel::performance, viewModel::writtenPitches) }
+                val playbackViewModel = viewModel(key = "${score.path}/playback") { PlaybackViewModel(viewModel.part, viewModel::performance, viewModel::writtenPitches, viewModel::playback, viewModel::savePlayback) }
                 ScoreViewerScreen(viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose = { close() })
             }
         }

@@ -6,6 +6,8 @@ import de.citrinscore.score.ImagePage
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
+import de.citrinscore.score.PlaybackPreferences
+import de.citrinscore.score.playback.Instrument
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
@@ -362,6 +364,22 @@ class LibraryRepositoryTest {
             opened.updatePart(part.directory) { it.copy(view = ScoreViewState(1.5f, 0.25f, 0.5f)) },
             repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt),
         )
+    }
+
+    @Test
+    fun `tempo and instrument stay on the device`() = runTest {
+        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = repository.open(score).parts.single()
+        val playback = PlaybackPreferences(tempo = 0.75f, instrument = Instrument.Violin)
+
+        repository.savePlayback(PartRef(score, part.directory), playback)
+
+        val shared = File(root, "Etude.citscore/${CitScore.MANIFEST_FILE}").readText()
+        val device = AppJson.decodeFromString<ScoreDeviceState>(File(root, "Etude.citscore/${CitScore.DEVICE_STATE_FILE}").readText())
+        assertFalse("playback" in shared, shared)
+        assertEquals(mapOf(part.directory to playback), device.playback)
+        assertEquals(playback, repository.load(score).parts.single().playback)
     }
 
     @Test

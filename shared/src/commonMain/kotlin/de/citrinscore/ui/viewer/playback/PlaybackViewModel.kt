@@ -3,6 +3,7 @@ package de.citrinscore.ui.viewer.playback
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.PartRef
+import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.audio.isMicrophoneAvailable
 import de.citrinscore.score.audio.microphoneSamples
 import de.citrinscore.score.musicxml.PerformanceEvent
@@ -36,6 +37,8 @@ class PlaybackViewModel(
     private val part: StateFlow<PartRef?>,
     private val loadPerformance: suspend (PartRef) -> ScorePerformance?,
     private val loadWrittenPitches: suspend (PartRef, Collection<String>) -> Map<String, Int>,
+    private val loadPreferences: (PartRef) -> PlaybackPreferences?,
+    private val storePreferences: (PartRef, PlaybackPreferences) -> Unit,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PlaybackState())
@@ -53,11 +56,12 @@ class PlaybackViewModel(
 
     init {
         viewModelScope.launch {
-            part.collectLatest {
+            part.collectLatest { ref ->
                 stop()
                 release()
                 _cursor.value = null
-                _state.update { PlaybackState(tempo = it.tempo, microphoneAvailable = it.microphoneAvailable) }
+                val preferences = ref?.let(loadPreferences) ?: PlaybackPreferences()
+                _state.update { PlaybackState(tempo = preferences.tempo, instrument = preferences.instrument, microphoneAvailable = it.microphoneAvailable) }
             }
         }
     }
@@ -108,12 +112,21 @@ class PlaybackViewModel(
         synthesizer?.setTempo(clamped)
     }
 
+    fun commitTempo() = savePreferences()
+
     fun setInstrument(instrument: Instrument?) {
         if (_state.value.instrument == instrument) return
         stop()
         synthesizer?.close()
         synthesizer = null
         _state.update { it.copy(instrument = instrument) }
+        savePreferences()
+    }
+
+    private fun savePreferences() {
+        val ref = part.value ?: return
+        val current = _state.value
+        storePreferences(ref, PlaybackPreferences(current.tempo, current.instrument))
     }
 
     fun select(note: String) {

@@ -71,7 +71,7 @@ fun PlaybackBar(state: PlaybackState, viewModel: PlaybackViewModel, modifier: Mo
         when {
             error != null -> BarText(strings.message(error), MaterialTheme.colorScheme.error, Modifier.weight(1f))
             state.mode == PlaybackMode.Listen -> {
-                TempoSlider(state.tempo, viewModel::setTempo, showLabel = !compact, modifier = Modifier.weight(1f))
+                TempoSlider(state.tempo, viewModel::setTempo, viewModel::commitTempo, showLabel = !compact, modifier = Modifier.weight(1f))
                 InstrumentPicker(state.instrument, viewModel::setInstrument, enabled = !state.isLoading, compact = compact)
             }
             else -> BarText(strings.playAlongHint, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
@@ -117,7 +117,7 @@ private fun BarText(text: String, color: Color, modifier: Modifier) {
 }
 
 @Composable
-private fun TempoSlider(tempo: Float, onTempo: (Float) -> Unit, showLabel: Boolean, modifier: Modifier) {
+private fun TempoSlider(tempo: Float, onTempo: (Float) -> Unit, onTempoFinished: () -> Unit, showLabel: Boolean, modifier: Modifier) {
     val strings = LocalStrings.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Small)) {
         if (showLabel) Text(strings.tempo, style = MaterialTheme.typography.labelLarge)
@@ -126,6 +126,7 @@ private fun TempoSlider(tempo: Float, onTempo: (Float) -> Unit, showLabel: Boole
             onValueChange = { onTempo(exp(it)) },
             valueRange = ln(MIN_TEMPO)..ln(MAX_TEMPO),
             modifier = Modifier.weight(1f),
+            onValueChangeFinished = onTempoFinished,
         )
         Text(
             strings.tempoPercent((tempo * PERCENT).roundToInt()),

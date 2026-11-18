@@ -6,6 +6,7 @@ import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
+import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreDeviceState
@@ -123,6 +124,10 @@ class LibraryRepository(
 
     suspend fun saveView(part: PartRef, view: ScoreViewState) {
         updatePart(part) { it.copy(view = view) }
+    }
+
+    suspend fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
+        updatePart(part) { it.copy(playback = playback) }
     }
 
     suspend fun saveSystemBreaks(part: PartRef, systemBreaks: List<List<Float>>) {
