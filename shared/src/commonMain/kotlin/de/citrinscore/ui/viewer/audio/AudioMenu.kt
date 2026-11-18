@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
@@ -33,6 +32,7 @@ import de.citrinscore.score.CitScore
 import de.citrinscore.ui.components.ConfirmDeleteDialog
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.Spacing
+import de.citrinscore.ui.viewer.files.AttachmentName
 import de.citrinscore.ui.viewer.files.rememberAttachmentSaver
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -70,7 +70,7 @@ fun AudioMenu(viewModel: ScoreAudioViewModel, onOpenBar: () -> Unit) {
             }
             state.attachments.forEach { attachment ->
                 DropdownMenuItem(
-                    text = { Text(attachment.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    text = { AttachmentName(attachment.name) },
                     onClick = {
                         expanded = false
                         onOpenBar()

@@ -372,10 +372,9 @@ private fun ToolbarState.subtitle(): String? {
 private fun PartAction(toolbar: ToolbarState) {
     val ready = toolbar.ready?.takeIf { it.parts.size > 1 } ?: return
     val strings = LocalStrings.current
-    val audio by toolbar.audio.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true }, enabled = !audio.isRecording)
+        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ready.parts.forEachIndexed { index, part ->
                 val selected = part.directory == ready.part.directory

@@ -26,6 +26,7 @@ import de.citrinscore.score.render.openImageSource
 import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.serialization.AppJson
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.atomicMove
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
@@ -114,10 +115,12 @@ class LibraryRepository(
         }
         writeThumbnail(score, parts.first())
         val kept = parts.map { it.directory }.toSet()
+        val removed = previous.parts.filterNot { it.directory in kept }
         updateManifest(score) { manifest ->
             manifest.copy(metadata = metadata, parts = parts, currentPart = manifest.currentPart?.takeIf { it in kept })
+                .withAttachmentsMovedOutOf(score, removed.map { it.directory })
         }
-        previous.parts.filterNot { it.directory in kept }.forEach { deletePart(score, it) }
+        removed.forEach { deletePart(score, it) }
         return if (metadata.title == previous.metadata.title) score else score.renameDirectory(folder, CitScore.directoryName(metadata.title))
     }
 
@@ -149,35 +152,34 @@ class LibraryRepository(
         updatePart(part) { it.copy(systemBreaks = systemBreaks) }
     }
 
-    suspend fun attachments(part: PartRef, kind: AttachmentKind): List<Attachment> =
-        manifest(part.score)?.parts?.firstOrNull { it.directory == part.directory }?.attachments(kind).orEmpty()
+    suspend fun attachments(score: PlatformFile, kind: AttachmentKind): List<Attachment> = manifest(score)?.attachments(kind).orEmpty()
 
-    suspend fun addAttachment(part: PartRef, kind: AttachmentKind, source: PlatformFile, name: String): Attachment {
+    suspend fun addAttachment(score: PlatformFile, kind: AttachmentKind, source: PlatformFile, name: String): Attachment {
         val suffix = source.extension.takeIf { it.isNotEmpty() }?.let { ".${it.lowercase()}" }.orEmpty()
-        val attachment = Attachment("${kind.directory}/${Uuid.random()}$suffix", name)
-        logger.info("Adding {} attachment {} from {} to {}", kind, attachment.path, source.path, part)
-        (part.root / kind.directory).createDirectories()
-        CitScore.resolve(part.root, attachment.path) write source
-        updatePart(part) { it.withAttachments(kind, it.attachments(kind) + attachment) }
+        val attachment = Attachment(kind.path("${Uuid.random()}$suffix"), name)
+        logger.info("Adding {} attachment {} from {} to {}", kind, attachment.path, source.path, score.path)
+        (score / kind.directory).createDirectories()
+        CitScore.resolve(score, attachment.path) write source
+        updateManifest(score) { it.withAttachments(kind, it.attachments(kind) + attachment) }
         return attachment
     }
 
-    suspend fun renameAttachment(part: PartRef, kind: AttachmentKind, attachment: Attachment, name: String) {
-        logger.info("Renaming attachment {} of {}", attachment.path, part)
-        updatePart(part) { scorePart ->
-            scorePart.withAttachments(kind, scorePart.attachments(kind).map { if (it.path == attachment.path) it.copy(name = name) else it })
+    suspend fun renameAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment, name: String) {
+        logger.info("Renaming attachment {} of {}", attachment.path, score.path)
+        updateManifest(score) { manifest ->
+            manifest.withAttachments(kind, manifest.attachments(kind).map { if (it.path == attachment.path) it.copy(name = name) else it })
         }
     }
 
-    suspend fun deleteAttachment(part: PartRef, kind: AttachmentKind, attachment: Attachment) {
-        logger.info("Deleting attachment {} of {}", attachment.path, part)
-        updatePart(part) { scorePart -> scorePart.withAttachments(kind, scorePart.attachments(kind).filterNot { it.path == attachment.path }) }
-        CitScore.resolve(part.root, attachment.path).delete(mustExist = false)
+    suspend fun deleteAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment) {
+        logger.info("Deleting attachment {} of {}", attachment.path, score.path)
+        updateManifest(score) { manifest -> manifest.withAttachments(kind, manifest.attachments(kind).filterNot { it.path == attachment.path }) }
+        CitScore.resolve(score, attachment.path).delete(mustExist = false)
     }
 
-    suspend fun exportAttachment(part: PartRef, attachment: Attachment, target: PlatformFile) {
-        logger.info("Exporting attachment {} of {} to {}", attachment.path, part, target.path)
-        target write CitScore.resolve(part.root, attachment.path)
+    suspend fun exportAttachment(score: PlatformFile, attachment: Attachment, target: PlatformFile) {
+        logger.info("Exporting attachment {} of {} to {}", attachment.path, score.path, target.path)
+        target write CitScore.resolve(score, attachment.path)
     }
 
     suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
@@ -250,6 +252,24 @@ class LibraryRepository(
         val newIndexByOldIndex = pages.withIndex().mapNotNull { (index, page) -> (page as? PageEdit.Keep)?.let { it.index to index } }.toMap()
         if ((root / CitScore.ANNOTATIONS_FILE).exists()) saveAnnotations(ref, annotations(ref).remapPages(newIndexByOldIndex))
         return part.copy(content = content, systemBreaks = systemBreaks(root, content), view = null)
+    }
+
+    private suspend fun ScoreManifest.withAttachmentsMovedOutOf(score: PlatformFile, directories: List<String>) =
+        AttachmentKind.entries.fold(this) { manifest, kind ->
+            manifest.withAttachments(
+                kind,
+                manifest.attachments(kind).map { attachment ->
+                    if (directories.any { attachment.path.startsWith("$it/") }) moveAttachment(score, kind, attachment) else attachment
+                },
+            )
+        }
+
+    private suspend fun moveAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment): Attachment {
+        val moved = attachment.copy(path = kind.path(attachment.path.substringAfterLast('/')))
+        logger.info("Moving attachment {} of {} to {}", attachment.path, score.path, moved.path)
+        (score / kind.directory).createDirectories()
+        CitScore.resolve(score, attachment.path).atomicMove(CitScore.resolve(score, moved.path))
+        return moved
     }
 
     private suspend fun deletePart(score: PlatformFile, part: ScorePart) {

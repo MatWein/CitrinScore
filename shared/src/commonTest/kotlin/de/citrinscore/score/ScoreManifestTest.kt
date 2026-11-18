@@ -48,11 +48,27 @@ class ScoreManifestTest {
             content = ScoreContent.Images(listOf(ImagePage("pages/001.png"))),
             view = ScoreViewState(2f, 0.5f, 0.25f),
             systemBreaks = listOf(listOf(10f)),
-            audio = listOf(Attachment("audio/a.wav", "Take")),
-            files = listOf(Attachment("files/b.pdf", "Info")),
         )
         assertEquals(listOf(expected), manifest.parts)
+        assertEquals(listOf(Attachment("audio/a.wav", "Take")), manifest.audio)
+        assertEquals(listOf(Attachment("files/b.pdf", "Info")), manifest.files)
         assertEquals(Instant.parse("2026-02-01T00:00:00Z"), manifest.lastOpenedAt)
+    }
+
+    @Test
+    fun `attachments of parts belong to the whole score`() {
+        val json = """
+            {"metadata":{"title":"Duett"},"createdAt":"2026-01-01T00:00:00Z","audio":[{"path":"audio/s.wav","name":"Score"}],"parts":[
+              {"directory":"","name":"","content":{"type":"musicxml","path":"score.xml"},"audio":[{"path":"audio/r.wav","name":"Root"}]},
+              {"directory":"parts/b","name":"B","content":{"type":"musicxml","path":"score.xml"},
+               "audio":[{"path":"audio/b.wav","name":"Part"}],"files":[{"path":"files/b.pdf","name":"Info"}]}]}
+        """.trimIndent()
+
+        val manifest = AppJson.decodeFromString(ScoreManifestSerializer, json)
+
+        assertEquals(listOf(Attachment("audio/s.wav", "Score"), Attachment("audio/r.wav", "Root"), Attachment("parts/b/audio/b.wav", "Part")), manifest.audio)
+        assertEquals(listOf(Attachment("parts/b/files/b.pdf", "Info")), manifest.files)
+        assertEquals(manifest, AppJson.decodeFromString(ScoreManifestSerializer, AppJson.encodeToString(ScoreManifestSerializer, manifest)))
     }
 
     @Test

@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
@@ -60,7 +59,7 @@ fun FilesMenu(viewModel: ScoreFilesViewModel) {
             }
             state.files.forEach { attachment ->
                 DropdownMenuItem(
-                    text = { Text(attachment.name, maxLines = 1, overflow = TextOverflow.MiddleEllipsis) },
+                    text = { AttachmentName(attachment.name) },
                     onClick = { export(attachment) },
                     leadingIcon = { Icon(painterResource(Res.drawable.ic_description), contentDescription = null) },
                     trailingIcon = {

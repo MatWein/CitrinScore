@@ -1,5 +1,6 @@
 package de.citrinscore.library
 
+import de.citrinscore.score.Attachment
 import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ImagePage
@@ -171,20 +172,20 @@ class LibraryRepositoryTest {
     @Test
     fun `audio attachments are copied, renamed and deleted`() = runTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
-        val part = firstPart("Etude")
+        val score = File(root, "Etude.citscore")
         val source = File(root, "take.wav").apply { writeBytes(byteArrayOf(1, 2, 3)) }
 
-        val attachment = repository.addAttachment(part, AttachmentKind.Audio, PlatformFile(source), "Take")
-        repository.renameAttachment(part, AttachmentKind.Audio, attachment, "Final take")
+        val attachment = repository.addAttachment(PlatformFile(score), AttachmentKind.Audio, PlatformFile(source), "Take")
+        repository.renameAttachment(PlatformFile(score), AttachmentKind.Audio, attachment, "Final take")
 
         val renamed = attachment.copy(name = "Final take")
-        assertEquals(listOf(renamed), repository.attachments(part, AttachmentKind.Audio))
-        val stored = File(File(root, "Etude.citscore/${part.directory}"), attachment.path)
+        assertEquals(listOf(renamed), repository.attachments(PlatformFile(score), AttachmentKind.Audio))
+        val stored = File(score, attachment.path)
         assertContentEquals(source.readBytes(), stored.readBytes())
 
-        repository.deleteAttachment(part, AttachmentKind.Audio, renamed)
+        repository.deleteAttachment(PlatformFile(score), AttachmentKind.Audio, renamed)
 
-        assertEquals(emptyList(), repository.attachments(part, AttachmentKind.Audio))
+        assertEquals(emptyList(), repository.attachments(PlatformFile(score), AttachmentKind.Audio))
         assertFalse(stored.exists())
     }
 
@@ -196,7 +197,7 @@ class LibraryRepositoryTest {
         importImages(ScoreMetadata(title = "Etude"), first, second)
         val score = PlatformFile(File(root, "Etude.citscore"))
         val part = firstPart("Etude")
-        val audio = repository.addAttachment(part, AttachmentKind.Audio, PlatformFile(first), "Take")
+        val audio = repository.addAttachment(score, AttachmentKind.Audio, PlatformFile(first), "Take")
         val before = repository.load(score).parts.single().content as ScoreContent.Images
 
         val renamed = repository.updateScore(
@@ -215,7 +216,8 @@ class LibraryRepositoryTest {
         assertEquals(ScoreMetadata(title = "Studie", composer = "Czerny"), manifest.metadata)
         val edited = manifest.parts.single()
         assertEquals("Violine", edited.name)
-        assertEquals(listOf(audio), edited.audio)
+        assertEquals(listOf(audio), manifest.audio)
+        assertContentEquals(first.readBytes(), File(root, "Studie.citscore/${audio.path}").readBytes())
         val pages = (edited.content as ScoreContent.Images).pages
         assertEquals(listOf(PageCrop(0f, 0f, 300f, 420f), before.pages[1].crop), pages.map { it.crop })
         assertEquals(before.pages[1], pages[1])
@@ -259,7 +261,8 @@ class LibraryRepositoryTest {
     @Test
     fun `any file can be attached and exported again`() = runTest {
         importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
-        val part = firstPart("Etude")
+        val score = File(root, "Etude.citscore")
+        val part = PlatformFile(score)
         val musescore = File(root, "Etude.mscz").apply { writeBytes(byteArrayOf(9, 8, 7)) }
         val withoutExtension = File(root, "LIESMICH").apply { writeText("notes") }
 
@@ -275,7 +278,7 @@ class LibraryRepositoryTest {
         repository.deleteAttachment(part, AttachmentKind.File, second)
 
         assertEquals(listOf(first), repository.attachments(part, AttachmentKind.File))
-        assertFalse(File(File(root, "Etude.citscore/${part.directory}"), second.path).exists())
+        assertFalse(File(score, second.path).exists())
     }
 
     @Test
@@ -446,8 +449,11 @@ class LibraryRepositoryTest {
         File(score, "pages").mkdir()
         ImageIO.write(sheet(100, 140, 10, 10, 90, 130), "png", File(score, "pages/001.png"))
         File(score, CitScore.ANNOTATIONS_FILE).writeText("{}")
+        File(score, "audio").mkdir()
+        File(score, "audio/a.wav").writeText("take")
         File(score, CitScore.MANIFEST_FILE).writeText(
-            """{"metadata":{"title":"Legacy"},"content":{"type":"images","pages":["pages/001.png"]},"createdAt":"2025-01-01T00:00:00Z"}""",
+            """{"metadata":{"title":"Legacy"},"content":{"type":"images","pages":["pages/001.png"]},"createdAt":"2025-01-01T00:00:00Z",
+               "audio":[{"path":"audio/a.wav","name":"Take"}]}""",
         )
         val folder = PlatformFile(root)
         val file = PlatformFile(score)
@@ -462,12 +468,38 @@ class LibraryRepositoryTest {
         assertEquals(added.directory, manifest.currentPart)
         assertFalse(File(score, "pages").exists())
         assertFalse(File(score, CitScore.ANNOTATIONS_FILE).exists())
+        assertEquals(listOf(Attachment("audio/a.wav", "Take")), manifest.audio)
+        assertEquals("take", File(score, "audio/a.wav").readText())
         assertTrue(File(score, added.directory).exists())
 
         repository.updateScore(folder, file, ScoreMetadata("Legacy"), listOf(PartEdit.Keep(manifest.parts[1].directory, "Flöte")))
 
         assertNull(repository.load(file).currentPart)
         assertFalse(File(score, added.directory).exists())
+    }
+
+    @Test
+    fun `attachments stored in a deleted part move to the score`() = runTest {
+        val score = File(root, "Duett.citscore").apply { mkdir() }
+        listOf("parts/a", "parts/b").forEach { part ->
+            File(score, "$part/pages").mkdirs()
+            ImageIO.write(sheet(100, 140, 10, 10, 90, 130), "png", File(score, "$part/pages/001.png"))
+        }
+        File(score, "parts/b/files").mkdirs()
+        File(score, "parts/b/files/x.pdf").writeText("fingering")
+        File(score, CitScore.MANIFEST_FILE).writeText(
+            """{"metadata":{"title":"Duett"},"createdAt":"2025-01-01T00:00:00Z","parts":[
+               {"directory":"parts/a","name":"A","content":{"type":"images","pages":["pages/001.png"]}},
+               {"directory":"parts/b","name":"B","content":{"type":"images","pages":["pages/001.png"]},"files":[{"path":"files/x.pdf","name":"Fingersatz.pdf"}]}]}""",
+        )
+        val file = PlatformFile(score)
+        assertEquals(listOf(Attachment("parts/b/files/x.pdf", "Fingersatz.pdf")), repository.attachments(file, AttachmentKind.File))
+
+        repository.updateScore(PlatformFile(root), file, ScoreMetadata("Duett"), listOf(PartEdit.Keep("parts/a", "A")))
+
+        assertEquals(listOf(Attachment("files/x.pdf", "Fingersatz.pdf")), repository.attachments(file, AttachmentKind.File))
+        assertEquals("fingering", File(score, "files/x.pdf").readText())
+        assertFalse(File(score, "parts/b").exists())
     }
 
     @Test

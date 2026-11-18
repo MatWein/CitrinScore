@@ -3,7 +3,6 @@ package de.citrinscore.ui.viewer.audio
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
-import de.citrinscore.library.PartRef
 import de.citrinscore.score.Attachment
 import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
@@ -25,8 +24,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -39,7 +36,7 @@ private val PositionInterval = 200.milliseconds
 private val logger = LoggerFactory.getLogger(ScoreAudioViewModel::class.java)
 private const val RECORDING_FILE = "recording.${CitScore.RECORDING_EXTENSION}"
 
-class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val repository: LibraryRepository) : ViewModel() {
+class ScoreAudioViewModel(private val score: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
 
     private val _state = MutableStateFlow(AudioState())
     val state: StateFlow<AudioState> = _state.asStateFlow()
@@ -51,24 +48,19 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     init {
         viewModelScope.launch {
-            part.filterNotNull().collectLatest { ref ->
-                releasePlayer()
-                _state.update { it.copy(attachments = emptyList(), player = null) }
-                reporting(AudioError.Save) {
-                    val attachments = repository.attachments(ref, AttachmentKind.Audio)
-                    _state.update { it.copy(attachments = attachments) }
-                }
+            reporting(AudioError.Save) {
+                val attachments = repository.attachments(score, AttachmentKind.Audio)
+                _state.update { it.copy(attachments = attachments) }
             }
         }
     }
 
     fun load(attachment: Attachment) {
-        val ref = part.value ?: return
-        logger.info("Opening audio {} of {}", attachment.path, ref)
+        logger.info("Opening audio {} of {}", attachment.path, score.path)
         releasePlayer()
         viewModelScope.launch {
             reporting(AudioError.Playback) {
-                val opened = openAudioPlayer(CitScore.resolve(ref.root, attachment.path))
+                val opened = openAudioPlayer(CitScore.resolve(score, attachment.path))
                 logger.info("Opened audio with duration {}", opened.duration)
                 player = opened
                 _state.update { it.copy(player = PlayerState(attachment, opened.duration, Duration.ZERO, isPlaying = false)) }
@@ -120,10 +112,9 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     }
 
     fun addFiles(files: List<PlatformFile>) {
-        val ref = part.value ?: return
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                files.forEach { file -> append(ref, repository.addAttachment(ref, AttachmentKind.Audio, file, file.nameWithoutExtension)) }
+                files.forEach { file -> append(repository.addAttachment(score, AttachmentKind.Audio, file, file.nameWithoutExtension)) }
             }
         }
     }
@@ -162,9 +153,8 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     }
 
     fun saveRecording(name: String) {
-        val ref = part.value ?: return
         _state.update { it.copy(finishedRecording = null) }
-        viewModelScope.launch { storeRecording(ref, name) }
+        viewModelScope.launch { storeRecording(name) }
     }
 
     fun discardRecording() {
@@ -174,17 +164,15 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     }
 
     fun saveActiveRecording(name: String) {
-        val ref = part.value ?: return
         val active = takeRecording() ?: return
-        viewModelScope.launch { storeRecording(ref, name, finishing = active) }
+        viewModelScope.launch { storeRecording(name, finishing = active) }
     }
 
     fun rename(attachment: Attachment, name: String) {
-        val ref = part.value ?: return
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                repository.renameAttachment(ref, AttachmentKind.Audio, attachment, name)
-                update(ref) { state ->
+                repository.renameAttachment(score, AttachmentKind.Audio, attachment, name)
+                _state.update { state ->
                     val renamed = attachment.copy(name = name)
                     state.copy(
                         attachments = state.attachments.map { if (it.path == attachment.path) renamed else it },
@@ -196,28 +184,22 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     }
 
     fun export(attachment: Attachment, target: PlatformFile) {
-        val ref = part.value ?: return
-        viewModelScope.launch { reporting(AudioError.Save) { repository.exportAttachment(ref, attachment, target) } }
+        viewModelScope.launch { reporting(AudioError.Save) { repository.exportAttachment(score, attachment, target) } }
     }
 
     fun delete(attachment: Attachment) {
-        val ref = part.value ?: return
         if (_state.value.player?.attachment?.path == attachment.path) closePlayer()
         viewModelScope.launch {
             reporting(AudioError.Save) {
-                repository.deleteAttachment(ref, AttachmentKind.Audio, attachment)
-                update(ref) { state -> state.copy(attachments = state.attachments.filterNot { it.path == attachment.path }) }
+                repository.deleteAttachment(score, AttachmentKind.Audio, attachment)
+                _state.update { state -> state.copy(attachments = state.attachments.filterNot { it.path == attachment.path }) }
             }
         }
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
 
-    private fun append(ref: PartRef, attachment: Attachment) = update(ref) { it.copy(attachments = it.attachments + attachment) }
-
-    private fun update(ref: PartRef, transform: (AudioState) -> AudioState) {
-        if (part.value == ref) _state.update(transform)
-    }
+    private fun append(attachment: Attachment) = _state.update { it.copy(attachments = it.attachments + attachment) }
 
     private fun takeRecording(): AudioRecording? {
         val active = recording ?: return null
@@ -226,10 +208,10 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
         return active
     }
 
-    private suspend fun storeRecording(ref: PartRef, name: String, finishing: AudioRecording? = null) {
+    private suspend fun storeRecording(name: String, finishing: AudioRecording? = null) {
         reporting(AudioError.Save) {
             finishing?.finish()
-            append(ref, repository.addAttachment(ref, AttachmentKind.Audio, recordingFile, name))
+            append(repository.addAttachment(score, AttachmentKind.Audio, recordingFile, name))
         }
         recordingFile.delete(mustExist = false)
     }

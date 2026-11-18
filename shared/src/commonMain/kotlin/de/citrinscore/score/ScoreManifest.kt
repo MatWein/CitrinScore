@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import de.citrinscore.score.playback.Instrument
 import kotlin.time.Instant
@@ -24,9 +25,21 @@ data class ScoreManifest(
     val createdAt: Instant,
     val lastOpenedAt: Instant? = null,
     val currentPart: String? = null,
+    val audio: List<Attachment> = emptyList(),
+    val files: List<Attachment> = emptyList(),
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
 ) {
     val lastActivity get() = lastOpenedAt ?: createdAt
+
+    fun attachments(kind: AttachmentKind) = when (kind) {
+        AttachmentKind.Audio -> audio
+        AttachmentKind.File -> files
+    }
+
+    fun withAttachments(kind: AttachmentKind, attachments: List<Attachment>) = when (kind) {
+        AttachmentKind.Audio -> copy(audio = attachments)
+        AttachmentKind.File -> copy(files = attachments)
+    }
 
     fun part(directory: String) = parts.first { it.directory == directory }
 
@@ -46,19 +59,7 @@ data class ScorePart(
     val view: ScoreViewState? = null,
     val playback: PlaybackPreferences? = null,
     val systemBreaks: List<List<Float>>? = null,
-    val audio: List<Attachment> = emptyList(),
-    val files: List<Attachment> = emptyList(),
-) {
-    fun attachments(kind: AttachmentKind) = when (kind) {
-        AttachmentKind.Audio -> audio
-        AttachmentKind.File -> files
-    }
-
-    fun withAttachments(kind: AttachmentKind, attachments: List<Attachment>) = when (kind) {
-        AttachmentKind.Audio -> copy(audio = attachments)
-        AttachmentKind.File -> copy(files = attachments)
-    }
-}
+)
 
 @Serializable
 data class ScoreMetadata(
@@ -80,6 +81,9 @@ private const val EXTENSION_SEPARATOR = '.'
 enum class AttachmentKind(val directory: String) {
     Audio("audio"),
     File("files"),
+    ;
+
+    fun path(fileName: String) = "$directory/$fileName"
 }
 
 @Serializable
@@ -146,22 +150,33 @@ private object ImagePageSerializer : JsonTransformingSerializer<ImagePage>(Image
 }
 
 object ScoreManifestSerializer : JsonTransformingSerializer<ScoreManifest>(ScoreManifest.serializer()) {
-    private val singlePartKeys = listOf(
-        ScorePart::content.name,
-        ScorePart::view.name,
-        ScorePart::systemBreaks.name,
-        ScorePart::audio.name,
-        ScorePart::files.name,
-    )
+    private val singlePartKeys = listOf(ScorePart::content.name, ScorePart::view.name, ScorePart::systemBreaks.name)
+    private val attachmentKeys = listOf(ScoreManifest::audio.name, ScoreManifest::files.name)
 
     override fun transformDeserialize(element: JsonElement): JsonElement {
         val manifest = element.jsonObject
-        if (ScoreManifest::parts.name in manifest) return manifest
+        val parts = manifest[ScoreManifest::parts.name]?.jsonArray ?: return singlePart(manifest)
+        val lifted = attachmentKeys.associateWith { key ->
+            JsonArray(manifest[key]?.jsonArray.orEmpty() + parts.flatMap { part -> part.jsonObject.attachmentsInScore(key) })
+        }
+        val partsWithoutAttachments = JsonArray(parts.map { JsonObject(it.jsonObject - attachmentKeys.toSet()) })
+        return JsonObject(manifest + lifted + (ScoreManifest::parts.name to partsWithoutAttachments))
+    }
+
+    private fun singlePart(manifest: JsonObject): JsonObject {
         val part = buildJsonObject {
             put(ScorePart::directory.name, "")
             put(ScorePart::name.name, "")
             singlePartKeys.forEach { key -> manifest[key]?.let { put(key, it) } }
         }
         return JsonObject(manifest - singlePartKeys.toSet() + (ScoreManifest::parts.name to JsonArray(listOf(part))))
+    }
+
+    private fun JsonObject.attachmentsInScore(key: String): List<JsonElement> {
+        val directory = getValue(ScorePart::directory.name).jsonPrimitive.content
+        return this[key]?.jsonArray.orEmpty().map { attachment ->
+            val path = attachment.jsonObject.getValue(Attachment::path.name).jsonPrimitive.content
+            JsonObject(attachment.jsonObject + (Attachment::path.name to JsonPrimitive(CitScore.resolvePath(directory, path))))
+        }
     }
 }
