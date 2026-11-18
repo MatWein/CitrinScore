@@ -5,8 +5,9 @@ citrinScore is built with Kotlin Multiplatform and Compose Multiplatform.
 | Platform | Status |
 |---|---|
 | Android 8.0 (API 26) and newer | supported |
-| Linux, Windows, macOS (JVM desktop) | supported |
-| iOS | shared code compiles, no app project yet, no MusicXML, playback, play along or synchronization |
+| Linux, Windows (JVM desktop) | supported |
+
+macOS and iOS are not supported.
 
 ## Building
 
@@ -46,10 +47,8 @@ The desktop app keeps its settings and extracted resources in `~/.citrinscore`. 
 | Source set in `shared` | Platforms | Used for |
 |---|---|---|
 | `commonMain` | all | almost everything |
-| `skikoMain` | desktop, iOS | Skia based image rendering |
 | `jvmAndroidMain` | desktop, Android | Verovio and FluidSynth bindings through JNA, Git synchronization |
-| `mobileMain` | Android, iOS | camera capture, app storage |
-| `androidMain`, `jvmMain`, `iosMain` | one each | PDF rendering, audio, platform integration |
+| `androidMain`, `jvmMain` | one each | rendering, audio, camera, storage and platform integration |
 
 ## Libraries and licenses
 
@@ -117,8 +116,8 @@ version (`1.2.3` → `10203`).
 
 ## Releases
 
-Two workflows on GitHub Actions build the `.deb`, `.rpm`, portable `.tar.gz` and Arch Linux package, the Windows `.msi`,
-the macOS `.dmg` and the signed Android `.apk`:
+Two workflows on GitHub Actions build the `.deb`, `.rpm`, portable `.tar.gz` and Arch Linux package, the Windows `.msi` and
+the signed Android `.apk`:
 
 - [Build](.github/workflows/build.yml) only builds the packages and keeps them as workflow artifacts for seven days.
   Start it manually and choose a platform or all of them.

@@ -17,10 +17,6 @@ ANDROID_CONTENT_DP = 72
 ANDROID_DENSITIES = {"mdpi": 1.0, "hdpi": 1.5, "xhdpi": 2.0, "xxhdpi": 3.0, "xxxhdpi": 4.0}
 
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
-ICNS_ENTRIES = (
-    ("icp4", 16), ("icp5", 32), ("icp6", 64), ("ic07", 128), ("ic08", 256), ("ic09", 512), ("ic10", 1024),
-    ("ic11", 32), ("ic12", 64), ("ic13", 256), ("ic14", 512),
-)
 
 
 def render(svg: bytes, size: int) -> bytes:
@@ -52,11 +48,6 @@ def ico(images: dict[int, bytes]) -> bytes:
     return header + entries + payload
 
 
-def icns(images: dict[str, bytes]) -> bytes:
-    chunks = b"".join(kind.encode() + struct.pack(">I", len(png) + 8) + png for kind, png in images.items())
-    return b"icns" + struct.pack(">I", len(chunks) + 8) + chunks
-
-
 def write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
@@ -78,7 +69,6 @@ def main() -> None:
     write(SHARED_RESOURCE, large)
     write(DESKTOP_PACKAGING / "icon.png", large)
     write(DESKTOP_PACKAGING / "icon.ico", ico({size: render(svg, size) for size in ICO_SIZES}))
-    write(DESKTOP_PACKAGING / "icon.icns", icns({kind: render(svg, size) for kind, size in ICNS_ENTRIES}))
 
 
 if __name__ == "__main__":

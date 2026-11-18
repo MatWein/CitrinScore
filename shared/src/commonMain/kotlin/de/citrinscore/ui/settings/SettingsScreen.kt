@@ -125,16 +125,14 @@ fun SettingsScreen(
                             enabled = !moving,
                         )
                     }
-                    sync?.let {
-                        SettingsSection(strings.settingsSync) {
-                            SyncSettings(
-                                remote = settings.git,
-                                library = library,
-                                sync = it,
-                                available = it.supports(settings.library),
-                                onRemoteChange = { remote -> change(settings.copy(git = remote)) },
-                            )
-                        }
+                    SettingsSection(strings.settingsSync) {
+                        SyncSettings(
+                            remote = settings.git,
+                            library = library,
+                            sync = sync,
+                            available = sync.supports(settings.library),
+                            onRemoteChange = { remote -> change(settings.copy(git = remote)) },
+                        )
                     }
                     SettingsSection(strings.settingsAbout) {
                         AboutTile(onOpenAbout, Modifier.fillMaxWidth())
@@ -151,7 +149,7 @@ fun SettingsScreen(
                 LibraryTarget.App -> strings.libraryInApp
                 is LibraryTarget.Folder -> target.directory.name
             },
-            stopsSync = settings.git != null && !(target == LibraryTarget.App || sync?.syncsFolders == true),
+            stopsSync = settings.git != null && !(target == LibraryTarget.App || sync.syncsFolders),
             onConfirm = {
                 pendingMove = null
                 moving = true

@@ -29,7 +29,7 @@ compose.desktop {
         }
 
         nativeDistributions {
-            targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi, TargetFormat.Dmg)
+            targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Msi)
             packageName = rootProject.name
             packageVersion = project.version.toString()
             modules("java.instrument", "java.management", "java.security.jgss", "java.sql", "jdk.security.auth", "jdk.unsupported", "jdk.xml.dom")
@@ -44,16 +44,6 @@ compose.desktop {
                 menu = true
                 shortcut = true
                 upgradeUuid = "bc46cebd-3747-4492-bb3d-63996ce758ae"
-            }
-            macOS {
-                iconFile = file("packaging/icon.icns")
-                bundleID = project.group.toString()
-                infoPlist {
-                    extraKeysRawXml = """
-                        <key>NSMicrophoneUsageDescription</key>
-                        <string>${rootProject.name} uses the microphone to record audio and to follow your playing.</string>
-                    """.trimIndent()
-                }
             }
         }
     }

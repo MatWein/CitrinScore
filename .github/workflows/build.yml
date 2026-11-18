@@ -6,7 +6,7 @@ on:
       platform:
         description: Platform to build
         type: choice
-        options: [all, linux, windows, macos, android]
+        options: [all, linux, windows, android]
         default: all
   workflow_call:
     outputs:
@@ -34,7 +34,7 @@ jobs:
           PLATFORM: ${{ inputs.platform || 'all' }}
         run: |
           case "$PLATFORM" in
-            all) desktop='["linux","windows","macos"]' ;;
+            all) desktop='["linux","windows"]' ;;
             android) desktop='[]' ;;
             *) desktop="[\"$PLATFORM\"]" ;;
           esac
@@ -48,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: ${{ fromJSON(needs.prepare.outputs.desktop) }}
-    runs-on: ${{ fromJSON('{"linux":"ubuntu-latest","windows":"windows-latest","macos":"macos-latest"}')[matrix.platform] }}
+    runs-on: ${{ fromJSON('{"linux":"ubuntu-latest","windows":"windows-latest"}')[matrix.platform] }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,7 +86,6 @@ jobs:
             desktopApp/build/compose/binaries/main-release/deb/*.deb
             desktopApp/build/compose/binaries/main-release/rpm/*.rpm
             desktopApp/build/compose/binaries/main-release/msi/*.msi
-            desktopApp/build/compose/binaries/main-release/dmg/*.dmg
           retention-days: 7
           if-no-files-found: error
 

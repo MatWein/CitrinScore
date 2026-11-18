@@ -21,7 +21,7 @@ interface LibrarySync {
 
 fun LibrarySync.supports(location: LibraryLocation) = location is LibraryLocation.App || syncsFolders
 
-expect fun librarySync(): LibrarySync?
+expect fun librarySync(): LibrarySync
 
 enum class SyncStep { Committing, Downloading, Merging, Uploading }
 

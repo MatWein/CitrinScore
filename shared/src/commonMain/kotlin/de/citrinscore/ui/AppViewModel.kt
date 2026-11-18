@@ -63,12 +63,12 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
             val destination = attempt { target.location() to target.directory() } ?: return@launch onResult(LibraryMoveResult.Failed)
             val (location, directory) = destination
             val sync = librarySync()
-            val synchronized = sync?.supports(location) == true
+            val synchronized = sync.supports(location)
             val settings = current.settings.copy(library = location, git = current.settings.git.takeIf { synchronized })
             val result = moveLibrary(
                 source = current.library,
                 target = directory,
-                discarded = sync?.takeUnless { synchronized }?.metadata.orEmpty(),
+                discarded = if (synchronized) emptySet() else sync.metadata,
                 commit = { settingsRepository.save(settings) },
             )
             if (result == LibraryMoveResult.Moved || result == LibraryMoveResult.SourceKept) _state.value = AppState.Ready(settings, directory)

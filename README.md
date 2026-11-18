@@ -1,6 +1,6 @@
 # citrinScore
 
-citrinScore is a free, open-source sheet music library for tablets, phones and desktop computers. Your scores stay on
+citrinScore is a free, open-source sheet music library for Android tablets and phones and for Windows and Linux computers. Your scores stay on
 your own device as plain files: no account, no cloud, no lock-in.
 
 <table>
@@ -38,7 +38,6 @@ Download the package for your system from the [releases](https://github.com/MatW
 |---|---|---|
 | Android 8.0 or newer | `citrinScore-<version>.apk` | Allow installing apps from your browser or file manager when Android asks. |
 | Windows | `citrinScore-<version>.msi` | Windows SmartScreen may warn because the installer is not signed ("More info" → "Run anyway"). |
-| macOS (Apple silicon) | `citrinScore-<version>.dmg` | If macOS refuses to open the app, allow it under System Settings → Privacy & Security. |
 | Debian, Ubuntu | `citrinscore_<version>-1_amd64.deb` | `sudo apt install ./citrinscore_<version>-1_amd64.deb` |
 | Fedora, openSUSE | `citrinscore-<version>-1.x86_64.rpm` | `sudo dnf install ./citrinscore-<version>-1.x86_64.rpm` |
 | Arch Linux | `citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` | `sudo pacman -U citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` |

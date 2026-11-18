@@ -18,7 +18,6 @@ import de.citrinscore.resources.ic_folder
 import de.citrinscore.resources.ic_library_music
 import de.citrinscore.settings.LibraryTarget
 import de.citrinscore.settings.appStorageSelectable
-import de.citrinscore.sync.librarySync
 import de.citrinscore.ui.components.IconBadge
 import de.citrinscore.ui.components.IconBadgeSize
 import de.citrinscore.ui.components.Tile
@@ -37,7 +36,6 @@ fun LibraryLocationOptions(
     enabled: Boolean = true,
 ) {
     val strings = LocalStrings.current
-    val sync = librarySync()
     val folder = (selected as? LibraryTarget.Folder)?.directory
     val picker = rememberDirectoryPickerLauncher(directory = folder, onError = { onError() }) { directory ->
         directory?.let { onSelect(LibraryTarget.Folder(it)) }
@@ -48,7 +46,7 @@ fun LibraryLocationOptions(
             LocationTile(
                 icon = Res.drawable.ic_library_music,
                 title = strings.libraryInApp,
-                description = strings.libraryInAppText(sync = sync != null),
+                description = strings.libraryInAppText,
                 selected = selected == LibraryTarget.App,
                 onClick = { onSelect(LibraryTarget.App) }.takeIf { enabled },
             )
@@ -56,7 +54,7 @@ fun LibraryLocationOptions(
         LocationTile(
             icon = Res.drawable.ic_folder,
             title = folder?.name ?: if (appStorageSelectable) strings.libraryOwnFolder else strings.chooseFolder,
-            description = strings.libraryOwnFolderText(sync = sync?.syncsFolders == true).takeIf { appStorageSelectable },
+            description = strings.libraryOwnFolderText.takeIf { appStorageSelectable },
             detail = folder?.displayPath,
             action = when {
                 folder != null -> strings.changeFolder

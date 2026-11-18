@@ -75,27 +75,10 @@ kotlin {
 
     applyDefaultHierarchyTemplate {
         common {
-            group("skiko") {
-                withJvm()
-                group("ios") {
-                    withIos()
-                }
-            }
-            group("mobile") {
-                withCompilations { it.platformType == KotlinPlatformType.androidJvm }
-                group("ios")
-            }
             group("jvmAndroid") {
                 withJvm()
                 withCompilations { it.platformType == KotlinPlatformType.androidJvm }
             }
-        }
-    }
-
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
-        target.binaries.framework {
-            baseName = "Shared"
-            isStatic = true
         }
     }
 
@@ -162,11 +145,7 @@ val nativeResourcePrefix = run {
         "amd64", "x86_64" -> "x86-64"
         else -> name
     }
-    when {
-        os.startsWith("windows") -> "win32-$arch"
-        os.startsWith("mac") -> "darwin-$arch"
-        else -> "linux-$arch"
-    }
+    if (os.startsWith("windows")) "win32-$arch" else "linux-$arch"
 }
 
 fun registerNativeBuild(name: String, source: Directory, sources: List<String>, options: String, target: String): TaskProvider<Exec> {

@@ -42,9 +42,9 @@ interface Strings {
     val libraryLocationSubtitle: String
     val chooseFolder: String
     val libraryInApp: String
-    fun libraryInAppText(sync: Boolean): String
+    val libraryInAppText: String
     val libraryOwnFolder: String
-    fun libraryOwnFolderText(sync: Boolean): String
+    val libraryOwnFolderText: String
     val moveLibraryTitle: String
     fun moveLibraryText(target: String, stopsSync: Boolean): String
     val moveLibrary: String

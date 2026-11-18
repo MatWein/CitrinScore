@@ -63,7 +63,7 @@ fun LibraryNavigation(
     val repository = remember { LibraryRepository() }
     val libraryViewModel = viewModel(key = library.path) { LibraryViewModel(library, repository) }
     val navController = rememberNavController()
-    val syncViewModel = librarySync()?.takeIf { it.supports(settings.library) }?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
+    val syncViewModel = librarySync().takeIf { it.supports(settings.library) }?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
 
     NavHost(navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {

@@ -44,7 +44,7 @@ private const val TIMEOUT_SECONDS = 30
 private val IgnoredPatterns = listOf("**/*.${CitScore.EXTENSION}/${CitScore.DEVICE_STATE_FILE}")
 private val AcceptedPushes = setOf(RemoteRefUpdate.Status.OK, RemoteRefUpdate.Status.UP_TO_DATE)
 
-actual fun librarySync(): LibrarySync? = GitLibrarySync
+actual fun librarySync(): LibrarySync = GitLibrarySync
 
 internal object GitLibrarySync : LibrarySync {
 

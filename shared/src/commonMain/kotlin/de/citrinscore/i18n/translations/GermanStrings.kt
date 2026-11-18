@@ -44,16 +44,9 @@ object GermanStrings : Strings {
     override val libraryLocationSubtitle = "Deine Noten werden als normale Dateien gespeichert. Du kannst den Ort später in den Einstellungen ändern, die Noten ziehen dann mit um."
     override val chooseFolder = "Ordner wählen"
     override val libraryInApp = "In der App"
-    override fun libraryInAppText(sync: Boolean) = listOfNotNull(
-        "citrinScore verwaltet den Speicherort selbst.",
-        "Die Bibliothek kann mit Git synchronisiert werden.".takeIf { sync },
-        "Wird beim Deinstallieren der App gelöscht.",
-    ).joinToString(" ")
+    override val libraryInAppText = "citrinScore verwaltet den Speicherort selbst. Die Bibliothek kann mit Git synchronisiert werden. Wird beim Deinstallieren der App gelöscht."
     override val libraryOwnFolder = "Eigener Ordner"
-    override fun libraryOwnFolderText(sync: Boolean) = listOfNotNull(
-        "Ein Ordner deiner Wahl, den du auch mit anderen Apps öffnen kannst.",
-        "Synchronisieren ist dann nicht möglich.".takeIf { !sync },
-    ).joinToString(" ")
+    override val libraryOwnFolderText = "Ein Ordner deiner Wahl, den du auch mit anderen Apps öffnen kannst. Synchronisieren ist dann nicht möglich."
     override val moveLibraryTitle = "Bibliothek verschieben?"
     override fun moveLibraryText(target: String, stopsSync: Boolean) = listOfNotNull(
         "Alle Noten und Ordner werden nach „$target“ verschoben.",
