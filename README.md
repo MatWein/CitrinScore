@@ -1,12 +1,7 @@
 # citrinScore
 
-citrinScore is a free, open-source sheet music library for tablets, phones and desktop computers. It keeps your scores as
-plain folders on your own storage, so there is no account, no cloud and no lock-in.
-
-The app is built with Kotlin Multiplatform and Compose Multiplatform and runs on Android, Linux, Windows and macOS.
-The shared code base is prepared for iOS.
-
-## Screenshots
+citrinScore is a free, open-source sheet music library for tablets, phones and desktop computers. Your scores stay on
+your own device as plain files: no account, no cloud, no lock-in.
 
 <table>
   <tr>
@@ -25,56 +20,15 @@ The shared code base is prepared for iOS.
 
 ## Features
 
-- **Library** – keep the library in a folder of your choice (on Android and iOS alternatively in the app storage),
-  organise scores in sub folders, search and sort them, delete scores and folders. Changing the location in the
-  settings moves all scores along.
-- **Parts** – a score can hold several parts, for example one per instrument, each imported from its own images, PDF or
-  MusicXML file. The viewer switches between them and remembers the last one.
-- **Editing** – add, rename, reorder or remove parts, reorder, remove or add pages and change title, composer and
-  description.
-- **Import wizard**
-  - **Images** (PNG, JPG, WebP, BMP, SVG): one or more pages, reorderable, rendered as vectors for SVG.
-  - **PDF**: a single document, rendered page by page.
-  - **MusicXML** (`.musicxml`, `.xml`, `.mxl`): engraved with Verovio and laid out to fit the screen. Zooming reflows the
-    music instead of scaling it.
-  - **Scan**: take photos with the camera on Android/iOS, or pick scanned images and PDFs on desktop. Pages are converted
-    to clean black and white with an adaptive threshold that can be tuned with a slider.
-  - White margins are cropped automatically, previews show the result before importing.
-- **Viewer**
-  - Continuous vertical page layout with smooth zooming (pinch, mouse wheel, zoom slider) and panning.
-  - Sharp rendering at every zoom level: only the visible area is re-rendered at the current resolution.
-  - Previous/next page buttons that page by staff systems, so a partly visible system moves to the top instead of being cut.
-  - Keyboard and Bluetooth page turner support (Page Up/Down, arrow keys, space, +/-).
-  - Notes on the score: draw with finger, stylus or mouse and place text, with eraser and undo. On MusicXML parts notes
-    stick to their measures when the music reflows.
-- **Playback** – MusicXML parts can be played with a built-in General MIDI synthesizer. A cursor follows the music, the
-  sounding notes are highlighted and the view scrolls along. Tap a note to hear it and to start from there, the tempo can
-  be changed while playing and the part can be played with another instrument sound.
-- **Play along** – the microphone listens while you play a MusicXML part on your instrument. The cursor waits on the next
-  note and moves on as soon as you play it, so you always see where you are. It follows one voice at a time, any note of
-  a chord counts.
-  - Follows the app theme: in the dark theme the score is recoloured to the theme's paper and text colours.
-  - The screen stays on while a score is open.
-  - Zoom level and position are remembered per score.
-- **Audio attachments** – attach WAV or MP3 files or record with the microphone and play them back in a slim bar at the
-  bottom of the score while reading it.
-- **File attachments** – keep any related file with a score, for example MuseScore or MusicXML files, and save it again
-  with "Save as".
-- **Synchronization** – keep the whole library in a Git repository (for example on GitHub, GitLab or Gitea) and
-  synchronize it between devices with one button. Local changes are committed, remote changes pulled and the result
-  pushed. When a score was changed on both sides, you choose per score whether to keep the local or the remote version,
-  or cancel the synchronization. Zoom, position and the last opened part stay on each device. On Android and iOS the
-  library has to be stored in the app for this, on desktop any folder works.
-- **Settings** – language (English, German), light/dark/system theme, library location, Git repository URL and access
-  token for synchronization.
-
-## Supported platforms
-
-| Platform | Status |
-|---|---|
-| Android 8.0 (API 26) and newer | supported |
-| Linux, Windows, macOS (JVM desktop) | supported |
-| iOS | shared code compiles, no app project yet, no MusicXML, playback, play along or synchronization |
+- **Import** images, SVGs, PDFs and MusicXML, or scan pages with the camera. Margins are cropped automatically.
+- **Parts** – keep several parts per score, for example one per instrument.
+- **Viewer** with smooth zooming, page turning by staff systems and support for keyboards and Bluetooth page turners.
+- **Notes** – draw and write on your scores with finger, stylus or mouse.
+- **Playback** – listen to MusicXML scores while a cursor follows the music. Change the tempo or the instrument sound.
+- **Play along** – play on your instrument and the cursor follows you through the microphone.
+- **Audio and files** – record yourself, attach MP3 or WAV files and keep related files with each score.
+- **Synchronization** – keep your library up to date on all your devices with a Git repository.
+- Organise scores in folders, search and sort them, light and dark theme, English and German.
 
 ## Installation
 
@@ -82,153 +36,33 @@ Download the package for your system from the [releases](https://github.com/MatW
 
 | System | File | Notes |
 |---|---|---|
-| Android | `citrinScore-<version>.apk` | Allow installing apps from your browser or file manager when Android asks. |
-| Windows | `citrinScore-<version>.msi` | The installer is not signed, so Windows SmartScreen may warn before it starts ("More info" → "Run anyway"). |
-| macOS (Apple silicon) | `citrinScore-<version>.dmg` | The app is not signed. If macOS refuses to open it, allow it under System Settings → Privacy & Security. |
+| Android 8.0 or newer | `citrinScore-<version>.apk` | Allow installing apps from your browser or file manager when Android asks. |
+| Windows | `citrinScore-<version>.msi` | Windows SmartScreen may warn because the installer is not signed ("More info" → "Run anyway"). |
+| macOS (Apple silicon) | `citrinScore-<version>.dmg` | If macOS refuses to open the app, allow it under System Settings → Privacy & Security. |
 | Debian, Ubuntu | `citrinscore_<version>-1_amd64.deb` | `sudo apt install ./citrinscore_<version>-1_amd64.deb` |
 | Fedora, openSUSE | `citrinscore-<version>-1.x86_64.rpm` | `sudo dnf install ./citrinscore-<version>-1.x86_64.rpm` |
 | Arch Linux | `citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` | `sudo pacman -U citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` |
 | Other Linux | `citrinScore-<version>-linux-x86_64.tar.gz` | Extract it anywhere and start `citrinScore/bin/citrinScore`. |
 
-## Score format
+## Where your scores are stored
 
-Every score is a directory with the suffix `.citscore`, so it can be copied, synced and backed up like any other folder. A score holds one or more parts, for example one per instrument, each in its own directory:
+You choose the library folder when you start the app for the first time and can change it later in the settings. Your
+scores move along to the new location.
 
-```
-Etude.citscore/
-├── manifest.json            metadata and the parts with their page lists, crop boxes, staff system positions and attachments
-├── device.json              last opened time, selected part and view state of this device, not synchronized
-├── thumbnail.jpg            preview of the first part used by the library
-└── parts/<id>/
-    ├── annotations.json     drawings and text notes, in page coordinates or anchored to measures for MusicXML
-    ├── pages/001.png        original images (image and scan imports)
-    ├── score.pdf            original document (PDF imports)
-    ├── score.musicxml       original file (MusicXML imports, also .xml or .mxl)
-    ├── audio/               audio attachments (WAV, MP3)
-    └── files/               other attached files
-```
+On Android you can keep the library either in the app or in a folder of your choice. Synchronization only works when
+the library is stored in the app. Keep in mind that Android removes the app's data when the app is uninstalled.
 
-Scores created before parts existed keep their single part directly in the score directory.
+## Synchronization
 
-Unknown keys in `manifest.json` are ignored, missing optional values are recomputed when a score is opened. View state
-found in older manifests is moved to `device.json`.
+Create an empty repository at a Git host such as GitHub, GitLab or Gitea and an access token that may write to it. Enter
+the repository URL and the token in the settings and press the sync button in the library. When a score was changed on
+two devices, you choose which version to keep.
 
-When synchronization is set up, the library folder is a Git repository. Its `.gitignore` excludes the `device.json`
-files, and empty folders get a `.gitkeep` file so that they are synchronized as well. Git works on plain files, which
-Android only offers for the app's own storage without special permissions. A library in a folder chosen through the
-system folder picker can therefore not be synchronized on Android. The app storage is removed when the app is
-uninstalled, Android asks whether to keep it when the app is uninstalled from the system settings.
+## Development
 
-Moving the library copies all entries to the new location, saves the settings and then deletes the old entries. Nothing
-is changed when the target already contains an entry with the same name or copying fails. The Git repository is left
-behind and the synchronization disconnected when the new location cannot be synchronized.
-
-## Building
-
-Requirements:
-
-- JDK 17 or newer to start Gradle. Gradle provisions JDK 25 for the build automatically.
-- Android SDK with platform 37 and the NDK and CMake versions from `gradle.properties` for the Android app (configure
-  `sdk.dir` in `local.properties` or `ANDROID_HOME`).
-- CMake 3.24 or newer and a C++20 compiler to build Verovio and FluidSynth for the desktop.
-- The third party sources, checked out as git submodules: `git submodule update --init --recursive`.
-- `dpkg-deb` and `rpmbuild` to package the desktop app on Linux, since jpackage builds both a `.deb` and an `.rpm`
-  (on Arch Linux: `pacman -S dpkg rpm-tools`).
-
-All versions are defined in [`gradle.properties`](gradle.properties).
-
-| Task | Command |
-|---|---|
-| Run the desktop app | `./gradlew :desktopApp:run` |
-| Package the desktop app for the current OS | `./gradlew :desktopApp:packageReleaseDistributionForCurrentOS` |
-| Build the Android app | `./gradlew :androidApp:assembleRelease` |
-| Run the tests | `./gradlew :shared:jvmTest` |
-
-The licenses of all libraries are collected at build time with [AboutLibraries](https://github.com/mikepenz/AboutLibraries)
-and shown in the app under Settings → About → Show licenses. Native components that are not Maven dependencies (Verovio,
-FluidSynth, fonts, sound font) are described in [`shared/aboutlibraries`](shared/aboutlibraries). The build fails when a
-dependency uses a license that is not in the allowed list in [`shared/build.gradle.kts`](shared/build.gradle.kts).
-
-The desktop app keeps its settings and extracted resources in `~/.citrinscore`. Start it with
-`-Dcitrinscore.home=/absolute/path` to use another directory, for example a separate test library during development.
-
-### Signing the Android app
-
-Release builds are signed with the key configured by these Gradle properties, for example in
-`~/.gradle/gradle.properties` (never in the repository):
-
-```properties
-androidSigningStoreFile=/absolute/path/to/citrinscore-release.jks
-androidSigningStorePassword=...
-androidSigningKeyAlias=citrinscore
-androidSigningKeyPassword=...
-```
-
-Without them, release builds are signed with the debug key for local testing. The version code is derived from the
-version (`1.2.3` → `10203`).
-
-### Releases
-
-The [Package](.github/workflows/package.yml) workflow on GitHub Actions builds the `.deb`, `.rpm`, portable `.tar.gz`
-and Arch Linux package, the Windows `.msi`, the macOS `.dmg` and the signed Android `.apk`. Start it manually to build
-selected platforms, or push a tag to create a release:
-
-1. Set the new `version` in [`gradle.properties`](gradle.properties) and commit it.
-2. Push a tag with the same version: `git tag v1.2.3 && git push origin v1.2.3`.
-3. The workflow builds everything and creates a draft release with all packages. Check the generated notes and publish it.
-
-The Android job needs these repository secrets:
-
-| Secret | Value |
-|---|---|
-| `ANDROID_SIGNING_KEYSTORE` | the keystore file, Base64 encoded (`base64 -w0 citrinscore-release.jks`) |
-| `ANDROID_SIGNING_STORE_PASSWORD` | keystore password |
-| `ANDROID_SIGNING_KEY_ALIAS` | key alias |
-| `ANDROID_SIGNING_KEY_PASSWORD` | key password |
-
-The Arch Linux job also uploads the `PKGBUILD` and `.SRCINFO` with the checksums of the release as workflow artifact
-`citrinScore-arch`, ready to be pushed to the AUR. The template lives in [`desktopApp/packaging/arch`](desktopApp/packaging/arch).
-
-## Project structure
-
-| Module | Content |
-|---|---|
-| `shared` | UI, view models, rendering, import and storage for all platforms |
-| `androidApp` | Android entry point |
-| `verovio` | Android library that builds the native Verovio engraver with the NDK |
-| `fluidsynth` | Android library that builds the native FluidSynth synthesizer with the NDK |
-| `desktopApp` | Desktop entry point and packaging |
-| `branding` | App icon source and the script that generates all platform icons |
-
-Source sets in `shared`:
-
-| Source set | Platforms | Used for |
-|---|---|---|
-| `commonMain` | all | almost everything |
-| `skikoMain` | desktop, iOS | Skia based image rendering |
-| `jvmAndroidMain` | desktop, Android | Verovio and FluidSynth bindings through JNA |
-| `mobileMain` | Android, iOS | camera capture |
-| `androidMain`, `jvmMain`, `iosMain` | one each | PDF rendering, audio, platform integration |
-
-## Libraries
-
-- [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/) and Material 3
-- [FileKit](https://github.com/vinceglb/FileKit) for file and folder access, pickers and the camera
-- [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) for the manifest and settings
-- [Apache PDFBox](https://pdfbox.apache.org/) for PDF rendering on desktop
-- [AndroidSVG](https://github.com/BigBadaboom/androidsvg) for SVG rendering on Android
-- [Apache Batik](https://xmlgraphics.apache.org/batik/) for SVG rendering on desktop
-- [Verovio](https://www.verovio.org/) for engraving MusicXML, called through [JNA](https://github.com/java-native-access/jna)
-- [FluidSynth](https://www.fluidsynth.org/) for playback, with the [GeneralUser GS](https://www.schristiancollins.com/generaluser)
-  sound font by S. Christian Collins
-- [ktmidi](https://github.com/atsushieno/ktmidi) for reading the MIDI export of Verovio
-- [JGit](https://www.eclipse.org/jgit/) for synchronizing the library with a Git repository
-- [JLayer and MP3SPI](https://github.com/pdudits/soundlibs) for MP3 playback on desktop
-
-Audio playback and recording use the platform APIs (Java Sound, Android MediaPlayer/AudioTrack/AudioRecord, AVFoundation).
-Pitch detection for play along uses the YIN algorithm.
+How to build the app, the score format and the release process are described in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 
-citrinScore is licensed under the [GNU General Public License v3.0](LICENSE). The bundled libraries, fonts and the sound
-font keep their own licenses, which are listed in the app.
+citrinScore is licensed under the [GNU General Public License v3.0](LICENSE). The libraries, fonts and the sound font it
+uses keep their own licenses, which are listed in the app under Settings → About.
