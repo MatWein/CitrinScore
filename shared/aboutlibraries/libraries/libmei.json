@@ -1,0 +1,17 @@
+{
+  "uniqueId": "org.music-encoding:libmei",
+  "name": "LibMEI",
+  "description": "C++ library for the Music Encoding Initiative format, bundled with Verovio.",
+  "website": "https://github.com/DDMAL/libmei",
+  "developers": [
+    {
+      "name": "Andrew Hankinson"
+    },
+    {
+      "name": "Alastair Porter"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.smufl:bravura",
+  "name": "Bravura font metrics",
+  "description": "SMuFL glyph metrics used by Verovio.",
+  "website": "https://github.com/steinbergmedia/bravura",
+  "developers": [
+    {
+      "name": "Steinberg Media Technologies GmbH"
+    }
+  ],
+  "licenses": [
+    "OFL-1.1"
+  ]
+}

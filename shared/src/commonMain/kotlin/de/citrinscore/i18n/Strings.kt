@@ -210,6 +210,10 @@ interface Strings {
     val license: String
     val licenseText: String
     val openSourceLibraries: String
+    val openSourceLibrariesText: String
+    val showLicenses: String
+    val website: String
+    val viewLicense: String
     val syncSettingsHint: String
     val gitUrl: String
     val gitUsername: String

@@ -6,4 +6,5 @@ plugins {
     id("org.jetbrains.compose") apply false
     id("com.android.application") apply false
     id("com.android.kotlin.multiplatform.library") apply false
+    id("com.mikepenz.aboutlibraries.plugin") apply false
 }

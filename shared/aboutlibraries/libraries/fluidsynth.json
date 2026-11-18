@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.fluidsynth:fluidsynth",
+  "name": "FluidSynth",
+  "description": "Software synthesizer based on the SoundFont 2 specification.",
+  "website": "https://www.fluidsynth.org",
+  "developers": [
+    {
+      "name": "FluidSynth contributors"
+    }
+  ],
+  "licenses": [
+    "LGPL-2.1-or-later"
+  ]
+}

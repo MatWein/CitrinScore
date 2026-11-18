@@ -4,6 +4,7 @@ pluginManagement {
     val kotlinVersion = providers.gradleProperty("kotlinVersion").get()
     val composeVersion = providers.gradleProperty("composeVersion").get()
     val agpVersion = providers.gradleProperty("agpVersion").get()
+    val aboutLibrariesVersion = providers.gradleProperty("aboutLibrariesVersion").get()
 
     repositories {
         google()
@@ -20,6 +21,7 @@ pluginManagement {
         id("com.android.application") version agpVersion
         id("com.android.library") version agpVersion
         id("com.android.kotlin.multiplatform.library") version agpVersion
+        id("com.mikepenz.aboutlibraries.plugin") version aboutLibrariesVersion
     }
 }
 

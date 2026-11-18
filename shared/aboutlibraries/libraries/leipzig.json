@@ -1,0 +1,20 @@
+{
+  "uniqueId": "org.verovio:leipzig",
+  "name": "Leipzig font",
+  "description": "SMuFL music font used for engraving.",
+  "website": "https://github.com/rism-digital/leipzig",
+  "developers": [
+    {
+      "name": "Etienne Darbellay"
+    },
+    {
+      "name": "Jean-François Marti"
+    },
+    {
+      "name": "Laurent Pugin"
+    }
+  ],
+  "licenses": [
+    "OFL-1.1"
+  ]
+}

@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,27 +43,10 @@ import org.jetbrains.compose.resources.painterResource
 private val AppIconSize = 112.dp
 private const val LICENSE_NAME = "GNU General Public License v3.0"
 private const val LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
-private const val BULLET = "•"
-
-private val OpenSourceLibraries = listOf(
-    "Compose Multiplatform",
-    "FileKit",
-    "kotlinx.serialization",
-    "Verovio",
-    "FluidSynth",
-    "GeneralUser GS – S. Christian Collins",
-    "JNA",
-    "ktmidi",
-    "JGit",
-    "Apache PDFBox",
-    "Apache Batik",
-    "AndroidSVG",
-    "JLayer / MP3SPI",
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(onClose: () -> Unit) {
+fun AboutScreen(onOpenLicenses: () -> Unit, onClose: () -> Unit) {
     val strings = LocalStrings.current
     val scrollState = rememberScrollState()
     Scaffold(
@@ -95,9 +79,8 @@ fun AboutScreen(onClose: () -> Unit) {
                         LinkText(LICENSE_NAME, LICENSE_URL)
                     }
                     SettingsSection(strings.openSourceLibraries) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
-                            OpenSourceLibraries.forEach { Text("$BULLET $it", style = MaterialTheme.typography.bodyLarge) }
-                        }
+                        Text(strings.openSourceLibrariesText, style = MaterialTheme.typography.bodyLarge)
+                        OutlinedButton(onClick = onOpenLicenses) { Text(strings.showLicenses) }
                     }
                 }
             }

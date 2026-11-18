@@ -74,6 +74,20 @@ The shared code base is prepared for iOS.
 | Linux, Windows, macOS (JVM desktop) | supported |
 | iOS | shared code compiles, no app project yet, no MusicXML, playback, play along or synchronization |
 
+## Installation
+
+Download the package for your system from the [releases](https://github.com/MatWein/CitrinScore/releases) page.
+
+| System | File | Notes |
+|---|---|---|
+| Android | `citrinScore-<version>.apk` | Allow installing apps from your browser or file manager when Android asks. |
+| Windows | `citrinScore-<version>.msi` | The installer is not signed, so Windows SmartScreen may warn before it starts ("More info" → "Run anyway"). |
+| macOS (Apple silicon) | `citrinScore-<version>.dmg` | The app is not signed. If macOS refuses to open it, allow it under System Settings → Privacy & Security. |
+| Debian, Ubuntu | `citrinscore_<version>-1_amd64.deb` | `sudo apt install ./citrinscore_<version>-1_amd64.deb` |
+| Fedora, openSUSE | `citrinscore-<version>-1.x86_64.rpm` | `sudo dnf install ./citrinscore-<version>-1.x86_64.rpm` |
+| Arch Linux | `citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` | `sudo pacman -U citrinscore-bin-<version>-1-x86_64.pkg.tar.zst` |
+| Other Linux | `citrinScore-<version>-linux-x86_64.tar.gz` | Extract it anywhere and start `citrinScore/bin/citrinScore`. |
+
 ## Score format
 
 Every score is a directory with the suffix `.citscore`, so it can be copied, synced and backed up like any other folder. A score holds one or more parts, for example one per instrument, each in its own directory:
@@ -123,15 +137,50 @@ All versions are defined in [`gradle.properties`](gradle.properties).
 | Build the Android app | `./gradlew :androidApp:assembleRelease` |
 | Run the tests | `./gradlew :shared:jvmTest` |
 
-The installers for Linux (`.deb`, `.rpm`), Windows (`.msi`) and macOS (`.dmg`) are built by the
-[Package](.github/workflows/package.yml) workflow on GitHub Actions. Start it manually and choose a platform or all of them.
-The macOS package is not signed, so macOS asks for confirmation when it is opened for the first time.
+The licenses of all libraries are collected at build time with [AboutLibraries](https://github.com/mikepenz/AboutLibraries)
+and shown in the app under Settings → About → Show licenses. Native components that are not Maven dependencies (Verovio,
+FluidSynth, fonts, sound font) are described in [`shared/aboutlibraries`](shared/aboutlibraries). The build fails when a
+dependency uses a license that is not in the allowed list in [`shared/build.gradle.kts`](shared/build.gradle.kts).
 
 The desktop app keeps its settings and extracted resources in `~/.citrinscore`. Start it with
 `-Dcitrinscore.home=/absolute/path` to use another directory, for example a separate test library during development.
 
-The release build of the Android app is signed with the debug key for local testing. Replace the signing configuration in
-[`androidApp/build.gradle.kts`](androidApp/build.gradle.kts) before publishing to a store.
+### Signing the Android app
+
+Release builds are signed with the key configured by these Gradle properties, for example in
+`~/.gradle/gradle.properties` (never in the repository):
+
+```properties
+androidSigningStoreFile=/absolute/path/to/citrinscore-release.jks
+androidSigningStorePassword=...
+androidSigningKeyAlias=citrinscore
+androidSigningKeyPassword=...
+```
+
+Without them, release builds are signed with the debug key for local testing. The version code is derived from the
+version (`1.2.3` → `10203`).
+
+### Releases
+
+The [Package](.github/workflows/package.yml) workflow on GitHub Actions builds the `.deb`, `.rpm`, portable `.tar.gz`
+and Arch Linux package, the Windows `.msi`, the macOS `.dmg` and the signed Android `.apk`. Start it manually to build
+selected platforms, or push a tag to create a release:
+
+1. Set the new `version` in [`gradle.properties`](gradle.properties) and commit it.
+2. Push a tag with the same version: `git tag v1.2.3 && git push origin v1.2.3`.
+3. The workflow builds everything and creates a draft release with all packages. Check the generated notes and publish it.
+
+The Android job needs these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_SIGNING_KEYSTORE` | the keystore file, Base64 encoded (`base64 -w0 citrinscore-release.jks`) |
+| `ANDROID_SIGNING_STORE_PASSWORD` | keystore password |
+| `ANDROID_SIGNING_KEY_ALIAS` | key alias |
+| `ANDROID_SIGNING_KEY_PASSWORD` | key password |
+
+The Arch Linux job also uploads the `PKGBUILD` and `.SRCINFO` with the checksums of the release as workflow artifact
+`citrinScore-arch`, ready to be pushed to the AUR. The template lives in [`desktopApp/packaging/arch`](desktopApp/packaging/arch).
 
 ## Project structure
 
@@ -174,4 +223,5 @@ Pitch detection for play along uses the YIN algorithm.
 
 ## License
 
-citrinScore is licensed under the [GNU General Public License v3.0](LICENSE).
+citrinScore is licensed under the [GNU General Public License v3.0](LICENSE). The bundled libraries, fonts and the sound
+font keep their own licenses, which are listed in the app.

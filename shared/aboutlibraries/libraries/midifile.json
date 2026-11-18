@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.sapp:midifile",
+  "name": "midifile",
+  "description": "Standard MIDI file library, bundled with Verovio.",
+  "website": "https://midifile.sapp.org",
+  "developers": [
+    {
+      "name": "Craig Stuart Sapp"
+    }
+  ],
+  "licenses": [
+    "BSD-2-Clause"
+  ]
+}

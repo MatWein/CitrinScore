@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.github.hjiang:jsonxx",
+  "name": "jsonxx",
+  "description": "JSON parser, bundled with Verovio.",
+  "website": "https://github.com/hjiang/jsonxx",
+  "developers": [
+    {
+      "name": "Hong Jiang"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

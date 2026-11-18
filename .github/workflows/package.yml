@@ -1,20 +1,56 @@
 name: Package
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       platform:
         description: Platform to package
         type: choice
-        options: [all, linux, windows, macos]
+        options: [all, linux, windows, macos, android]
         default: all
 
 jobs:
-  package:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      desktop: ${{ steps.platforms.outputs.desktop }}
+      android: ${{ steps.platforms.outputs.android }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: version
+        name: Read version
+        run: |
+          version=$(sed -n 's/^version=//p' gradle.properties)
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in gradle.properties"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - id: platforms
+        name: Select platforms
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          case "$PLATFORM" in
+            all) desktop='["linux","windows","macos"]' ;;
+            android) desktop='[]' ;;
+            *) desktop="[\"$PLATFORM\"]" ;;
+          esac
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
+          echo "android=$([[ "$PLATFORM" == all || "$PLATFORM" == android ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    needs: prepare
+    if: needs.prepare.outputs.desktop != '[]'
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(inputs.platform == 'all' && '["linux","windows","macos"]' || format('["{0}"]', inputs.platform)) }}
+        platform: ${{ fromJSON(needs.prepare.outputs.desktop) }}
     runs-on: ${{ fromJSON('{"linux":"ubuntu-latest","windows":"windows-latest","macos":"macos-latest"}')[matrix.platform] }}
     steps:
       - uses: actions/checkout@v7
@@ -41,13 +77,116 @@ jobs:
       - name: Package
         run: ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS
 
+      - name: Archive portable Linux app
+        if: matrix.platform == 'linux'
+        run: tar -czf "citrinScore-${{ needs.prepare.outputs.version }}-linux-x86_64.tar.gz" -C desktopApp/build/compose/binaries/main-release/app citrinScore
+
       - uses: actions/upload-artifact@v7
         with:
           name: citrinScore-${{ matrix.platform }}
           path: |
+            citrinScore-*.tar.gz
             desktopApp/build/compose/binaries/main-release/deb/*.deb
             desktopApp/build/compose/binaries/main-release/rpm/*.rpm
             desktopApp/build/compose/binaries/main-release/msi/*.msi
             desktopApp/build/compose/binaries/main-release/dmg/*.dmg
           retention-days: 7
           if-no-files-found: error
+
+  arch:
+    needs: [prepare, desktop]
+    if: contains(fromJSON(needs.prepare.outputs.desktop), 'linux')
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: citrinScore-linux
+          path: linux
+
+      - name: Build package
+        run: |
+          pacman -Syu --noconfirm pacman-contrib
+          useradd --create-home builder
+          install -d -o builder build
+          cp desktopApp/packaging/arch/* linux/citrinScore-*.tar.gz build/
+          chown builder build/*
+          cd build
+          sed -i "s/^pkgver=.*/pkgver=${{ needs.prepare.outputs.version }}/" PKGBUILD
+          su builder -c "updpkgsums && makepkg --nodeps && makepkg --printsrcinfo > .SRCINFO"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: citrinScore-arch
+          path: |
+            build/*.pkg.tar.zst
+            build/PKGBUILD
+            build/.SRCINFO
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  android:
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE }}
+        run: |
+          if [[ -z "$KEYSTORE" ]]; then
+            echo "::error::The ANDROID_SIGNING_KEYSTORE secret is not set"
+            exit 1
+          fi
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - name: Build
+        env:
+          ORG_GRADLE_PROJECT_androidSigningStoreFile: ${{ runner.temp }}/release.jks
+          ORG_GRADLE_PROJECT_androidSigningStorePassword: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_androidSigningKeyAlias: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_androidSigningKeyPassword: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          ./gradlew :androidApp:assembleRelease
+          mv androidApp/build/outputs/apk/release/androidApp-release.apk "citrinScore-${{ needs.prepare.outputs.version }}.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: citrinScore-android
+          path: citrinScore-*.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, desktop, arch, android]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --generate-notes \
+            --title "citrinScore ${{ needs.prepare.outputs.version }}" \
+            $(find artifacts -type f ! -name PKGBUILD ! -name .SRCINFO)

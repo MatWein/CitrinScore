@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.github.tfussell:miniz-cpp",
+  "name": "miniz-cpp",
+  "description": "ZIP archive library, bundled with Verovio.",
+  "website": "https://github.com/tfussell/miniz-cpp",
+  "developers": [
+    {
+      "name": "Thomas Fussell"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

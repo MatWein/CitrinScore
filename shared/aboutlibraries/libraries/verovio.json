@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.verovio:verovio",
+  "name": "Verovio",
+  "description": "Music notation engraving library for MEI and MusicXML.",
+  "website": "https://www.verovio.org",
+  "developers": [
+    {
+      "name": "RISM Digital Center"
+    }
+  ],
+  "licenses": [
+    "LGPL-3.0-or-later"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.schristiancollins:generaluser-gs",
+  "name": "GeneralUser GS",
+  "description": "General MIDI SoundFont used for playback.",
+  "website": "https://www.schristiancollins.com/generaluser",
+  "developers": [
+    {
+      "name": "S. Christian Collins"
+    }
+  ],
+  "licenses": [
+    "generaluser-gs"
+  ]
+}

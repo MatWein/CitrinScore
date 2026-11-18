@@ -1,0 +1,24 @@
+pkgname=citrinscore-bin
+_app=citrinScore
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Sheet music library with MusicXML playback, play along and Git synchronization'
+arch=('x86_64')
+url='https://github.com/MatWein/CitrinScore'
+license=('GPL-3.0-only')
+depends=('alsa-lib' 'fontconfig' 'freetype2' 'gcc-libs' 'glibc' 'libgl' 'libx11' 'libxext' 'libxi' 'libxrender' 'libxtst' 'zlib')
+provides=('citrinscore')
+conflicts=('citrinscore')
+options=('!strip' '!debug')
+source=("$url/releases/download/v$pkgver/$_app-$pkgver-linux-x86_64.tar.gz"
+        'citrinscore.desktop')
+sha256sums=('SKIP'
+            'SKIP')
+
+package() {
+    install -d "$pkgdir/opt/citrinscore" "$pkgdir/usr/bin"
+    cp -a "$_app/." "$pkgdir/opt/citrinscore/"
+    ln -s "/opt/citrinscore/bin/$_app" "$pkgdir/usr/bin/citrinscore"
+    install -Dm644 citrinscore.desktop "$pkgdir/usr/share/applications/citrinscore.desktop"
+    install -Dm644 "$_app/lib/$_app.png" "$pkgdir/usr/share/pixmaps/citrinscore.png"
+}

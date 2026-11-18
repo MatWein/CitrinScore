@@ -1,6 +1,7 @@
 package de.citrinscore.ui.components
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -10,3 +11,6 @@ expect fun VerticalScrollIndicator(scrollState: ScrollState, modifier: Modifier 
 
 @Composable
 expect fun VerticalScrollIndicator(gridState: LazyGridState, modifier: Modifier = Modifier)
+
+@Composable
+expect fun VerticalScrollIndicator(listState: LazyListState, modifier: Modifier = Modifier)

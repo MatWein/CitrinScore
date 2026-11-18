@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.signalsmith-audio:basics",
+  "name": "Signalsmith Audio Basics",
+  "description": "Audio effects library, used by FluidSynth.",
+  "website": "https://github.com/Signalsmith-Audio/basics",
+  "developers": [
+    {
+      "name": "Geraint Luff"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

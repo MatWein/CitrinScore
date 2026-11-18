@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.pugixml:pugixml",
+  "name": "pugixml",
+  "description": "XML parser, bundled with Verovio.",
+  "website": "https://pugixml.org",
+  "developers": [
+    {
+      "name": "Arseny Kapoulkine"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

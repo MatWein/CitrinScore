@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.github.kthohr:gcem",
+  "name": "GCE-Math",
+  "description": "Compile-time math library, used by FluidSynth.",
+  "website": "https://github.com/kthohr/gcem",
+  "developers": [
+    {
+      "name": "Keith O'Hara"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ]
+}

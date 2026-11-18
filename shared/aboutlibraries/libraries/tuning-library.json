@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.surge-synthesizer:tuning-library",
+  "name": "Surge Synth Team Tuning Library",
+  "description": "Scala tuning library, bundled with Verovio.",
+  "website": "https://github.com/surge-synthesizer/tuning-library",
+  "developers": [
+    {
+      "name": "Paul Walker"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

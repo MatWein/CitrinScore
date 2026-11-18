@@ -1,3 +1,4 @@
+import com.mikepenz.aboutlibraries.plugin.StrictMode
 import java.time.LocalDate
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
@@ -7,9 +8,11 @@ plugins {
     kotlin("plugin.serialization")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
+    id("com.mikepenz.aboutlibraries.plugin")
 }
 
 val composeVersion: String by project
+val aboutLibrariesVersion: String by project
 val material3Version: String by project
 val lifecycleVersion: String by project
 val navigationVersion: String by project
@@ -113,6 +116,7 @@ kotlin {
             implementation("org.jetbrains.androidx.navigationevent:navigationevent-compose:$navigationEventVersion")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             implementation("androidx.collection:collection:$collectionVersion")
+            implementation("com.mikepenz:aboutlibraries-compose-m3:$aboutLibrariesVersion")
         }
         named("jvmAndroidMain").dependencies {
             compileOnly("net.java.dev.jna:jna:$jnaVersion")
@@ -225,22 +229,34 @@ val verovioResources by tasks.registering(Zip::class) {
     destinationDirectory = layout.buildDirectory.dir("native/archives")
 }
 
-val nativeResources by tasks.registering(Sync::class) {
+val bundledResources by tasks.registering(Sync::class) {
     from(verovioResources)
+    from(tasks.named("exportLibraryDefinitions"))
     from(thirdParty.dir("generaluser-gs")) {
         include("GeneralUser-GS.sf2")
     }
-    into(layout.buildDirectory.dir("native/resources/files"))
+    into(layout.buildDirectory.dir("bundled/resources/files"))
 }
 
 kotlin.sourceSets.named("jvmMain") {
     resources.srcDir(nativeLibraries.map { layout.buildDirectory.dir("native/libraries").get() })
 }
 
+aboutLibraries {
+    collect {
+        configPath = layout.projectDirectory.dir("aboutlibraries")
+        filterVariants.addAll("android", "jvm")
+    }
+    license {
+        strictMode = StrictMode.FAIL
+        allowedLicenses.addAll("Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "LGPL-2.1-or-later", "LGPL-3.0-or-later", "MIT", "OFL-1.1", "generaluser-gs", "6f2d5d14a0a0caf9830496e9db99e0d3")
+    }
+}
+
 compose.resources {
     publicResClass = true
     packageOfResClass = "de.citrinscore.resources"
-    customDirectory("jvmAndroidMain", nativeResources.map { layout.buildDirectory.dir("native/resources").get() })
+    customDirectory("jvmAndroidMain", bundledResources.map { layout.buildDirectory.dir("bundled/resources").get() })
 }
 
 tasks.named<Test>("jvmTest") {

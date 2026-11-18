@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=citrinScore
+Comment=Sheet music library
+Exec=citrinscore
+Icon=citrinscore
+Categories=AudioVideo;Audio;
+Terminal=false
