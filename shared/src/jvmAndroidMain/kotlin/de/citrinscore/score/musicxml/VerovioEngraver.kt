@@ -13,9 +13,16 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 import org.w3c.dom.Element
+import org.xml.sax.InputSource
+import org.xml.sax.SAXException
+import java.io.StringReader
+import java.io.StringWriter
 import java.util.Base64
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 import kotlin.math.roundToInt
 import kotlin.time.measureTimedValue
 
@@ -27,13 +34,17 @@ private const val TICK_TOLERANCE = 1
 private const val MXL_CONTAINER = "META-INF/container.xml"
 private const val MXL_ROOTFILE = "rootfile"
 private const val MXL_ROOTFILE_PATH = "full-path"
+private const val SCORE_PART = "score-part"
+private const val PRINT_OBJECT = "print-object"
+private const val NO = "no"
+private val PART_LABELS = listOf("part-name", "part-abbreviation")
 private val Utf16Boms = listOf(byteArrayOf(0xFE.toByte(), 0xFF.toByte()), byteArrayOf(0xFF.toByte(), 0xFE.toByte()))
 private val TimemapJson = Json { ignoreUnknownKeys = true }
 private val logger = LoggerFactory.getLogger("de.citrinscore.score.musicxml.Verovio")
 
 actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver {
     logger.debug("Loading MusicXML with {} bytes, compressed: {}", data.size, compressed)
-    val score = (if (compressed) withContext(Dispatchers.Default) { data.uncompressMusicXml() } else data).decodeXml()
+    val score = withContext(Dispatchers.Default) { (if (compressed) data.uncompressMusicXml() else data).decodeXml().withoutSinglePartName() }
     val resources = verovioResourcePath()
     val (toolkit, duration) = measureTimedValue {
         Verovio.call {
@@ -168,6 +179,24 @@ private fun ByteArray.uncompressMusicXml(): ByteArray {
         .getElementsByTagName(MXL_ROOTFILE).item(0) as? Element
     val path = rootfile?.getAttribute(MXL_ROOTFILE_PATH)?.takeIf { it.isNotEmpty() } ?: error("$MXL_CONTAINER names no score")
     return entries[path] ?: error("The archive contains no $path")
+}
+
+private fun String.withoutSinglePartName(): String {
+    val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder().apply { setEntityResolver { _, _ -> InputSource(StringReader("")) } }
+    val document = try {
+        builder.parse(InputSource(StringReader(this)))
+    } catch (e: SAXException) {
+        logger.debug("Leaving unparsable MusicXML to Verovio", e)
+        return this
+    }
+    val parts = document.getElementsByTagName(SCORE_PART)
+    if (parts.length != 1) return this
+    val part = parts.item(0) as Element
+    PART_LABELS.forEach { label ->
+        val names = part.getElementsByTagName(label)
+        (0 until names.length).forEach { (names.item(it) as Element).setAttribute(PRINT_OBJECT, NO) }
+    }
+    return StringWriter().also { TransformerFactory.newInstance().newTransformer().transform(DOMSource(document), StreamResult(it)) }.toString()
 }
 
 private fun ByteArray.decodeXml(): String =

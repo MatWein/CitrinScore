@@ -11,6 +11,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MusicXmlEngraverTest {
@@ -89,6 +90,21 @@ class MusicXmlEngraverTest {
             assertEquals(setOf(70, 74), first.pitches)
             assertEquals(listOf(72, 76), first.notes.map { written.getValue(it.id) })
             assertEquals(listOf(70, 74), first.notes.map { first.pitchOf(it.id, written) })
+        }
+    }
+
+    @Test
+    fun `the part name is only printed when the score has several parts`() = runTest {
+        val single = score(measures = 1)
+        val duet = single.replace("</score-part>", "</score-part><score-part id=\"P2\"><part-name>Klavier</part-name></score-part>")
+            .replace("</score-partwise>", single.substringAfter("</part-list>").substringBefore("</score-partwise>").replace("\"P1\"", "\"P2\"") + "</score-partwise>")
+
+        openMusicXmlEngraver(single.encodeToByteArray(), compressed = false).use { engraver ->
+            assertFalse(engraver.engrave(EngravingLayout.Print).any { "Violine" in it.svg })
+        }
+        openMusicXmlEngraver(duet.encodeToByteArray(), compressed = false).use { engraver ->
+            val svg = engraver.engrave(EngravingLayout.Print).joinToString { it.svg }
+            assertTrue("Violine" in svg && "Klavier" in svg)
         }
     }
 
