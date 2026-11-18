@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_folder
+import de.citrinscore.settings.LibraryLocation
 import de.citrinscore.ui.components.IconBadge
 import de.citrinscore.ui.components.IconBadgeSize
 import de.citrinscore.ui.theme.ContentWidth
@@ -31,7 +32,7 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLaunche
 
 @Composable
 fun LibraryUnavailableScreen(
-    folder: String,
+    location: LibraryLocation,
     onRetry: (onFailure: () -> Unit) -> Unit,
     onChooseFolder: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
 ) {
@@ -50,7 +51,12 @@ fun LibraryUnavailableScreen(
             IconBadge(Res.drawable.ic_folder, size = IconBadgeSize.Hero)
             Text(strings.libraryUnavailableTitle, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
             Text(
-                strings.libraryUnavailableText(folder),
+                strings.libraryUnavailableText(
+                    when (location) {
+                        LibraryLocation.App -> strings.libraryInApp
+                        is LibraryLocation.Folder -> location.displayPath
+                    },
+                ),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

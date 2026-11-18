@@ -48,6 +48,10 @@ actual fun librarySync(): LibrarySync? = GitLibrarySync
 
 internal object GitLibrarySync : LibrarySync {
 
+    override val syncsFolders = foldersHaveWorkingDirectory
+
+    override val metadata = setOf(Constants.DOT_GIT)
+
     override suspend fun connect(library: PlatformFile, remote: GitRemote) = withContext(Dispatchers.IO) {
         failingAs {
             val directory = library.workingDirectory()

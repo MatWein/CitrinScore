@@ -36,9 +36,9 @@ fun App() {
             AppState.Onboarding -> OnboardingScreen(onFinished = viewModel::completeOnboarding)
             is AppState.LibraryUnavailable -> ConfiguredScreen(current.settings) {
                 LibraryUnavailableScreen(
-                    folder = current.settings.library.displayPath,
+                    location = current.settings.library,
                     onRetry = viewModel::retryLibrary,
-                    onChooseFolder = viewModel::changeLibrary,
+                    onChooseFolder = viewModel::switchLibrary,
                 )
             }
             is AppState.Ready -> ConfiguredScreen(current.settings) {
@@ -46,7 +46,7 @@ fun App() {
                     settings = current.settings,
                     library = current.library,
                     onSettingsChange = viewModel::updateSettings,
-                    onLibraryChange = viewModel::changeLibrary,
+                    onLibraryMove = viewModel::moveLibrary,
                 )
             }
         }

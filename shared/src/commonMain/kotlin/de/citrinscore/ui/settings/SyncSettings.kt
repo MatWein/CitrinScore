@@ -27,7 +27,6 @@ import de.citrinscore.settings.GitRemote
 import de.citrinscore.sync.LibrarySync
 import de.citrinscore.sync.SyncException
 import de.citrinscore.sync.SyncFailure
-import de.citrinscore.sync.rememberLibraryAccess
 import de.citrinscore.ui.components.CitrinTextField
 import de.citrinscore.ui.sync.message
 import de.citrinscore.ui.theme.Spacing
@@ -37,7 +36,7 @@ import kotlinx.coroutines.launch
 private val ProgressSize = 20.dp
 
 @Composable
-fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, onRemoteChange: (GitRemote?) -> Unit) {
+fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, available: Boolean, onRemoteChange: (GitRemote?) -> Unit) {
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     var url by rememberSaveable { mutableStateOf(remote?.url.orEmpty()) }
@@ -47,11 +46,9 @@ fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, o
     var failure by rememberSaveable { mutableStateOf<SyncFailure?>(null) }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     val candidate = GitRemote(url.trim(), token.trim(), username.trim())
-    val requestAccess = rememberLibraryAccess { granted ->
-        if (!granted) {
-            failure = SyncFailure.StorageAccess
-            return@rememberLibraryAccess
-        }
+    val connect = {
+        failure = null
+        detail = null
         connecting = true
         scope.launch {
             try {
@@ -67,6 +64,11 @@ fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, o
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
         Text(strings.syncSettingsHint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!available) {
+            Text(strings.syncLibraryLocation, style = MaterialTheme.typography.bodyLarge)
+            if (remote != null) OutlinedButton(onClick = { onRemoteChange(null) }) { Text(strings.disconnect) }
+            return@Column
+        }
         if (remote != null) {
             Text(strings.syncConnectedTo(remote.url), style = MaterialTheme.typography.bodyLarge)
             OutlinedButton(onClick = { onRemoteChange(null) }) { Text(strings.disconnect) }
@@ -99,11 +101,7 @@ fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, o
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Medium)) {
             Button(
-                onClick = {
-                    failure = null
-                    detail = null
-                    requestAccess()
-                },
+                onClick = { connect() },
                 enabled = editable && candidate.url.isNotEmpty() && candidate.token.isNotEmpty(),
             ) { Text(strings.connect) }
             if (connecting) CircularProgressIndicator(Modifier.size(ProgressSize))

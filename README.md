@@ -25,8 +25,9 @@ The shared code base is prepared for iOS.
 
 ## Features
 
-- **Library** – browse a folder of your choice, organise scores in sub folders, search and sort them, delete scores and
-  folders.
+- **Library** – keep the library in a folder of your choice (on Android and iOS alternatively in the app storage),
+  organise scores in sub folders, search and sort them, delete scores and folders. Changing the location in the
+  settings moves all scores along.
 - **Parts** – a score can hold several parts, for example one per instrument, each imported from its own images, PDF or
   MusicXML file. The viewer switches between them and remembers the last one.
 - **Editing** – add, rename, reorder or remove parts, reorder, remove or add pages and change title, composer and
@@ -62,7 +63,8 @@ The shared code base is prepared for iOS.
 - **Synchronization** – keep the whole library in a Git repository (for example on GitHub, GitLab or Gitea) and
   synchronize it between devices with one button. Local changes are committed, remote changes pulled and the result
   pushed. When a score was changed on both sides, you choose per score whether to keep the local or the remote version,
-  or cancel the synchronization. Zoom, position and the last opened part stay on each device.
+  or cancel the synchronization. Zoom, position and the last opened part stay on each device. On Android and iOS the
+  library has to be stored in the app for this, on desktop any folder works.
 - **Settings** – language (English, German), light/dark/system theme, library location, Git repository URL and access
   token for synchronization.
 
@@ -112,9 +114,14 @@ Unknown keys in `manifest.json` are ignored, missing optional values are recompu
 found in older manifests is moved to `device.json`.
 
 When synchronization is set up, the library folder is a Git repository. Its `.gitignore` excludes the `device.json`
-files, and empty folders get a `.gitkeep` file so that they are synchronized as well. On Android, synchronization needs
-the "All files access" permission, because Git works on plain files and the library folder has to be on the device
-storage.
+files, and empty folders get a `.gitkeep` file so that they are synchronized as well. Git works on plain files, which
+Android only offers for the app's own storage without special permissions. A library in a folder chosen through the
+system folder picker can therefore not be synchronized on Android. The app storage is removed when the app is
+uninstalled, Android asks whether to keep it when the app is uninstalled from the system settings.
+
+Moving the library copies all entries to the new location, saves the settings and then deletes the old entries. Nothing
+is changed when the target already contains an entry with the same name or copying fails. The Git repository is left
+behind and the synchronization disconnected when the new location cannot be synchronized.
 
 ## Building
 

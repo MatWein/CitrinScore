@@ -30,7 +30,7 @@ class FileSettingsRepositoryTest {
     @Test
     fun `saved settings are loaded again`() = runTest {
         val library = PlatformFile(root.resolve("library").apply { mkdirs() })
-        val settings = AppSettings(AppLanguage.German, LibraryReference.of(library), ThemeMode.Dark)
+        val settings = AppSettings(AppLanguage.German, LibraryLocation.Folder.of(library), ThemeMode.Dark)
 
         repository.save(settings)
 
@@ -38,11 +38,23 @@ class FileSettingsRepositoryTest {
     }
 
     @Test
-    fun `settings without a theme follow the system`() = runTest {
+    fun `a library in the app storage is loaded again`() = runTest {
+        val settings = AppSettings(AppLanguage.English, LibraryLocation.App)
+
+        repository.save(settings)
+
+        assertEquals(settings, repository.load())
+    }
+
+    @Test
+    fun `settings from before library locations keep their folder and follow the system theme`() = runTest {
         root.resolve("config").mkdirs()
         (directory / "settings.json").writeString("""{"language":"English","library":{"displayPath":"/music","bookmark":""}}""")
 
-        assertEquals(ThemeMode.System, repository.load()?.theme)
+        val settings = repository.load()
+
+        assertEquals(LibraryLocation.Folder("/music", ""), settings?.library)
+        assertEquals(ThemeMode.System, settings?.theme)
     }
 
     @Test

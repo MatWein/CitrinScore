@@ -32,11 +32,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import de.citrinscore.AppInfo
 import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.i18n.Strings
+import de.citrinscore.library.LibraryMoveResult
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.app_icon
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.settings.AppSettings
+import de.citrinscore.settings.LibraryLocation
+import de.citrinscore.settings.LibraryTarget
 import de.citrinscore.sync.librarySync
+import de.citrinscore.sync.supports
 import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.components.IconBadgeSize
 import de.citrinscore.ui.components.Tile
@@ -44,6 +49,7 @@ import de.citrinscore.ui.components.VerticalScrollIndicator
 import de.citrinscore.ui.theme.ContentWidth
 import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
 import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,16 +58,28 @@ fun SettingsScreen(
     settings: AppSettings,
     library: PlatformFile,
     onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
-    onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
+    onLibraryMove: (LibraryTarget, onResult: (LibraryMoveResult) -> Unit) -> Unit,
     onOpenAbout: () -> Unit,
     onClose: () -> Unit,
 ) {
     val strings = LocalStrings.current
     var libraryError by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
+    var pendingMove by remember { mutableStateOf<LibraryTarget?>(null) }
+    var moving by remember { mutableStateOf(false) }
+    var moveResult by remember { mutableStateOf<LibraryMoveResult?>(null) }
+    val sync = librarySync()
+    val currentTarget = if (settings.library is LibraryLocation.App) LibraryTarget.App else LibraryTarget.Folder(library)
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val change = { updated: AppSettings -> onSettingsChange(updated) { saveFailed = true } }
+
+    LaunchedEffect(moveResult) {
+        moveResult?.let { result ->
+            strings.message(result)?.let { snackbarHostState.showSnackbar(it) }
+            moveResult = null
+        }
+    }
 
     LaunchedEffect(saveFailed) {
         if (saveFailed) {
@@ -95,20 +113,27 @@ fun SettingsScreen(
                         ThemeOptions(settings.theme, onSelect = { change(settings.copy(theme = it)) })
                     }
                     SettingsSection(strings.settingsLibrary) {
-                        LibraryFolderTile(
-                            library = library,
+                        LibraryLocationOptions(
+                            selected = currentTarget,
                             showError = libraryError,
-                            onSelect = { directory ->
+                            onSelect = { target ->
                                 libraryError = false
-                                onLibraryChange(directory) { libraryError = true }
+                                if (target != currentTarget) pendingMove = target
                             },
                             onError = { libraryError = true },
                             modifier = Modifier.fillMaxWidth(),
+                            enabled = !moving,
                         )
                     }
-                    librarySync()?.let { sync ->
+                    sync?.let {
                         SettingsSection(strings.settingsSync) {
-                            SyncSettings(settings.git, library, sync, onRemoteChange = { change(settings.copy(git = it)) })
+                            SyncSettings(
+                                remote = settings.git,
+                                library = library,
+                                sync = it,
+                                available = it.supports(settings.library),
+                                onRemoteChange = { remote -> change(settings.copy(git = remote)) },
+                            )
                         }
                     }
                     SettingsSection(strings.settingsAbout) {
@@ -119,6 +144,33 @@ fun SettingsScreen(
             VerticalScrollIndicator(scrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = Spacing.ExtraSmall))
         }
     }
+
+    pendingMove?.let { target ->
+        MoveLibraryDialog(
+            target = when (target) {
+                LibraryTarget.App -> strings.libraryInApp
+                is LibraryTarget.Folder -> target.directory.name
+            },
+            stopsSync = settings.git != null && !(target == LibraryTarget.App || sync?.syncsFolders == true),
+            onConfirm = {
+                pendingMove = null
+                moving = true
+                onLibraryMove(target) { result ->
+                    moving = false
+                    moveResult = result
+                }
+            },
+            onDismiss = { pendingMove = null },
+        )
+    }
+    if (moving) MovingLibraryDialog()
+}
+
+private fun Strings.message(result: LibraryMoveResult) = when (result) {
+    LibraryMoveResult.Moved -> null
+    LibraryMoveResult.SourceKept -> libraryMoveSourceKept
+    LibraryMoveResult.TargetOccupied -> libraryMoveOccupied
+    LibraryMoveResult.Failed -> libraryMoveFailed
 }
 
 @Composable
@@ -138,8 +190,8 @@ private fun AboutTile(onClick: () -> Unit, modifier: Modifier) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
                 Text(AppInfo.NAME, style = MaterialTheme.typography.headlineSmall)
                 Text(strings.appVersion(AppInfo.VERSION), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.aboutTitle, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
-            Text(strings.aboutTitle, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
     }
 }

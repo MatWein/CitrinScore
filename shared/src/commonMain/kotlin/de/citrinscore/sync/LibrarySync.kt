@@ -1,9 +1,14 @@
 package de.citrinscore.sync
 
 import de.citrinscore.settings.GitRemote
+import de.citrinscore.settings.LibraryLocation
 import io.github.vinceglb.filekit.PlatformFile
 
 interface LibrarySync {
+    val syncsFolders: Boolean
+
+    val metadata: Set<String>
+
     suspend fun connect(library: PlatformFile, remote: GitRemote)
 
     suspend fun synchronize(
@@ -13,6 +18,8 @@ interface LibrarySync {
         resolve: suspend (List<SyncConflict>) -> Map<String, ConflictChoice>?,
     ): SyncOutcome
 }
+
+fun LibrarySync.supports(location: LibraryLocation) = location is LibraryLocation.App || syncsFolders
 
 expect fun librarySync(): LibrarySync?
 
@@ -30,6 +37,6 @@ sealed interface SyncOutcome {
     data object Cancelled : SyncOutcome
 }
 
-enum class SyncFailure { StorageAccess, LibraryLocation, Connection, Rejected, Failed }
+enum class SyncFailure { LibraryLocation, Connection, Rejected, Failed }
 
 class SyncException(val failure: SyncFailure, message: String?, cause: Throwable? = null) : Exception(message, cause)

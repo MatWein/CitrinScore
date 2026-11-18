@@ -32,12 +32,32 @@ object GermanStrings : Strings {
     override val settings = "Einstellungen"
     override val settingsLanguage = "Sprache"
     override val settingsTheme = "Design"
-    override val settingsLibrary = "Bibliotheksordner"
+    override val settingsLibrary = "Bibliothek"
 
     override val libraryLocationTitle = "Wo soll deine Bibliothek liegen?"
-    override val libraryLocationSubtitle =
-        "Wähle einen Ordner für deine Noten. Alles wird dort als normale Dateien gespeichert – so kannst du sie jederzeit sichern oder verschieben."
+    override val libraryLocationSubtitle = "Deine Noten werden als normale Dateien gespeichert. Du kannst den Ort später in den Einstellungen ändern, die Noten ziehen dann mit um."
     override val chooseFolder = "Ordner wählen"
+    override val libraryInApp = "In der App"
+    override fun libraryInAppText(sync: Boolean) = listOfNotNull(
+        "citrinScore verwaltet den Speicherort selbst.",
+        "Die Bibliothek kann mit Git synchronisiert werden.".takeIf { sync },
+        "Wird beim Deinstallieren der App gelöscht.",
+    ).joinToString(" ")
+    override val libraryOwnFolder = "Eigener Ordner"
+    override fun libraryOwnFolderText(sync: Boolean) = listOfNotNull(
+        "Ein Ordner deiner Wahl, den du auch mit anderen Apps öffnen kannst.",
+        "Synchronisieren ist dann nicht möglich.".takeIf { !sync },
+    ).joinToString(" ")
+    override val moveLibraryTitle = "Bibliothek verschieben?"
+    override fun moveLibraryText(target: String, stopsSync: Boolean) = listOfNotNull(
+        "Alle Noten und Ordner werden nach „$target“ verschoben.",
+        "Die Synchronisation wird dabei getrennt.".takeIf { stopsSync },
+    ).joinToString(" ")
+    override val moveLibrary = "Verschieben"
+    override val movingLibrary = "Bibliothek wird verschoben …"
+    override val libraryMoveOccupied = "Im Zielordner gibt es schon Einträge mit gleichem Namen. Es wurde nichts verschoben."
+    override val libraryMoveFailed = "Die Bibliothek konnte nicht verschoben werden. Es wurde nichts verändert."
+    override val libraryMoveSourceKept = "Die Bibliothek wurde verschoben, aber einige Dateien am alten Ort konnten nicht gelöscht werden."
     override val changeFolder = "Ordner ändern"
     override val folderPickerFailed = "Der Ordner konnte nicht geöffnet werden. Bitte versuche es erneut."
     override val libraryUnavailableTitle = "Bibliothek nicht erreichbar"
@@ -256,8 +276,7 @@ object GermanStrings : Strings {
     override val keepRemote = "Remote"
     override val continueSync = "Fortsetzen"
     override val cancelSync = "Sync abbrechen"
-    override val syncStorageAccess = "citrinScore braucht Zugriff auf alle Dateien, um die Bibliothek mit Git zu synchronisieren."
-    override val syncLibraryLocation = "Der Bibliotheksordner liegt nicht im Gerätespeicher (z. B. in einem Cloud-Ordner) und kann nicht synchronisiert werden."
+    override val syncLibraryLocation = "Synchronisieren ist nur möglich, wenn die Bibliothek in der App liegt. Du kannst sie oben unter „Bibliothek“ dorthin verschieben."
     override val syncConnection = "Keine Verbindung zum Repository. Prüfe URL, Token und Netzwerk."
     override val syncRejected = "Das Repository hat die Änderungen abgelehnt, vermutlich wurde zwischenzeitlich etwas hochgeladen. Synchronisiere erneut."
     override val syncFailed = "Die Synchronisation ist fehlgeschlagen."

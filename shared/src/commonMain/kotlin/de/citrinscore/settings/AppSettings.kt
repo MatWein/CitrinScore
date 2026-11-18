@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AppSettings(
     val language: AppLanguage,
-    val library: LibraryReference,
+    val library: LibraryLocation,
     val theme: ThemeMode = ThemeMode.System,
     val librarySort: LibrarySort = LibrarySort.RecentlyUsed,
     val git: GitRemote? = null,

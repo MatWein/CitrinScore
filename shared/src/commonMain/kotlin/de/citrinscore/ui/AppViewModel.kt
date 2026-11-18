@@ -3,8 +3,13 @@ package de.citrinscore.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.settings.AppSettings
-import de.citrinscore.settings.LibraryReference
+import de.citrinscore.library.LibraryMoveResult
+import de.citrinscore.library.moveLibrary
+import de.citrinscore.settings.LibraryLocation
+import de.citrinscore.settings.LibraryTarget
 import de.citrinscore.settings.SettingsRepository
+import de.citrinscore.sync.librarySync
+import de.citrinscore.sync.supports
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
@@ -42,17 +47,32 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
         viewModelScope.launch { attempt { settingsRepository.save(settings) } ?: onFailure() }
     }
 
-    fun changeLibrary(directory: PlatformFile, onFailure: () -> Unit) {
-        val current = when (val state = _state.value) {
-            is AppState.Ready -> state.settings
-            is AppState.LibraryUnavailable -> state.settings
-            else -> return
-        }
+    fun switchLibrary(directory: PlatformFile, onFailure: () -> Unit) {
+        val unavailable = _state.value as? AppState.LibraryUnavailable ?: return
         viewModelScope.launch {
             val settings = attempt {
-                current.copy(library = LibraryReference.of(directory)).also { settingsRepository.save(it) }
+                unavailable.settings.copy(library = LibraryLocation.Folder.of(directory)).also { settingsRepository.save(it) }
             }
             if (settings == null) onFailure() else _state.value = AppState.Ready(settings, directory)
+        }
+    }
+
+    fun moveLibrary(target: LibraryTarget, onResult: (LibraryMoveResult) -> Unit) {
+        val current = _state.value as? AppState.Ready ?: return
+        viewModelScope.launch {
+            val destination = attempt { target.location() to target.directory() } ?: return@launch onResult(LibraryMoveResult.Failed)
+            val (location, directory) = destination
+            val sync = librarySync()
+            val synchronized = sync?.supports(location) == true
+            val settings = current.settings.copy(library = location, git = current.settings.git.takeIf { synchronized })
+            val result = moveLibrary(
+                source = current.library,
+                target = directory,
+                discarded = sync?.takeUnless { synchronized }?.metadata.orEmpty(),
+                commit = { settingsRepository.save(settings) },
+            )
+            if (result == LibraryMoveResult.Moved || result == LibraryMoveResult.SourceKept) _state.value = AppState.Ready(settings, directory)
+            onResult(result)
         }
     }
 
@@ -66,7 +86,7 @@ class AppViewModel(private val settingsRepository: SettingsRepository) : ViewMod
 
     private suspend fun readyState(settings: AppSettings): AppState.Ready? = attempt {
         val library = settings.library.resolve().takeIf { it.exists() } ?: return@attempt null
-        val described = settings.copy(library = settings.library.describing(library))
+        val described = (settings.library as? LibraryLocation.Folder)?.let { settings.copy(library = it.describing(library)) } ?: settings
         if (described != settings) attempt { settingsRepository.save(described) }
         AppState.Ready(described, library)
     }

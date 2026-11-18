@@ -4,13 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.i18n.AppLanguage
 import de.citrinscore.settings.AppSettings
-import de.citrinscore.settings.LibraryReference
+import de.citrinscore.settings.LibraryTarget
 import de.citrinscore.settings.ThemeMode
 import de.citrinscore.ui.components.isLastStep
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
 import de.citrinscore.util.attempt
-import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +25,7 @@ class OnboardingViewModel : ViewModel() {
 
     fun selectTheme(theme: ThemeMode) = _state.update { it.copy(theme = theme) }
 
-    fun selectLibrary(directory: PlatformFile) = _state.update { it.copy(library = directory, libraryError = false) }
+    fun selectLibrary(target: LibraryTarget) = _state.update { it.copy(library = target, libraryError = false) }
 
     fun reportLibraryError() = _state.update { it.copy(libraryError = true) }
 
@@ -42,8 +41,8 @@ class OnboardingViewModel : ViewModel() {
         val library = current.library ?: return
         _state.update { it.copy(isCompleting = true) }
         viewModelScope.launch {
-            val reference = attempt { LibraryReference.of(library) } ?: return@launch failCompletion()
-            onFinished(AppSettings(current.language, reference, current.theme), ::failCompletion)
+            val location = attempt { library.location() } ?: return@launch failCompletion()
+            onFinished(AppSettings(current.language, location, current.theme), ::failCompletion)
         }
     }
 

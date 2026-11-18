@@ -35,6 +35,17 @@ interface Strings {
     val libraryLocationTitle: String
     val libraryLocationSubtitle: String
     val chooseFolder: String
+    val libraryInApp: String
+    fun libraryInAppText(sync: Boolean): String
+    val libraryOwnFolder: String
+    fun libraryOwnFolderText(sync: Boolean): String
+    val moveLibraryTitle: String
+    fun moveLibraryText(target: String, stopsSync: Boolean): String
+    val moveLibrary: String
+    val movingLibrary: String
+    val libraryMoveOccupied: String
+    val libraryMoveFailed: String
+    val libraryMoveSourceKept: String
     val changeFolder: String
     val folderPickerFailed: String
     val libraryUnavailableTitle: String
@@ -232,7 +243,6 @@ interface Strings {
     val keepRemote: String
     val continueSync: String
     val cancelSync: String
-    val syncStorageAccess: String
     val syncLibraryLocation: String
     val syncConnection: String
     val syncRejected: String

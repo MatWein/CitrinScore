@@ -126,7 +126,6 @@ private fun Strings.message(outcome: SyncOutcome) = when (outcome) {
 }
 
 fun Strings.message(failure: SyncFailure) = when (failure) {
-    SyncFailure.StorageAccess -> syncStorageAccess
     SyncFailure.LibraryLocation -> syncLibraryLocation
     SyncFailure.Connection -> syncConnection
     SyncFailure.Rejected -> syncRejected

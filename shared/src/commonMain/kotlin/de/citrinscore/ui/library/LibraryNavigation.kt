@@ -9,11 +9,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import de.citrinscore.library.LibraryMoveResult
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.settings.AppSettings
+import de.citrinscore.settings.LibraryTarget
 import de.citrinscore.ui.editor.EditScoreScreen
 import de.citrinscore.ui.importer.ImportScreen
 import de.citrinscore.sync.librarySync
+import de.citrinscore.sync.supports
 import de.citrinscore.ui.settings.AboutScreen
 import de.citrinscore.ui.settings.LicensesScreen
 import de.citrinscore.ui.settings.SettingsScreen
@@ -55,12 +58,12 @@ fun LibraryNavigation(
     settings: AppSettings,
     library: PlatformFile,
     onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
-    onLibraryChange: (directory: PlatformFile, onFailure: () -> Unit) -> Unit,
+    onLibraryMove: (LibraryTarget, onResult: (LibraryMoveResult) -> Unit) -> Unit,
 ) {
     val repository = remember { LibraryRepository() }
     val libraryViewModel = viewModel(key = library.path) { LibraryViewModel(library, repository) }
     val navController = rememberNavController()
-    val syncViewModel = librarySync()?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
+    val syncViewModel = librarySync()?.takeIf { it.supports(settings.library) }?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
 
     NavHost(navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
@@ -121,7 +124,7 @@ fun LibraryNavigation(
                 settings = settings,
                 library = library,
                 onSettingsChange = onSettingsChange,
-                onLibraryChange = onLibraryChange,
+                onLibraryMove = onLibraryMove,
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onClose = { navController.popBackStack() },
             )

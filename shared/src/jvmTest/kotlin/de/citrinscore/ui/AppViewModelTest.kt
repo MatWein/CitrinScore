@@ -2,7 +2,7 @@ package de.citrinscore.ui
 
 import de.citrinscore.i18n.AppLanguage
 import de.citrinscore.settings.AppSettings
-import de.citrinscore.settings.LibraryReference
+import de.citrinscore.settings.LibraryLocation
 import de.citrinscore.settings.SettingsRepository
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +44,7 @@ class AppViewModelTest {
     @Test
     fun `a missing library folder is reported instead of restarting the onboarding`() = runTest {
         val library = File(root, "Noten").apply { mkdir() }
-        val settings = AppSettings(AppLanguage.English, LibraryReference.of(PlatformFile(library)))
+        val settings = AppSettings(AppLanguage.English, LibraryLocation.Folder.of(PlatformFile(library)))
         library.delete()
 
         val viewModel = AppViewModel(FakeSettings(settings))
