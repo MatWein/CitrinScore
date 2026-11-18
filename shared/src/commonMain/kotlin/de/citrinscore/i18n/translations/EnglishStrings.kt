@@ -282,4 +282,13 @@ object EnglishStrings : Strings {
     override fun syncConnectedTo(url: String) = "Connected to $url"
     override fun syncCompleted(uploaded: Int, downloaded: Int) = "${scores(uploaded)} uploaded, ${scores(downloaded)} downloaded."
     private fun scores(count: Int) = if (count == 1) "1 score" else "$count scores"
+    override fun syncWithChanges(count: Int) = "Synchronize (${changes(count)})"
+    override fun localChanges(count: Int) = "Since the last synchronization: ${changes(count)}"
+    private fun changes(count: Int) = if (count == 1) "1 local change" else "$count local changes"
+    override val discardChanges = "Discard local changes"
+    override val discardChangesTitle = "Discard local changes?"
+    override val discardChangesText = "All changes since the last synchronization will be lost. The library is reset to the last synchronized state."
+    override val discard = "Discard"
+    override val changesDiscarded = "The local changes were discarded."
+    override val discardFailed = "The local changes could not be discarded."
 }

@@ -40,6 +40,7 @@ import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.LibraryLocation
 import de.citrinscore.settings.LibraryTarget
+import de.citrinscore.sync.LocalChanges
 import de.citrinscore.sync.librarySync
 import de.citrinscore.sync.supports
 import de.citrinscore.ui.components.IconAction
@@ -59,6 +60,8 @@ fun SettingsScreen(
     library: PlatformFile,
     onSettingsChange: (AppSettings, onFailure: () -> Unit) -> Unit,
     onLibraryMove: (LibraryTarget, onResult: (LibraryMoveResult) -> Unit) -> Unit,
+    localChanges: LocalChanges?,
+    onDiscardChanges: ((onResult: (Boolean) -> Unit) -> Unit)?,
     onOpenAbout: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -68,6 +71,8 @@ fun SettingsScreen(
     var pendingMove by remember { mutableStateOf<LibraryTarget?>(null) }
     var moving by remember { mutableStateOf(false) }
     var moveResult by remember { mutableStateOf<LibraryMoveResult?>(null) }
+    var discarding by remember { mutableStateOf(false) }
+    var discardResult by remember { mutableStateOf<Boolean?>(null) }
     val sync = librarySync()
     val currentTarget = if (settings.library is LibraryLocation.App) LibraryTarget.App else LibraryTarget.Folder(library)
     val scrollState = rememberScrollState()
@@ -78,6 +83,13 @@ fun SettingsScreen(
         moveResult?.let { result ->
             strings.message(result)?.let { snackbarHostState.showSnackbar(it) }
             moveResult = null
+        }
+    }
+
+    LaunchedEffect(discardResult) {
+        discardResult?.let { discarded ->
+            snackbarHostState.showSnackbar(if (discarded) strings.changesDiscarded else strings.discardFailed)
+            discardResult = null
         }
     }
 
@@ -132,6 +144,17 @@ fun SettingsScreen(
                             sync = sync,
                             available = sync.supports(settings.library),
                             onRemoteChange = { remote -> change(settings.copy(git = remote)) },
+                            localChanges = localChanges,
+                            discarding = discarding,
+                            onDiscard = onDiscardChanges?.let { discard ->
+                                {
+                                    discarding = true
+                                    discard { discarded ->
+                                        discarding = false
+                                        discardResult = discarded
+                                    }
+                                }
+                            },
                         )
                     }
                     SettingsSection(strings.settingsAbout) {

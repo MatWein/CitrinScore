@@ -71,6 +71,8 @@ fun LibraryNavigation(
     }
     val syncViewModel = librarySync().takeIf { it.supports(settings.library) }?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
 
+    val localChanges = syncViewModel?.localChanges?.collectAsStateWithLifecycle()?.value
+
     NavHost(navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
             LibraryScreen(
@@ -90,9 +92,12 @@ fun LibraryNavigation(
                     navController.navigate(EditRoute)
                 },
                 onSync = syncViewModel?.let { sync -> settings.git?.let { remote -> { sync.start(remote, libraryViewModel::reload) } } },
+                localChanges = localChanges?.documents ?: 0,
             )
             syncViewModel?.let { sync ->
                 val syncState by sync.state.collectAsStateWithLifecycle()
+                val content = libraryViewModel.state.collectAsStateWithLifecycle().value.content
+                LaunchedEffect(content, settings.git) { if (settings.git != null) sync.refreshChanges() }
                 SyncDialog(syncState, sync)
             }
         }
@@ -131,6 +136,15 @@ fun LibraryNavigation(
                 library = library,
                 onSettingsChange = onSettingsChange,
                 onLibraryMove = onLibraryMove,
+                localChanges = localChanges,
+                onDiscardChanges = syncViewModel?.let { sync ->
+                    { onResult ->
+                        sync.discard { discarded ->
+                            libraryViewModel.reload()
+                            onResult(discarded)
+                        }
+                    }
+                },
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onClose = { navController.popBackStack() },
             )

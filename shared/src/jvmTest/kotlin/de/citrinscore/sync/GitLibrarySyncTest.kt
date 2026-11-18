@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GitLibrarySyncTest {
@@ -107,6 +108,40 @@ class GitLibrarySyncTest {
         assertEquals("second", manifest(second, "Noten/Etude"))
         Git.open(second).use { git -> assertTrue(git.status().call().isClean) }
         assertEquals(SyncOutcome.Completed(uploaded = 1, downloaded = 0), sync(second) { mapOf("Noten/Etude.citscore" to ConflictChoice.Local) })
+    }
+
+    @Test
+    fun `local changes count changed documents until they are synchronized`() = runTest {
+        score(first, "Etude", "one")
+        assertNull(GitLibrarySync.localChanges(PlatformFile(first)))
+
+        sync(first)
+        File(first, "Etude.citscore/${CitScore.DEVICE_STATE_FILE}").writeText("{}")
+        assertEquals(LocalChanges(documents = 0, discardable = true), GitLibrarySync.localChanges(PlatformFile(first)))
+
+        score(first, "Etude", "two")
+        File(first, "Etude.citscore/take.mp3").writeText("audio")
+        score(first, "Noten/Neu", "new")
+        assertEquals(LocalChanges(documents = 2, discardable = true), GitLibrarySync.localChanges(PlatformFile(first)))
+    }
+
+    @Test
+    fun `discarding restores the synchronized library and keeps device state`() = runTest {
+        score(first, "Etude", "one")
+        File(first, "Etude.citscore/take.mp3").writeText("audio")
+        sync(first)
+
+        File(first, "Etude.citscore/take.mp3").delete()
+        File(first, "Etude.citscore/${CitScore.MANIFEST_FILE}").writeText("changed")
+        File(first, "Etude.citscore/${CitScore.DEVICE_STATE_FILE}").writeText("{}")
+        score(first, "Noten/Neu", "new")
+        GitLibrarySync.discardLocalChanges(PlatformFile(first))
+
+        assertEquals("audio", File(first, "Etude.citscore/take.mp3").readText())
+        assertEquals("one", manifest(first, "Etude"))
+        assertEquals("{}", File(first, "Etude.citscore/${CitScore.DEVICE_STATE_FILE}").readText())
+        assertFalse(File(first, "Noten/Neu.citscore").exists())
+        assertEquals(LocalChanges(documents = 0, discardable = true), GitLibrarySync.localChanges(PlatformFile(first)))
     }
 
     private suspend fun prepareConflict(): MutableList<SyncConflict> {

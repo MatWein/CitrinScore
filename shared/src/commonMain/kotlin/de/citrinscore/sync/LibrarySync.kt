@@ -17,11 +17,17 @@ interface LibrarySync {
         progress: (SyncProgress) -> Unit,
         resolve: suspend (List<SyncConflict>) -> Map<String, ConflictChoice>?,
     ): SyncOutcome
+
+    suspend fun localChanges(library: PlatformFile): LocalChanges?
+
+    suspend fun discardLocalChanges(library: PlatformFile)
 }
 
 fun LibrarySync.supports(location: LibraryLocation) = location is LibraryLocation.App || syncsFolders
 
 expect fun librarySync(): LibrarySync
+
+data class LocalChanges(val documents: Int, val discardable: Boolean)
 
 enum class SyncStep { Committing, Downloading, Merging, Uploading }
 

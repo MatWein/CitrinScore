@@ -1,6 +1,7 @@
 package de.citrinscore.ui.viewer
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import de.citrinscore.score.ScoreViewState
 import kotlin.test.Test
@@ -122,5 +123,16 @@ class ScoreViewportTest {
         viewport.nextPage()
 
         assertEquals(800f, viewport.offset.y)
+    }
+
+    @Test
+    fun `revealing turns the page once the following system leaves the viewport`() {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+
+        viewport.reveal(Rect(0f, 300f, 1000f, 500f), ahead = Rect(0f, 550f, 1000f, 750f))
+        assertEquals(0f, viewport.offset.y)
+
+        viewport.reveal(Rect(0f, 550f, 1000f, 750f), ahead = Rect(0f, 800f, 1000f, 1000f))
+        assertEquals(510f, viewport.offset.y)
     }
 }

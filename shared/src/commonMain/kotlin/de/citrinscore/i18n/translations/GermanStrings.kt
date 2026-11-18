@@ -282,4 +282,13 @@ object GermanStrings : Strings {
     override fun syncConnectedTo(url: String) = "Verbunden mit $url"
     override fun syncCompleted(uploaded: Int, downloaded: Int) = "${scores(uploaded)} hochgeladen, ${scores(downloaded)} heruntergeladen."
     private fun scores(count: Int) = if (count == 1) "1 Notendokument" else "$count Notendokumente"
+    override fun syncWithChanges(count: Int) = "Synchronisieren (${changes(count)})"
+    override fun localChanges(count: Int) = "Seit der letzten Synchronisation: ${changes(count)}"
+    private fun changes(count: Int) = if (count == 1) "1 lokale Änderung" else "$count lokale Änderungen"
+    override val discardChanges = "Lokale Änderungen verwerfen"
+    override val discardChangesTitle = "Lokale Änderungen verwerfen?"
+    override val discardChangesText = "Alle Änderungen seit der letzten Synchronisation gehen verloren. Die Bibliothek wird auf den zuletzt synchronisierten Stand zurückgesetzt."
+    override val discard = "Verwerfen"
+    override val changesDiscarded = "Die lokalen Änderungen wurden verworfen."
+    override val discardFailed = "Die lokalen Änderungen konnten nicht verworfen werden."
 }

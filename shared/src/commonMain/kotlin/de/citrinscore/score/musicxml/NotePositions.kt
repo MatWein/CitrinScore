@@ -26,11 +26,19 @@ class NotePositions(pages: List<EngravedPage>) {
         val system = systems[first.page][first.box.measure] ?: return null
         val heads = placed.filter { it.page == first.page && it.box.measure == first.box.measure }.map { it.box.bounds }
         val padding = system.space * CURSOR_PADDING
-        val extent = system.space * SYSTEM_PADDING
         return PageRegion(
             first.page,
-            Rect(heads.minOf { it.left } - padding, system.bounds.top - extent, heads.maxOf { it.right } + padding, system.bounds.bottom + extent),
+            Rect(heads.minOf { it.left } - padding, system.extended.top, heads.maxOf { it.right } + padding, system.extended.bottom),
         )
+    }
+
+    fun followingSystem(ids: List<String>): PageRegion? {
+        val placement = ids.firstNotNullOfOrNull(notes::get) ?: return null
+        val current = systems[placement.page][placement.box.measure] ?: return null
+        val below = systems[placement.page].values.filter { it.bounds.top >= current.bounds.bottom }.minByOrNull { it.bounds.top }
+        if (below != null) return PageRegion(placement.page, below.extended)
+        val next = placement.page + 1
+        return systems.getOrNull(next)?.values?.minByOrNull { it.bounds.top }?.let { PageRegion(next, it.extended) }
     }
 
     fun system(id: String): PageRegion? = notes[id]?.let { placement ->
@@ -45,7 +53,9 @@ class NotePositions(pages: List<EngravedPage>) {
 
     private data class Placement(val page: Int, val box: NoteBox)
 
-    private class System(val bounds: Rect, val space: Float)
+    private class System(val bounds: Rect, val space: Float) {
+        val extended get() = Rect(bounds.left, bounds.top - space * SYSTEM_PADDING, bounds.right, bounds.bottom + space * SYSTEM_PADDING)
+    }
 
     private fun Rect.union(other: Rect) = Rect(minOf(left, other.left), minOf(top, other.top), maxOf(right, other.right), maxOf(bottom, other.bottom))
 

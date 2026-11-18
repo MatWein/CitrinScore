@@ -62,11 +62,12 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         scrollBy(Offset(0f, target - top))
     }
 
-    fun reveal(document: Rect) {
+    fun reveal(document: Rect, ahead: Rect? = null) {
         val bounds = Rect(document.left * zoom, document.top * zoom, document.right * zoom, document.bottom * zoom)
         val visible = Rect(offset, viewportSize)
+        val bottom = maxOf(bounds.bottom, (ahead?.bottom ?: 0f) * zoom)
         val x = if (bounds.left < visible.left || bounds.right > visible.right) bounds.center.x - viewportSize.width / 2 else offset.x
-        val y = if (bounds.top < visible.top || bounds.bottom > visible.bottom) bounds.top - viewportSize.height * REVEAL_MARGIN else offset.y
+        val y = if (bounds.top < visible.top || bottom > visible.bottom) bounds.top - viewportSize.height * REVEAL_MARGIN else offset.y
         offset = clamp(Offset(x, y))
     }
 

@@ -118,8 +118,10 @@ fun ScoreDocument(
             viewport.setBounds(viewportSize, Size(layout.width, layout.height))
             viewport.breaks = breaks
         }
-        LaunchedEffect(layout, highlight?.reveal) {
-            highlight?.reveal?.let { viewport.reveal(layout.documentRect(it.page, it.bounds)) }
+        LaunchedEffect(layout, highlight?.reveal, highlight?.lookahead) {
+            highlight?.reveal?.let { target ->
+                viewport.reveal(layout.documentRect(target.page, target.bounds), highlight.lookahead?.let { layout.documentRect(it.page, it.bounds) })
+            }
         }
         val baseImages = remember(layout) { mutableStateMapOf<Int, ImageBitmap>() }
         var tiles by remember(layout) { mutableStateOf(emptyList<Tile>()) }
@@ -187,6 +189,7 @@ class ScoreHighlight(
     val cursor: PageRegion?,
     val notes: List<PageRegion>,
     val reveal: PageRegion?,
+    val lookahead: PageRegion?,
     val cursorColor: Color,
     val noteColor: Color,
     val noteBlendMode: BlendMode,

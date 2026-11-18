@@ -255,6 +255,14 @@ interface Strings {
     val syncFailed: String
     fun syncConnectedTo(url: String): String
     fun syncCompleted(uploaded: Int, downloaded: Int): String
+    fun syncWithChanges(count: Int): String
+    fun localChanges(count: Int): String
+    val discardChanges: String
+    val discardChangesTitle: String
+    val discardChangesText: String
+    val discard: String
+    val changesDiscarded: String
+    val discardFailed: String
 }
 
 val LocalStrings = staticCompositionLocalOf { AppLanguage.English.strings }

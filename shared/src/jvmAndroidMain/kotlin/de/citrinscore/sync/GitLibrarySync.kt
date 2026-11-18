@@ -22,6 +22,7 @@ import org.eclipse.jgit.lib.ProgressMonitor
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.merge.MergeStrategy
 import org.eclipse.jgit.revwalk.RevWalk
+import org.eclipse.jgit.revwalk.filter.RevFilter
 import org.eclipse.jgit.transport.CredentialsProvider
 import org.eclipse.jgit.transport.RefSpec
 import org.eclipse.jgit.transport.RemoteRefUpdate
@@ -82,7 +83,7 @@ internal object GitLibrarySync : LibrarySync {
                     .setProgressMonitor(StepMonitor(SyncStep.Downloading, progress)).call()
                 val branch = fetched.getAdvertisedRef(Constants.HEAD)?.target?.name?.removePrefix(Constants.R_HEADS) ?: repository.branch
                 useBranch(git, branch)
-                val remoteHead = repository.resolve("${Constants.R_REMOTES}$REMOTE/$branch")
+                val remoteHead = repository.syncedHead()
                 val localHead = repository.resolve(Constants.HEAD)
                 logger.info("Fetched branch {}, local head {}, remote head {}", branch, localHead?.name, remoteHead?.name)
                 if (remoteHead != null) {
@@ -93,7 +94,7 @@ internal object GitLibrarySync : LibrarySync {
                     }
                 }
                 val merged = repository.resolve(Constants.HEAD)
-                removeDeletedScores(repository, directory, localHead, merged)
+                if (localHead != null && merged != null) removeMissingScores(repository, directory, changedDocuments(repository, localHead, merged), merged)
                 val downloaded = changedScores(repository, localHead, merged)
                 val uploaded = changedScores(repository, remoteHead, merged)
                 if (merged != null && merged != remoteHead) push(git, branch, remote, progress)
@@ -102,6 +103,49 @@ internal object GitLibrarySync : LibrarySync {
             }
         }
     }
+
+    override suspend fun localChanges(library: PlatformFile): LocalChanges? = withContext(Dispatchers.IO) {
+        failingAs {
+            val directory = library.workingDirectory()
+            if (!File(directory, Constants.DOT_GIT).exists()) return@failingAs null
+            Git.open(directory).use { git ->
+                val synced = git.repository.syncedHead()
+                LocalChanges(localDocuments(git, synced).size, discardable = synced != null)
+            }
+        }
+    }
+
+    override suspend fun discardLocalChanges(library: PlatformFile) = withContext(Dispatchers.IO) {
+        failingAs {
+            val directory = library.workingDirectory()
+            Git.open(directory).use { git ->
+                val repository = git.repository
+                val synced = repository.syncedHead() ?: throw SyncException(SyncFailure.Failed, "The library was never synchronized")
+                val documents = localDocuments(git, synced)
+                logger.info("Discarding local changes in {} and resetting to {}", documents, synced.name)
+                git.reset().setMode(ResetType.HARD).setRef(synced.name).call()
+                git.clean().setCleanDirectories(true).call()
+                removeMissingScores(repository, directory, documents, synced)
+            }
+        }
+    }
+
+    private fun localDocuments(git: Git, synced: ObjectId?): Set<String> {
+        val repository = git.repository
+        val head = repository.resolve(Constants.HEAD)
+        val unpushed = if (head == null || head == synced) emptySet() else changedDocuments(repository, synced?.let { mergeBase(repository, it, head) }, head)
+        val status = git.status().call()
+        return unpushed + (status.uncommittedChanges + status.untracked).map(::documentOf)
+    }
+
+    private fun mergeBase(repository: Repository, first: ObjectId, second: ObjectId): ObjectId? = RevWalk(repository).use { walk ->
+        walk.revFilter = RevFilter.MERGE_BASE
+        walk.markStart(walk.parseCommit(first))
+        walk.markStart(walk.parseCommit(second))
+        walk.next()
+    }
+
+    private fun Repository.syncedHead(): ObjectId? = resolve("${Constants.R_REMOTES}$REMOTE/$branch")
 
     private fun open(directory: File): Git {
         val git = if (File(directory, Constants.DOT_GIT).exists()) {
@@ -225,11 +269,9 @@ internal object GitLibrarySync : LibrarySync {
         }
     }
 
-    private fun removeDeletedScores(repository: Repository, directory: File, before: ObjectId?, after: ObjectId?) {
-        if (before == null || after == null) return
-        val tree = RevWalk(repository).use { it.parseCommit(after).tree }
-        changedDocuments(repository, before, after)
-            .filter { CitScore.isScoreDirectoryName(it.substringAfterLast(PATH_SEPARATOR)) && TreeWalk.forPath(repository, it, tree) == null }
+    private fun removeMissingScores(repository: Repository, directory: File, documents: Set<String>, commit: ObjectId) {
+        val tree = RevWalk(repository).use { it.parseCommit(commit).tree }
+        documents.filter { CitScore.isScoreDirectoryName(it.substringAfterLast(PATH_SEPARATOR)) && TreeWalk.forPath(repository, it, tree) == null }
             .forEach { File(directory, it).deleteRecursively() }
     }
 

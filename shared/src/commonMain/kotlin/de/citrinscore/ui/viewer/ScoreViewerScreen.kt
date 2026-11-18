@@ -418,6 +418,7 @@ private fun playbackHighlight(cursor: PlaybackCursor?, notes: NotePositions?): S
             cursor = region,
             notes = cursor.highlighted.mapNotNull(notes::note),
             reveal = region.takeIf { cursor.follow },
+            lookahead = notes.followingSystem(cursor.notes).takeIf { cursor.follow },
             cursorColor = colors.primary.copy(alpha = CURSOR_ALPHA),
             noteColor = if (dark) colors.inversePrimary else colors.primary,
             noteBlendMode = if (dark) BlendMode.Darken else BlendMode.Lighten,

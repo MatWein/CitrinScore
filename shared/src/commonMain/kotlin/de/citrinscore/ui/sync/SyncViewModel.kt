@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.settings.GitRemote
 import de.citrinscore.sync.ConflictChoice
 import de.citrinscore.sync.LibrarySync
+import de.citrinscore.sync.LocalChanges
 import de.citrinscore.sync.SyncConflict
 import de.citrinscore.sync.SyncException
 import de.citrinscore.sync.SyncFailure
@@ -41,7 +42,32 @@ class SyncViewModel(private val library: PlatformFile, private val sync: Library
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state.asStateFlow()
 
+    private val _localChanges = MutableStateFlow<LocalChanges?>(null)
+    val localChanges: StateFlow<LocalChanges?> = _localChanges.asStateFlow()
+
     private var decision: CompletableDeferred<Map<String, ConflictChoice>?>? = null
+
+    private val isBusy get() = _state.value is SyncState.Running || _state.value is SyncState.Resolving
+
+    fun refreshChanges() {
+        if (isBusy) return
+        viewModelScope.launch { _localChanges.value = countChanges() }
+    }
+
+    fun discard(onResult: (Boolean) -> Unit) {
+        if (isBusy) return
+        viewModelScope.launch {
+            val discarded = try {
+                sync.discardLocalChanges(library)
+                true
+            } catch (e: SyncException) {
+                logger.warn("Discarding local changes failed", e)
+                false
+            }
+            _localChanges.value = countChanges()
+            onResult(discarded)
+        }
+    }
 
     fun start(remote: GitRemote, onFinished: () -> Unit) {
         if (_state.value != SyncState.Idle) return
@@ -53,6 +79,7 @@ class SyncViewModel(private val library: PlatformFile, private val sync: Library
                 logger.warn("Synchronization failed", e)
                 SyncState.Failed(e.failure, e.message)
             }
+            _localChanges.value = countChanges()
             onFinished()
         }
     }
@@ -82,6 +109,13 @@ class SyncViewModel(private val library: PlatformFile, private val sync: Library
             decision = null
             _state.value = SyncState.Running(SyncProgress(SyncStep.Merging))
         }
+    }
+
+    private suspend fun countChanges(): LocalChanges? = try {
+        sync.localChanges(library)
+    } catch (e: SyncException) {
+        logger.warn("Counting local changes failed", e)
+        null
     }
 
     override fun onCleared() = cancel()

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -110,6 +111,7 @@ fun LibraryScreen(
     onEditScore: (PlatformFile) -> Unit,
     onOpenSettings: () -> Unit,
     onSync: (() -> Unit)? = null,
+    localChanges: Int = 0,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val strings = LocalStrings.current
@@ -169,7 +171,7 @@ fun LibraryScreen(
                         IconAction(Res.drawable.ic_close, strings.closeSearch, onClick = { query = null })
                     }
                     SortMenu(sort, onSortChange)
-                    onSync?.let { IconAction(Res.drawable.ic_sync, strings.sync, onClick = it) }
+                    onSync?.let { SyncAction(localChanges, it) }
                     OverflowActions(
                         listOf(
                             ToolbarAction(Res.drawable.ic_refresh, strings.refresh, onClick = viewModel::refresh),
@@ -444,4 +446,15 @@ private fun EmptyLibrary(title: String, modifier: Modifier) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+@Composable
+private fun SyncAction(localChanges: Int, onClick: () -> Unit) {
+    val strings = LocalStrings.current
+    IconAction(
+        icon = Res.drawable.ic_sync,
+        label = if (localChanges > 0) strings.syncWithChanges(localChanges) else strings.sync,
+        onClick = onClick,
+        badge = { if (localChanges > 0) Badge { Text(localChanges.toString()) } },
+    )
 }

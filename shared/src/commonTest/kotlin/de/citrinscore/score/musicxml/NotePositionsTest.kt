@@ -39,4 +39,29 @@ class NotePositionsTest {
         assertNull(positions.nearest(0, Offset(900f, 900f)))
         assertNull(positions.nearest(1, Offset(210f, 300f)))
     }
+
+    @Test
+    fun `the following system is the next line on the page or the first line of the next page`() {
+        val pages = NotePositions(
+            listOf(
+                EngravedPage(
+                    svg = "",
+                    staves = listOf(
+                        StaffBox(0, 0, Rect(100f, 100f, 300f, 172f), 18f),
+                        StaffBox(1, 0, Rect(300f, 100f, 500f, 172f), 18f),
+                        StaffBox(2, 0, Rect(100f, 300f, 500f, 372f), 18f),
+                    ),
+                    notes = listOf(
+                        NoteBox("first", 0, Rect(200f, 120f, 222f, 138f)),
+                        NoteBox("last", 2, Rect(200f, 320f, 222f, 338f)),
+                    ),
+                ),
+                EngravedPage(svg = "", staves = listOf(StaffBox(3, 0, Rect(100f, 50f, 500f, 122f), 18f))),
+            ),
+        )
+
+        assertEquals(PageRegion(0, Rect(100f, 282f, 500f, 390f)), pages.followingSystem(listOf("first")))
+        assertEquals(PageRegion(1, Rect(100f, 32f, 500f, 140f)), pages.followingSystem(listOf("last")))
+        assertNull(positions.followingSystem(listOf("upper")))
+    }
 }

@@ -1,5 +1,7 @@
 package de.citrinscore.ui.components
 
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -14,10 +16,15 @@ fun IconAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    badge: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     LabelTooltip(label) {
         IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
-            Icon(painterResource(icon), contentDescription = label)
+            if (badge == null) {
+                Icon(painterResource(icon), contentDescription = label)
+            } else {
+                BadgedBox(badge = badge) { Icon(painterResource(icon), contentDescription = label) }
+            }
         }
     }
 }
