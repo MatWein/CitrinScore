@@ -15,6 +15,7 @@ import de.citrinscore.resources.Res
 import de.citrinscore.resources.app_icon
 import io.github.vinceglb.filekit.FileKit
 import org.jetbrains.compose.resources.painterResource
+import org.slf4j.LoggerFactory
 import java.awt.Dimension
 import java.io.File
 
@@ -25,10 +26,17 @@ private val InitialWindowSize = DpSize(1280.dp, 800.dp)
 
 fun main() {
     val filesDir = System.getProperty(HOME_PROPERTY)?.let(::File) ?: File(System.getProperty("user.home"), SETTINGS_DIRECTORY)
+    System.setProperty(HOME_PROPERTY, filesDir.absolutePath)
+    val logger = LoggerFactory.getLogger("de.citrinscore.desktop")
+    Thread.setDefaultUncaughtExceptionHandler { thread, e -> logger.error("Uncaught exception in thread {}", thread.name, e) }
+    logger.info("Starting {} {} on {} {} with Java {}", AppInfo.NAME, AppInfo.VERSION, System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("java.version"))
     FileKit.init(appId = AppInfo.ID, filesDir = filesDir)
     application(exitProcessOnExit = false) {
         Window(
-            onCloseRequest = ::exitApplication,
+            onCloseRequest = {
+                logger.info("Closing {}", AppInfo.NAME)
+                exitApplication()
+            },
             title = AppInfo.NAME,
             icon = painterResource(Res.drawable.app_icon),
             state = rememberWindowState(

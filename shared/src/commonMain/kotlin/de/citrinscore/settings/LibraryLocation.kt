@@ -38,6 +38,8 @@ sealed interface LibraryLocation {
 
         fun describing(directory: PlatformFile) = copy(displayPath = displayPathOf(directory))
 
+        override fun toString() = "Folder($displayPath)"
+
         companion object {
             suspend fun of(directory: PlatformFile) = Folder(
                 displayPath = displayPathOf(directory),

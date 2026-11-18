@@ -33,6 +33,19 @@ All versions are defined in [`gradle.properties`](gradle.properties).
 The desktop app keeps its settings and extracted resources in `~/.citrinscore`. Start it with
 `-Dcitrinscore.home=/absolute/path` to use another directory, for example a separate test library.
 
+## Logging
+
+The app logs through [SLF4J](https://www.slf4j.org/). Opened screens, user actions, file operations and synchronization
+steps are logged as info, calls into Verovio, FluidSynth and the audio system as debug and failed operations as warnings
+with their stack trace.
+
+- Desktop: [Logback](https://logback.qos.ch/) writes info messages to `~/.citrinscore/logs/citrinscore.log` and the
+  console. The log rolls over daily or at 10 MB into compressed `.log.gz` files, which are kept for 14 days and 100 MB
+  in total. The configuration is [`desktopApp/src/main/resources/logback.xml`](desktopApp/src/main/resources/logback.xml).
+- Android: [logback-android](https://github.com/tony19/logback-android) writes warnings and errors to logcat with the
+  tag `citrinScore` (`adb logcat -s citrinScore`). The configuration is
+  [`androidApp/src/main/assets/logback.xml`](androidApp/src/main/assets/logback.xml).
+
 ## Project structure
 
 | Module | Content |

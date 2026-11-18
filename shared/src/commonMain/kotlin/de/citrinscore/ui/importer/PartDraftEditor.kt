@@ -26,8 +26,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 
 private const val THRESHOLD_DELAY_MILLIS = 300L
+private val logger = LoggerFactory.getLogger(PartDraftEditor::class.java)
 
 class PartDraftEditor(private val scope: CoroutineScope) {
 
@@ -49,6 +51,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     fun selectType(type: ImportType) {
         val current = _draft.value
         if (current.type == type) return
+        logger.info("Selecting import type {}", type)
         discard(current)
         _draft.value = current.copy(type = type, files = emptyList(), previews = emptyMap(), failedPreviews = emptySet())
     }
@@ -121,6 +124,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     }
 
     private fun loadPreview(key: String, file: PlatformFile, type: ImportType) {
+        logger.info("Loading {} preview of {}", type, file.path)
         scope.launch {
             val pages = attempt {
                 type.open(file).use { source ->

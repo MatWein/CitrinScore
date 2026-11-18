@@ -1,5 +1,6 @@
 package de.citrinscore.score.playback
 
+import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.sound.sampled.AudioFormat
@@ -7,6 +8,7 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.SourceDataLine
 
 private const val BITS_PER_SAMPLE = 16
+private val logger = LoggerFactory.getLogger("de.citrinscore.score.playback.PcmOutput")
 private const val BUFFER_MILLIS = 100
 private const val MILLIS_PER_SECOND = 1000
 
@@ -15,6 +17,7 @@ internal actual fun openPcmOutput(sampleRate: Int, channels: Int): PcmOutput {
     val line = AudioSystem.getSourceDataLine(format)
     line.open(format, sampleRate * BUFFER_MILLIS / MILLIS_PER_SECOND * format.frameSize)
     line.start()
+    logger.debug("Opened audio output {} with {}", line.lineInfo, line.format)
     return JavaSoundOutput(line)
 }
 

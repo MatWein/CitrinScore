@@ -34,6 +34,7 @@ import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.isDirectory
 import io.github.vinceglb.filekit.list
 import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.path
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.readString
 import io.github.vinceglb.filekit.write
@@ -46,8 +47,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+
+private val logger = LoggerFactory.getLogger(LibraryRepository::class.java)
 
 class LibraryRepository(
     private val json: Json = AppJson,
@@ -65,34 +69,40 @@ class LibraryRepository(
     }
 
     suspend fun createFolder(parent: PlatformFile, name: String) {
+        logger.info("Creating folder {} in {}", name, parent.path)
         (parent / name).createDirectories()
     }
 
     suspend fun delete(item: PlatformFile) = withContext(Dispatchers.IO) {
+        logger.info("Deleting {}", item.path)
         item.delete(mustExist = false, recursively = true)
         if (item.exists()) throw IOException("${item.name} could not be deleted")
     }
 
-    suspend fun open(score: PlatformFile): ScoreManifest = updateManifest(score) { manifest ->
-        manifest.withCrops(score).copy(lastOpenedAt = clock.now())
+    suspend fun open(score: PlatformFile): ScoreManifest {
+        logger.info("Opening score {}", score.path)
+        return updateManifest(score) { manifest -> manifest.withCrops(score).copy(lastOpenedAt = clock.now()) }
     }
 
     suspend fun load(score: PlatformFile): ScoreManifest = readManifest(score).withCrops(score)
 
     suspend fun importScore(folder: PlatformFile, metadata: ScoreMetadata, parts: List<NewPart>) {
         val score = folder / CitScore.directoryName(metadata.title)
+        logger.info("Importing score {} with parts {}", score.path, parts.map { it.source.description })
         try {
             score.createDirectories()
             val created = parts.map { createPart(score, it) }
             writeThumbnail(score, created.first())
             writeManifest(score, ScoreManifest(metadata, created, createdAt = clock.now()))
         } catch (e: Exception) {
+            logger.warn("Importing score {} failed, removing it", score.path)
             score.delete(mustExist = false, recursively = true)
             throw e
         }
     }
 
     suspend fun updateScore(folder: PlatformFile, score: PlatformFile, metadata: ScoreMetadata, edits: List<PartEdit>): PlatformFile {
+        logger.info("Updating score {} with parts {}", score.path, edits.map { it.description })
         val previous = load(score)
         val parts = edits.map { edit ->
             when (edit) {
@@ -112,6 +122,7 @@ class LibraryRepository(
     }
 
     suspend fun selectPart(part: PartRef) {
+        logger.info("Selecting part {}", part)
         updateManifest(part.score) { it.copy(currentPart = part.directory) }
     }
 
@@ -119,18 +130,22 @@ class LibraryRepository(
         read(part.root / CitScore.ANNOTATIONS_FILE) { readString() }?.let { decode(ScoreAnnotations.serializer(), it) } ?: ScoreAnnotations()
 
     suspend fun saveAnnotations(part: PartRef, annotations: ScoreAnnotations) {
+        logger.debug("Saving annotations of {}", part)
         (part.root / CitScore.ANNOTATIONS_FILE).writeString(json.encodeToString(annotations))
     }
 
     suspend fun saveView(part: PartRef, view: ScoreViewState) {
+        logger.debug("Saving view {} of {}", view, part)
         updatePart(part) { it.copy(view = view) }
     }
 
     suspend fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
+        logger.debug("Saving playback preferences {} of {}", playback, part)
         updatePart(part) { it.copy(playback = playback) }
     }
 
     suspend fun saveSystemBreaks(part: PartRef, systemBreaks: List<List<Float>>) {
+        logger.debug("Saving staff systems of {} pages of {}", systemBreaks.size, part)
         updatePart(part) { it.copy(systemBreaks = systemBreaks) }
     }
 
@@ -140,6 +155,7 @@ class LibraryRepository(
     suspend fun addAttachment(part: PartRef, kind: AttachmentKind, source: PlatformFile, name: String): Attachment {
         val suffix = source.extension.takeIf { it.isNotEmpty() }?.let { ".${it.lowercase()}" }.orEmpty()
         val attachment = Attachment("${kind.directory}/${Uuid.random()}$suffix", name)
+        logger.info("Adding {} attachment {} from {} to {}", kind, attachment.path, source.path, part)
         (part.root / kind.directory).createDirectories()
         CitScore.resolve(part.root, attachment.path) write source
         updatePart(part) { it.withAttachments(kind, it.attachments(kind) + attachment) }
@@ -147,17 +163,20 @@ class LibraryRepository(
     }
 
     suspend fun renameAttachment(part: PartRef, kind: AttachmentKind, attachment: Attachment, name: String) {
+        logger.info("Renaming attachment {} of {}", attachment.path, part)
         updatePart(part) { scorePart ->
             scorePart.withAttachments(kind, scorePart.attachments(kind).map { if (it.path == attachment.path) it.copy(name = name) else it })
         }
     }
 
     suspend fun deleteAttachment(part: PartRef, kind: AttachmentKind, attachment: Attachment) {
+        logger.info("Deleting attachment {} of {}", attachment.path, part)
         updatePart(part) { scorePart -> scorePart.withAttachments(kind, scorePart.attachments(kind).filterNot { it.path == attachment.path }) }
         CitScore.resolve(part.root, attachment.path).delete(mustExist = false)
     }
 
     suspend fun exportAttachment(part: PartRef, attachment: Attachment, target: PlatformFile) {
+        logger.info("Exporting attachment {} of {} to {}", attachment.path, part, target.path)
         target write CitScore.resolve(part.root, attachment.path)
     }
 
@@ -285,6 +304,7 @@ class LibraryRepository(
     private suspend fun readManifest(score: PlatformFile) = manifest(score) ?: throw IOException("${score.name} has no readable manifest")
 
     private suspend fun writeManifest(score: PlatformFile, manifest: ScoreManifest) {
+        logger.debug("Writing {} and {} of {}", CitScore.MANIFEST_FILE, CitScore.DEVICE_STATE_FILE, score.path)
         (score / CitScore.MANIFEST_FILE).writeString(json.encodeToString(manifest.shared))
         (score / CitScore.DEVICE_STATE_FILE).writeString(json.encodeToString(manifest.deviceState))
     }
@@ -297,15 +317,31 @@ class LibraryRepository(
 
     private fun <T> decode(deserializer: DeserializationStrategy<T>, text: String): T? = try {
         json.decodeFromString(deserializer, text)
-    } catch (_: IllegalArgumentException) {
+    } catch (e: IllegalArgumentException) {
+        logger.warn("Invalid {}", deserializer.descriptor.serialName, e)
         null
     }
 
     private suspend fun <T> read(file: PlatformFile, block: suspend PlatformFile.() -> T): T? = try {
         if (file.exists()) file.block() else null
-    } catch (_: IOException) {
+    } catch (e: IOException) {
+        logger.warn("Reading {} failed", file, e)
         null
     }
 
     private fun PlatformFile.isScore() = CitScore.isScoreDirectoryName(name)
+
+    private val PartSource.description
+        get() = when (this) {
+            is PartSource.Images -> "${files.size} images"
+            is PartSource.Scans -> "${images.size} scans"
+            is PartSource.Pdf -> "PDF ${file.path}"
+            is PartSource.MusicXml -> "MusicXML ${file.path}"
+        }
+
+    private val PartEdit.description
+        get() = when (this) {
+            is PartEdit.Keep -> "keep $directory" + pages?.let { " with ${it.size} pages" }.orEmpty()
+            is PartEdit.Add -> "add ${part.source.description}"
+        }
 }

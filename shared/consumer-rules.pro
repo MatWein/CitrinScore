@@ -7,3 +7,5 @@
 -dontwarn java.lang.management.**
 -dontwarn javax.management.**
 -dontwarn org.ietf.jgss.**
+-keep class ch.qos.logback.** { *; }
+-dontwarn javax.mail.**

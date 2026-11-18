@@ -31,6 +31,7 @@ import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
 
 private const val UNITS_PER_DP = 1.65f
@@ -48,6 +52,7 @@ private const val MAX_PAGE_SIZE = 60000
 private const val DEFAULT_REFLOW_SCALE = 1f
 private const val MIN_LAYOUT_WIDTH = 1100f
 private const val VIEWPORT_SETTLE_MILLIS = 150L
+private val logger = LoggerFactory.getLogger(ScoreViewModel::class.java)
 
 class ScoreViewModel(private val score: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
 
@@ -72,6 +77,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val performances = mutableMapOf<String, ScorePerformance>()
     private var manifest: ScoreManifest? = null
     private var detection: Job? = null
+    private val showing = Mutex()
 
     init {
         viewModelScope.launch {
@@ -104,6 +110,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     fun reflow(part: PartRef, zoom: Float, view: ScoreViewState?) {
         val current = manifest ?: return
         val scale = (current.part(part.directory).reflowScale * zoom).coerceIn(ScoreViewport.MIN_ZOOM, ScoreViewport.MAX_ZOOM)
+        logger.info("Reflowing {} at scale {}", part, scale)
         val reflowed = ScoreViewState(scale, view?.x ?: 0f, view?.y ?: 0f)
         manifest = current.updatePart(part.directory) { it.copy(view = reflowed) }
         persistView(part, reflowed)
@@ -146,17 +153,20 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         }
     }
 
-    private suspend fun show(directory: String) {
+    private suspend fun show(directory: String) = showing.withLock { present(directory) }
+
+    private suspend fun present(directory: String) {
         val current = manifest ?: return
         val part = current.part(directory)
         val ref = PartRef(score, directory)
-        detection?.cancel()
+        detection?.cancelAndJoin()
         if (_part.value != ref) {
             _anchors.value = null
             _notes.value = null
         }
         _part.value = ref
         val content = part.content
+        logger.info("Showing {} as {}", ref, content::class.simpleName)
         var engraved: List<EngravedPage>? = null
         val renderer = if (content is ScoreContent.MusicXml) {
             val size = viewportSize.value ?: return run { _state.value = ScoreViewerState.Loading }
@@ -206,6 +216,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             val breaks = attempt { renderer.systemBreaks(page) } ?: return
             _systemBreaks.update { it + listOf(breaks) }
         }
+        logger.debug("Detected staff systems on {} pages of {}", renderer.pageSizes.size, part)
         if (!persist) return
         val detected = _systemBreaks.value
         manifest = manifest?.updatePart(part.directory) { it.copy(systemBreaks = detected) }

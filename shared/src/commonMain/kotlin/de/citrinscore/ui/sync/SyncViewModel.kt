@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger(SyncViewModel::class.java)
 
 sealed interface SyncState {
     data object Idle : SyncState
@@ -47,6 +50,7 @@ class SyncViewModel(private val library: PlatformFile, private val sync: Library
             _state.value = try {
                 SyncState.Finished(sync.synchronize(library, remote, progress = { _state.value = SyncState.Running(it) }, resolve = ::ask))
             } catch (e: SyncException) {
+                logger.warn("Synchronization failed", e)
                 SyncState.Failed(e.failure, e.message)
             }
             onFinished()

@@ -6,12 +6,18 @@ import de.citrinscore.library.LibraryRepository
 import de.citrinscore.library.NewPart
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.util.attempt
+import de.citrinscore.util.logChanges
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger(ImportViewModel::class.java)
 
 class ImportViewModel(
     private val folder: PlatformFile,
@@ -24,6 +30,8 @@ class ImportViewModel(
     val editor = PartDraftEditor(viewModelScope)
 
     init {
+        logger.info("Importing into {}", folder.path)
+        viewModelScope.logChanges(_state.map { it.step }, logger, "Import step {}")
         viewModelScope.launch {
             val titles = repository.content(folder).scoreTitles
             _state.update { it.copy(takenTitles = titles) }

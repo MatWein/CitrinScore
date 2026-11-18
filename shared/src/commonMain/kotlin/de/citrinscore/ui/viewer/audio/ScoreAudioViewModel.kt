@@ -19,6 +19,7 @@ import io.github.vinceglb.filekit.cacheDir
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
 import io.github.vinceglb.filekit.nameWithoutExtension
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,11 +30,13 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 private val PositionInterval = 200.milliseconds
+private val logger = LoggerFactory.getLogger(ScoreAudioViewModel::class.java)
 private const val RECORDING_FILE = "recording.${CitScore.RECORDING_EXTENSION}"
 
 class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val repository: LibraryRepository) : ViewModel() {
@@ -61,10 +64,12 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     fun load(attachment: Attachment) {
         val ref = part.value ?: return
+        logger.info("Opening audio {} of {}", attachment.path, ref)
         releasePlayer()
         viewModelScope.launch {
             reporting(AudioError.Playback) {
                 val opened = openAudioPlayer(CitScore.resolve(ref.root, attachment.path))
+                logger.info("Opened audio with duration {}", opened.duration)
                 player = opened
                 _state.update { it.copy(player = PlayerState(attachment, opened.duration, Duration.ZERO, isPlaying = false)) }
             }
@@ -73,6 +78,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     fun play() {
         val current = player ?: return
+        logger.info("Playing audio at {}", current.position)
         current.play()
         positionJob?.cancel()
         positionJob = viewModelScope.launch {
@@ -86,6 +92,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     fun pause() {
         player?.let {
+            logger.info("Pausing audio at {}", it.position)
             it.pause()
             publishPosition(it)
         }
@@ -93,6 +100,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
 
     fun stop() {
         player?.let {
+            logger.info("Stopping audio")
             it.pause()
             it.seekTo(Duration.ZERO)
             publishPosition(it)
@@ -124,12 +132,14 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
         if (_state.value.microphoneAvailable != null) return
         viewModelScope.launch {
             val available = isMicrophoneAvailable()
+            logger.info("Microphone available: {}", available)
             _state.update { it.copy(microphoneAvailable = available) }
         }
     }
 
     fun startRecording() {
         if (recording != null) return
+        logger.info("Starting recording to {}", recordingFile.path)
         closePlayer()
         viewModelScope.launch {
             reporting(AudioError.Recording) {
@@ -142,6 +152,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     fun stopRecording() {
         val length = _state.value.recordingStart?.elapsedNow() ?: return
         val active = takeRecording() ?: return
+        logger.info("Stopping recording after {}", length)
         viewModelScope.launch {
             reporting(AudioError.Save) {
                 active.finish()
@@ -157,6 +168,7 @@ class ScoreAudioViewModel(private val part: StateFlow<PartRef?>, private val rep
     }
 
     fun discardRecording() {
+        logger.info("Discarding recording")
         _state.update { it.copy(finishedRecording = null) }
         viewModelScope.launch { recordingFile.delete(mustExist = false) }
     }

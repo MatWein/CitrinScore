@@ -11,46 +11,64 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.slf4j.LoggerFactory
+import org.w3c.dom.Element
 import java.util.Base64
+import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.roundToInt
+import kotlin.time.measureTimedValue
 
 private const val PAGE_MARGIN = 50
 private const val CLASS_STYLES = ".placeholder {display:none} .ending, .fing, .reh, .tempo {font-weight:bold} .dir, .dynam, .mNum {font-style:italic} .label {font-weight:normal}"
 private const val TIMEMAP_OPTIONS = """{"includeMeasures":false,"includeRests":false}"""
 private const val UTF8_BOM = "﻿"
 private const val TICK_TOLERANCE = 1
+private const val MXL_CONTAINER = "META-INF/container.xml"
+private const val MXL_ROOTFILE = "rootfile"
+private const val MXL_ROOTFILE_PATH = "full-path"
 private val Utf16Boms = listOf(byteArrayOf(0xFE.toByte(), 0xFF.toByte()), byteArrayOf(0xFF.toByte(), 0xFE.toByte()))
 private val TimemapJson = Json { ignoreUnknownKeys = true }
+private val logger = LoggerFactory.getLogger("de.citrinscore.score.musicxml.Verovio")
 
 actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver {
+    logger.debug("Loading MusicXML with {} bytes, compressed: {}", data.size, compressed)
+    val score = (if (compressed) withContext(Dispatchers.Default) { data.uncompressMusicXml() } else data).decodeXml()
     val resources = verovioResourcePath()
-    val toolkit = Verovio.call {
-        val toolkit = constructorResourcePath(resources)
-        setOptions(toolkit, options(EngravingLayout.Print))
-        val loaded = if (compressed) loadZipDataBuffer(toolkit, data, data.size) else loadData(toolkit, data.decodeXml())
-        val log = getLog(toolkit)
-        if (!loaded) {
-            destructor(toolkit)
-            error("Verovio could not load the score: $log")
+    val (toolkit, duration) = measureTimedValue {
+        Verovio.call {
+            val toolkit = constructorResourcePath(resources)
+            setOptions(toolkit, options(EngravingLayout.Print))
+            val loaded = loadData(toolkit, score)
+            val log = getLog(toolkit)
+            if (!loaded) {
+                destructor(toolkit)
+                error("Verovio could not load the score: $log")
+            }
+            logVerovio(log)
+            toolkit
         }
-        toolkit
     }
+    logger.debug("Verovio loaded the score in {}", duration)
     return VerovioEngraver(GuardedResource(toolkit, Verovio::release))
 }
 
 private class VerovioEngraver(private val toolkit: GuardedResource<Pointer>) : MusicXmlEngraver {
     override suspend fun engrave(layout: EngravingLayout): List<EngravedPage> {
-        val pages = toolkit.use { handle ->
-            Verovio.call {
-                setOptions(handle, options(layout))
-                redoLayout(handle, "{}")
-                val pages = (1..getPageCount(handle)).map { page -> renderToSVG(handle, page, false) }
-                getLog(handle)
-                pages
+        val (pages, duration) = measureTimedValue {
+            toolkit.use { handle ->
+                Verovio.call {
+                    setOptions(handle, options(layout))
+                    redoLayout(handle, "{}")
+                    val pages = (1..getPageCount(handle)).map { page -> renderToSVG(handle, page, false) }
+                    drainLog(handle)
+                    pages
+                }
             }
         }
+        logger.debug("Verovio engraved {} pages for {} in {}", pages.size, layout, duration)
         val glyphs = verovioGlyphBounds()
-        return withContext(Dispatchers.Default) {
+        val engraved = withContext(Dispatchers.Default) {
             var firstMeasure = 0
             pages.map { svg ->
                 val geometry = pageGeometry(svg, firstMeasure, glyphs)
@@ -58,25 +76,31 @@ private class VerovioEngraver(private val toolkit: GuardedResource<Pointer>) : M
                 EngravedPage(svg, geometry.staves, geometry.notes)
             }
         }
+        check(engraved.any { it.staves.isNotEmpty() }) { "The score contains no staves" }
+        return engraved
     }
 
     override suspend fun perform(): ScorePerformance {
-        val (timemap, midi, notated) = toolkit.use { handle ->
-            Verovio.call {
-                val timemap = TimemapJson.decodeFromString<List<TimemapEntry>>(renderToTimemap(handle, TIMEMAP_OPTIONS))
-                val midi = Base64.getDecoder().decode(renderToMIDI(handle))
-                val ids = timemap.flatMap { it.on }.distinct().associateWith { getNotatedIdForElement(handle, it) }
-                getLog(handle)
-                Triple(timemap, midi, ids)
+        val (rendered, duration) = measureTimedValue {
+            toolkit.use { handle ->
+                Verovio.call {
+                    val timemap = TimemapJson.decodeFromString<List<TimemapEntry>>(renderToTimemap(handle, TIMEMAP_OPTIONS))
+                    val midi = Base64.getDecoder().decode(renderToMIDI(handle))
+                    val ids = timemap.flatMap { it.on }.distinct().associateWith { getNotatedIdForElement(handle, it) }
+                    drainLog(handle)
+                    Triple(timemap, midi, ids)
+                }
             }
         }
+        val (timemap, midi, notated) = rendered
+        logger.debug("Verovio rendered {} timemap entries and {} MIDI bytes in {}", timemap.size, midi.size, duration)
         return withContext(Dispatchers.Default) { performance(timemap, midi, notated) }
     }
 
     override suspend fun writtenPitches(notes: Collection<String>): Map<String, Int> = toolkit.use { handle ->
         Verovio.call {
             val values = notes.mapNotNull { note -> TimemapJson.decodeFromString<MidiValues>(getMIDIValuesForElement(handle, note)).pitch?.let { note to it } }
-            getLog(handle)
+            drainLog(handle)
             values.toMap()
         }
     }
@@ -128,6 +152,23 @@ private fun options(layout: EngravingLayout) = buildJsonObject {
     put("svgCss", CLASS_STYLES)
     put("svgViewBox", true)
 }.toString()
+
+private fun VerovioLibrary.drainLog(toolkit: Pointer) = logVerovio(getLog(toolkit))
+
+private fun logVerovio(log: String) {
+    if (log.isNotBlank()) logger.debug("Verovio reported: {}", log.trim())
+}
+
+private fun ByteArray.uncompressMusicXml(): ByteArray {
+    val entries = ZipInputStream(inputStream()).use { zip ->
+        generateSequence { zip.nextEntry }.filterNot { it.isDirectory }.associate { it.name to zip.readBytes() }
+    }
+    val container = entries[MXL_CONTAINER] ?: error("The archive contains no $MXL_CONTAINER")
+    val rootfile = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(container.inputStream())
+        .getElementsByTagName(MXL_ROOTFILE).item(0) as? Element
+    val path = rootfile?.getAttribute(MXL_ROOTFILE_PATH)?.takeIf { it.isNotEmpty() } ?: error("$MXL_CONTAINER names no score")
+    return entries[path] ?: error("The archive contains no $path")
+}
 
 private fun ByteArray.decodeXml(): String =
     if (Utf16Boms.any { bom -> bom.indices.all { getOrNull(it) == bom[it] } }) toString(Charsets.UTF_16) else decodeToString().removePrefix(UTF8_BOM)

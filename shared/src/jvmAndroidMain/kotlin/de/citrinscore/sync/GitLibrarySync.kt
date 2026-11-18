@@ -29,6 +29,7 @@ import org.eclipse.jgit.transport.URIish
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
 import org.eclipse.jgit.treewalk.TreeWalk
 import org.eclipse.jgit.util.io.DisabledOutputStream
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.net.URISyntaxException
@@ -42,6 +43,7 @@ private const val AUTHOR_EMAIL = "sync@citrinscore.invalid"
 private const val PATH_SEPARATOR = "/"
 private const val TIMEOUT_SECONDS = 30
 private val IgnoredPatterns = listOf("**/*.${CitScore.EXTENSION}/${CitScore.DEVICE_STATE_FILE}")
+private val logger = LoggerFactory.getLogger(GitLibrarySync::class.java)
 private val AcceptedPushes = setOf(RemoteRefUpdate.Status.OK, RemoteRefUpdate.Status.UP_TO_DATE)
 
 actual fun librarySync(): LibrarySync = GitLibrarySync
@@ -55,6 +57,7 @@ internal object GitLibrarySync : LibrarySync {
     override suspend fun connect(library: PlatformFile, remote: GitRemote) = withContext(Dispatchers.IO) {
         failingAs {
             val directory = library.workingDirectory()
+            logger.info("Connecting {} to {}", directory, remote)
             Git.lsRemoteRepository().setRemote(remote.url).setCredentialsProvider(remote.credentials).setTimeout(TIMEOUT_SECONDS).call()
             open(directory).close()
         }
@@ -68,6 +71,7 @@ internal object GitLibrarySync : LibrarySync {
     ): SyncOutcome = withContext(Dispatchers.IO) {
         failingAs {
             val directory = library.workingDirectory()
+            logger.info("Synchronizing {} with {}", directory, remote)
             open(directory).use { git ->
                 val repository = git.repository
                 progress(SyncProgress(SyncStep.Committing))
@@ -80,15 +84,20 @@ internal object GitLibrarySync : LibrarySync {
                 useBranch(git, branch)
                 val remoteHead = repository.resolve("${Constants.R_REMOTES}$REMOTE/$branch")
                 val localHead = repository.resolve(Constants.HEAD)
+                logger.info("Fetched branch {}, local head {}, remote head {}", branch, localHead?.name, remoteHead?.name)
                 if (remoteHead != null) {
                     progress(SyncProgress(SyncStep.Merging))
-                    if (!integrate(git, directory, localHead, remoteHead, resolve)) return@failingAs SyncOutcome.Cancelled
+                    if (!integrate(git, directory, localHead, remoteHead, resolve)) {
+                        logger.info("Synchronization cancelled while resolving conflicts")
+                        return@failingAs SyncOutcome.Cancelled
+                    }
                 }
                 val merged = repository.resolve(Constants.HEAD)
                 removeDeletedScores(repository, directory, localHead, merged)
                 val downloaded = changedScores(repository, localHead, merged)
                 val uploaded = changedScores(repository, remoteHead, merged)
                 if (merged != null && merged != remoteHead) push(git, branch, remote, progress)
+                logger.info("Synchronization completed, uploaded {} and downloaded {} scores", uploaded, downloaded)
                 SyncOutcome.Completed(uploaded, downloaded)
             }
         }
@@ -98,6 +107,7 @@ internal object GitLibrarySync : LibrarySync {
         val git = if (File(directory, Constants.DOT_GIT).exists()) {
             Git.open(directory)
         } else {
+            logger.info("Creating a repository in {}", directory)
             Git.init().setDirectory(directory).setInitialBranch(DEFAULT_BRANCH).call()
         }
         git.repository.config.apply {
@@ -123,7 +133,10 @@ internal object GitLibrarySync : LibrarySync {
             .forEach { File(it, KEEP_FILE).createNewFile() }
         git.add().addFilepattern(".").call()
         git.add().setUpdate(true).addFilepattern(".").call()
-        if (git.status().call().hasUncommittedChanges()) commit(git, "Sync from ${deviceName()}")
+        val status = git.status().call()
+        if (!status.hasUncommittedChanges()) return
+        logger.info("Committing {} added, {} changed and {} removed files", status.added.size, status.changed.size, status.removed.size)
+        commit(git, "Sync from ${deviceName()}")
     }
 
     private fun commit(git: Git, message: String) {
@@ -167,6 +180,7 @@ internal object GitLibrarySync : LibrarySync {
         }
         val result = git.merge().include(remoteHead).setStrategy(MergeStrategy.RECURSIVE).setFastForward(FastForwardMode.FF)
             .setMessage("Merge synchronized changes").call()
+        logger.info("Merged remote changes with status {}", result.mergeStatus)
         return when (result.mergeStatus) {
             MergeStatus.CONFLICTING -> resolveConflicts(git, directory, result.conflicts.keys, localHead, remoteHead, resolve)
             MergeStatus.FAILED, MergeStatus.ABORTED, MergeStatus.NOT_SUPPORTED, MergeStatus.CHECKOUT_CONFLICT ->
@@ -184,11 +198,13 @@ internal object GitLibrarySync : LibrarySync {
         resolve: suspend (List<SyncConflict>) -> Map<String, ConflictChoice>?,
     ): Boolean {
         val documents = paths.map(::documentOf).distinct().sorted()
+        logger.info("Resolving conflicts in {}", documents)
         val choices = resolve(documents.map(::conflictOf))
         if (choices == null) {
             git.reset().setMode(ResetType.HARD).call()
             return false
         }
+        logger.info("Resolved conflicts with {}", choices)
         documents.forEach { document ->
             val source = if (choices[document] == ConflictChoice.Remote) remoteHead else localHead
             restore(git, directory, document, source)
@@ -234,6 +250,7 @@ internal object GitLibrarySync : LibrarySync {
     private fun push(git: Git, branch: String, remote: GitRemote, progress: (SyncProgress) -> Unit) {
         progress(SyncProgress(SyncStep.Uploading, 0f))
         val reference = Constants.R_HEADS + branch
+        logger.info("Pushing {}", reference)
         val rejected = git.push().setRemote(REMOTE).setRefSpecs(RefSpec("$reference:$reference")).setCredentialsProvider(remote.credentials).setTimeout(TIMEOUT_SECONDS)
             .setProgressMonitor(StepMonitor(SyncStep.Uploading, progress)).call()
             .flatMap { it.remoteUpdates }

@@ -23,12 +23,18 @@ import de.citrinscore.ui.pages.PreviewPage
 import de.citrinscore.ui.pages.previewPage
 import de.citrinscore.ui.pages.previewSize
 import de.citrinscore.util.attempt
+import de.citrinscore.util.logChanges
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger(EditScoreViewModel::class.java)
 
 class EditScoreViewModel(
     private val folder: PlatformFile,
@@ -44,6 +50,8 @@ class EditScoreViewModel(
     private var manifest: ScoreManifest? = null
 
     init {
+        logger.info("Editing score {}", score.path)
+        viewModelScope.logChanges(_state.map { it.step }, logger, "Edit step {}")
         viewModelScope.launch {
             val loaded = attempt {
                 val manifest = repository.load(score)
@@ -109,6 +117,7 @@ class EditScoreViewModel(
         val draft = _state.value.pagesDraft ?: return
         val known = draft.pages.map { it.key }.toSet()
         val added = files.map(EditablePage::Added).distinctBy { it.key }.filter { it.key !in known }
+        logger.info("Adding images {} to part {}", added.map { it.file.path }, draft.directory)
         updatePages { it.copy(pages = it.pages + added) }
         added.forEach { page -> loadPreview(previewKey(draft.directory, page)) { openImageSource(page.file).use { it.previewPage(0) } } }
     }

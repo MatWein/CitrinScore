@@ -10,16 +10,25 @@ import de.citrinscore.ui.components.isLastStep
 import de.citrinscore.ui.components.nextStep
 import de.citrinscore.ui.components.previousStep
 import de.citrinscore.util.attempt
+import de.citrinscore.util.logChanges
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger(OnboardingViewModel::class.java)
 
 class OnboardingViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(OnboardingState())
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.logChanges(_state.map { it.step }, logger, "Onboarding step {}")
+    }
 
     fun selectLanguage(language: AppLanguage) = _state.update { it.copy(language = language) }
 

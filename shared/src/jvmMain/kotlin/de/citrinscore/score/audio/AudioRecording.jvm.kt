@@ -4,6 +4,7 @@ import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 import javax.sound.sampled.AudioFileFormat
 import javax.sound.sampled.AudioFormat
@@ -11,14 +12,16 @@ import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.TargetDataLine
 
+private val logger = LoggerFactory.getLogger("de.citrinscore.score.audio.AudioRecording")
 private val RecordingFormat = AudioFormat(RECORDING_SAMPLE_RATE.toFloat(), RECORDING_BITS_PER_SAMPLE, RECORDING_CHANNELS, true, false)
 
 actual suspend fun isMicrophoneAvailable(): Boolean = withContext(Dispatchers.IO) {
-    runCatching { openRecordingLine().close() }.isSuccess
+    runCatching { openRecordingLine().close() }.onFailure { logger.info("No recording line available: {}", it.message) }.isSuccess
 }
 
 actual suspend fun startAudioRecording(target: PlatformFile): AudioRecording = withContext(Dispatchers.IO) {
     val line = openRecordingLine().apply { start() }
+    logger.debug("Recording {} from {} to {}", line.format, line.lineInfo, target.file)
     val writing = CompletableFuture.runAsync { AudioSystem.write(AudioInputStream(line), AudioFileFormat.Type.WAVE, target.file) }
     JavaSoundRecording(line, writing)
 }

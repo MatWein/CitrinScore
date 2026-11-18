@@ -31,6 +31,9 @@ import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("de.citrinscore.ui.Navigation")
 
 @Serializable
 internal data object LibraryRoute
@@ -63,6 +66,9 @@ fun LibraryNavigation(
     val repository = remember { LibraryRepository() }
     val libraryViewModel = viewModel(key = library.path) { LibraryViewModel(library, repository) }
     val navController = rememberNavController()
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry -> logger.info("Showing {}", entry.destination.route?.substringAfterLast('.')) }
+    }
     val syncViewModel = librarySync().takeIf { it.supports(settings.library) }?.let { sync -> viewModel(key = "${library.path}/sync") { SyncViewModel(library, sync) } }
 
     NavHost(navController, startDestination = LibraryRoute) {

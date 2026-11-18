@@ -28,8 +28,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 private const val MICROPHONE_SAMPLE_RATE = 22050
+private val logger = LoggerFactory.getLogger(PlaybackViewModel::class.java)
 const val MIN_TEMPO = 0.25f
 const val MAX_TEMPO = 2f
 
@@ -71,6 +73,7 @@ class PlaybackViewModel(
     }
 
     fun close() {
+        logger.info("Closing playback")
         stop()
         _cursor.value = null
         _state.update { it.copy(isOpen = false, error = null) }
@@ -78,6 +81,7 @@ class PlaybackViewModel(
 
     fun selectMode(mode: PlaybackMode) {
         if (_state.value.mode == mode) return
+        logger.info("Selecting playback mode {}", mode)
         stop()
         _state.update { it.copy(mode = mode, error = null) }
     }
@@ -85,6 +89,7 @@ class PlaybackViewModel(
     fun start() {
         val current = performance?.takeIf { it.events.isNotEmpty() } ?: return
         stop()
+        _state.value.let { logger.info("Starting {} at event {} with tempo {} and instrument {}", it.mode, event, it.tempo, it.instrument) }
         _state.update { it.copy(isRunning = true, error = null) }
         running = viewModelScope.launch {
             when (_state.value.mode) {
@@ -99,6 +104,7 @@ class PlaybackViewModel(
 
     fun stop() {
         previewing?.cancel()
+        running?.let { logger.info("Stopping playback at event {}", event) }
         running?.cancel()
         running = null
         synthesizer?.let { synth -> viewModelScope.launch { synth.pause() } }
@@ -112,10 +118,14 @@ class PlaybackViewModel(
         synthesizer?.setTempo(clamped)
     }
 
-    fun commitTempo() = savePreferences()
+    fun commitTempo() {
+        logger.info("Changing tempo to {}", _state.value.tempo)
+        savePreferences()
+    }
 
     fun setInstrument(instrument: Instrument?) {
         if (_state.value.instrument == instrument) return
+        logger.info("Changing instrument to {}", instrument)
         stop()
         synthesizer?.close()
         synthesizer = null
@@ -153,6 +163,7 @@ class PlaybackViewModel(
     }
 
     private fun open() {
+        logger.info("Opening playback for {}", part.value)
         _state.update { it.copy(isOpen = true, error = null) }
         if (_state.value.microphoneAvailable == null) {
             viewModelScope.launch { _state.update { it.copy(microphoneAvailable = isMicrophoneAvailable()) } }
@@ -163,6 +174,7 @@ class PlaybackViewModel(
         loading = viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             val loaded = loadPerformance(ref)
+            logger.info("Loaded performance of {} with {} events", ref, loaded?.events?.size)
             performance = loaded
             event = 0
             _state.update { it.copy(isLoading = false, error = if (loaded == null) PlaybackError.Score else null) }
@@ -215,7 +227,10 @@ class PlaybackViewModel(
         microphoneSamples(MICROPHONE_SAMPLE_RATE)
             .map(listener::listen)
             .flowOn(Dispatchers.Default)
-            .catch { _state.update { it.copy(error = PlaybackError.Microphone) } }
+            .catch { e ->
+                logger.warn("Listening to the microphone failed", e)
+                _state.update { it.copy(error = PlaybackError.Microphone) }
+            }
             .takeWhile { !follower.isFinished }
             .collect { pitches ->
                 val hit = pitches.mapNotNull(follower::hear).lastOrNull() ?: return@collect

@@ -5,6 +5,7 @@ import com.sun.jna.IntegerType
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
+import de.citrinscore.util.loadNativeLibrary
 
 private const val LIBRARY_NAME = "fluidsynth"
 private val WordStart = Regex("([a-z0-9])([A-Z])")
@@ -68,14 +69,16 @@ internal interface FluidSynthLibrary : Library {
         const val ALL_CHANNELS = -1
 
         val instance: FluidSynthLibrary by lazy {
-            Native.load(
-                LIBRARY_NAME,
-                FluidSynthLibrary::class.java,
-                mapOf(
-                    Library.OPTION_STRING_ENCODING to Charsets.UTF_8.name(),
-                    Library.OPTION_FUNCTION_MAPPER to FunctionMapper { _, method -> method.name.replace(WordStart, "$1_$2").lowercase() },
-                ),
-            )
+            loadNativeLibrary(LIBRARY_NAME) {
+                Native.load(
+                    LIBRARY_NAME,
+                    FluidSynthLibrary::class.java,
+                    mapOf(
+                        Library.OPTION_STRING_ENCODING to Charsets.UTF_8.name(),
+                        Library.OPTION_FUNCTION_MAPPER to FunctionMapper { _, method -> method.name.replace(WordStart, "$1_$2").lowercase() },
+                    ),
+                )
+            }
         }
     }
 }

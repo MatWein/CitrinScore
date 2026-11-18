@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.io.File
 
 internal const val ENGINE_SAMPLE_RATE = 44100
@@ -22,6 +23,7 @@ private const val PREVIEW_VELOCITY = 96
 
 private val soundFontExtraction = Mutex()
 private var soundFont: File? = null
+private val logger = LoggerFactory.getLogger("de.citrinscore.score.playback.FluidSynth")
 
 internal class FluidSynthEngine private constructor(
     private val library: FluidSynthLibrary,
@@ -80,6 +82,7 @@ internal class FluidSynthEngine private constructor(
             val font = soundFontFile()
             return withContext(Dispatchers.IO) {
                 val midi = instrument?.let { performance.midi.withProgram(it.program) } ?: performance.midi
+                logger.debug("Opening FluidSynth with {} MIDI bytes, instrument {} and sound font {}", midi.size, instrument, font)
                 val previewProgram = instrument?.program ?: midi.initialProgram()
                 val library = FluidSynthLibrary.instance
                 val settings = library.newFluidSettings()
@@ -94,8 +97,9 @@ internal class FluidSynthEngine private constructor(
                     player?.let(library::deleteFluidPlayer)
                     synth?.let(library::deleteFluidSynth)
                     library.deleteFluidSettings(settings)
-                    error("FluidSynth could not be initialised")
+                    error("FluidSynth could not be initialised, synthesizer: ${synth != null}, player: ${player != null}")
                 }
+                logger.debug("Opened FluidSynth")
                 FluidSynthEngine(library, settings, synth, player, previewProgram)
             }
         }

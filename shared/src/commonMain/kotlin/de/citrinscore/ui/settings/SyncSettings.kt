@@ -32,8 +32,10 @@ import de.citrinscore.ui.sync.message
 import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 private val ProgressSize = 20.dp
+private val logger = LoggerFactory.getLogger("de.citrinscore.ui.settings.SyncSettings")
 
 @Composable
 fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, available: Boolean, onRemoteChange: (GitRemote?) -> Unit) {
@@ -55,6 +57,7 @@ fun SyncSettings(remote: GitRemote?, library: PlatformFile, sync: LibrarySync, a
                 sync.connect(library, candidate)
                 onRemoteChange(candidate)
             } catch (e: SyncException) {
+                logger.warn("Connecting the repository failed", e)
                 failure = e.failure
                 detail = e.message
             }

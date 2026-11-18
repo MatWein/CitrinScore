@@ -17,10 +17,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import org.slf4j.LoggerFactory
 
 private const val THUMBNAIL_CACHE_KILOBYTES = 64 * 1024
 private const val BYTES_PER_PIXEL = 4
 private const val BYTES_PER_KILOBYTE = 1024
+private val logger = LoggerFactory.getLogger(LibraryViewModel::class.java)
 
 class LibraryViewModel(root: PlatformFile, private val repository: LibraryRepository) : ViewModel() {
 
@@ -41,12 +43,14 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     }
 
     fun open(folder: PlatformFile) {
+        logger.info("Opening folder {}", folder.path)
         _state.update { it.copy(path = it.path + folder, content = null) }
         refresh()
     }
 
     fun up() {
         if (_state.value.isRoot) return
+        logger.info("Leaving folder {}", currentFolder.path)
         _state.update { it.copy(path = it.path.dropLast(1), content = null) }
         refresh()
     }

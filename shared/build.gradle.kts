@@ -29,6 +29,9 @@ val jnaVersion: String by project
 val ktmidiVersion: String by project
 val jgitVersion: String by project
 val batikVersion: String by project
+val slf4jVersion: String by project
+val logbackVersion: String by project
+val logbackAndroidVersion: String by project
 val activityComposeVersion: String by project
 val androidCompileSdk: String by project
 val androidMinSdk: String by project
@@ -100,6 +103,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
             implementation("androidx.collection:collection:$collectionVersion")
             implementation("com.mikepenz:aboutlibraries-compose-m3:$aboutLibrariesVersion")
+            implementation("org.slf4j:slf4j-api:$slf4jVersion")
         }
         named("jvmAndroidMain").dependencies {
             compileOnly("net.java.dev.jna:jna:$jnaVersion")
@@ -112,6 +116,7 @@ kotlin {
                 exclude(group = "xml-apis", module = "xml-apis")
             }
             implementation("org.apache.pdfbox:pdfbox:$pdfboxVersion")
+            implementation("ch.qos.logback:logback-classic:$logbackVersion")
             implementation("com.googlecode.soundlibs:mp3spi:$mp3spiVersion") {
                 exclude(group = "junit")
             }
@@ -122,6 +127,7 @@ kotlin {
             implementation("net.java.dev.jna:jna:$jnaVersion@aar")
             implementation("androidx.exifinterface:exifinterface:$exifInterfaceVersion")
             implementation("com.caverock:androidsvg-aar:$androidSvgVersion")
+            implementation("com.github.tony19:logback-android:$logbackAndroidVersion")
             api("androidx.activity:activity-compose:$activityComposeVersion")
         }
         commonTest.dependencies {
@@ -229,6 +235,8 @@ aboutLibraries {
     license {
         strictMode = StrictMode.FAIL
         allowedLicenses.addAll("Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "LGPL-2.1-or-later", "LGPL-3.0-or-later", "MIT", "OFL-1.1", "generaluser-gs", "6f2d5d14a0a0caf9830496e9db99e0d3")
+        val logback = listOf("ch.qos.logback:logback-classic", "ch.qos.logback:logback-core")
+        allowedLicensesMap.putAll(mapOf("EPL-2.0" to logback, "LGPL-2.1-only" to logback))
     }
 }
 

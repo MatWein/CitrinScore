@@ -8,6 +8,7 @@ plugins {
 
 val javaVersion: String by project
 val coroutinesVersion: String by project
+val slf4jVersion: String by project
 
 kotlin {
     jvmToolchain(javaVersion.toInt())
@@ -17,6 +18,7 @@ dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+    implementation("org.slf4j:slf4j-api:$slf4jVersion")
 }
 
 compose.desktop {

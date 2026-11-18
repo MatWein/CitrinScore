@@ -95,6 +95,10 @@ class MusicXmlEngraverTest {
     @Test
     fun `invalid scores are rejected`() = runTest {
         assertFailsWith<IllegalStateException> { openMusicXmlEngraver("no music".encodeToByteArray(), compressed = false) }
+        openMusicXmlEngraver("<score-partwise>".encodeToByteArray(), compressed = false).use { engraver ->
+            assertFailsWith<IllegalStateException> { engraver.engrave(EngravingLayout.Print) }
+        }
+        assertFailsWith<IllegalStateException> { openMusicXmlEngraver("not a score".encodeToByteArray(), compressed = true) }
     }
 
     companion object {
