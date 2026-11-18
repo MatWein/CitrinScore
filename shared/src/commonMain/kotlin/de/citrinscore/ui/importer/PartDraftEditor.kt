@@ -1,6 +1,11 @@
 package de.citrinscore.ui.importer
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import de.citrinscore.library.PartSource
+import de.citrinscore.score.PageCrop
+import de.citrinscore.score.scan.EraserStroke
 import de.citrinscore.score.render.BitmapPageSource
 import de.citrinscore.score.render.PageSource
 import de.citrinscore.score.render.contentCrop
@@ -11,6 +16,7 @@ import de.citrinscore.score.render.openPdfSource
 import de.citrinscore.score.scan.ScanPage
 import de.citrinscore.score.scan.scanPages
 import de.citrinscore.ui.pages.previewPage
+import de.citrinscore.ui.pages.previewSize
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.ImageFormat
 import io.github.vinceglb.filekit.PlatformFile
@@ -53,7 +59,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
         if (current.type == type) return
         logger.info("Selecting import type {}", type)
         discard(current)
-        _draft.value = current.copy(type = type, files = emptyList(), previews = emptyMap(), failedPreviews = emptySet())
+        _draft.value = current.copy(type = type, files = emptyList(), previews = emptyMap(), failedPreviews = emptySet(), scans = emptyMap(), erasedPages = emptyList())
     }
 
     fun updateName(name: String) = _draft.update { it.copy(name = name) }
@@ -63,7 +69,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
         val type = current.type ?: return
         if (type.singleFile) {
             val file = files.firstOrNull() ?: return
-            _draft.value = current.copy(files = listOf(file), previews = emptyMap(), failedPreviews = emptySet())
+            _draft.value = current.copy(files = listOf(file), previews = emptyMap(), failedPreviews = emptySet(), scans = emptyMap(), erasedPages = emptyList())
             loadPreview(current.key, file, type)
             return
         }
@@ -84,7 +90,20 @@ class PartDraftEditor(private val scope: CoroutineScope) {
             files = current.files.filterIndexed { i, _ -> i != index },
             previews = current.previews - path,
             failedPreviews = current.failedPreviews - path,
+            scans = current.scans - path,
+            erasedPages = current.erasedPages.filterNot { it.path == path },
         )
+    }
+
+    fun cropScan(page: ScanPageRef, crop: PageCrop) = _draft.update { draft -> draft.withScan(page) { it.copy(crop = crop) } }
+
+    fun eraseScan(page: ScanPageRef, stroke: EraserStroke) = _draft.update { draft ->
+        draft.withScan(page) { it.copy(erased = it.erased + stroke) }.copy(erasedPages = draft.erasedPages + page)
+    }
+
+    fun undoErase() = _draft.update { draft ->
+        val page = draft.erasedPages.lastOrNull() ?: return@update draft
+        draft.withScan(page) { it.copy(erased = it.erased.dropLast(1)) }.copy(erasedPages = draft.erasedPages.dropLast(1))
     }
 
     fun updateScanThreshold(threshold: Float) {
@@ -95,9 +114,14 @@ class PartDraftEditor(private val scope: CoroutineScope) {
             delay(THRESHOLD_DELAY_MILLIS)
             _draft.value.files.forEach { file ->
                 val pages = scans[scanKey(key, file.path)] ?: return@forEach
-                val previews = attempt { pages.map { it.preview(threshold) } } ?: return@forEach
+                val images = attempt { pages.map { it.previewImage(it.binarized(threshold)) } } ?: return@forEach
                 _draft.update { draft ->
-                    if (draft.key == key && file.path in draft.previews) draft.copy(previews = draft.previews + (file.path to previews)) else draft
+                    val current = draft.scans[file.path]
+                    if (draft.key != key || current == null) {
+                        draft
+                    } else {
+                        draft.copy(scans = draft.scans + (file.path to current.zip(images) { scan, image -> scan.copy(image = image) }))
+                    }
                 }
             }
         }
@@ -115,9 +139,9 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     }
 
     private suspend fun scanSource(draft: PartDraft): PartSource {
-        val (images, crops) = draft.files.flatMap { scans.getValue(scanKey(draft.key, it.path)) }.map { page ->
-            val image = page.binarized(draft.scanThreshold)
-            val crop = BitmapPageSource(image).use { it.contentCrop(0) }
+        val (images, crops) = draft.scanPages.map { (page, scan) ->
+            val image = scans.getValue(scanKey(draft.key, page.path))[page.index].binarized(draft.scanThreshold, scan.erased)
+            val crop = BitmapPageSource(image).use { it.contentCrop(0, within = scan.crop) }
             withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) } to crop
         }.unzip()
         return PartSource.Scans(images, crops)
@@ -126,26 +150,33 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     private fun loadPreview(key: String, file: PlatformFile, type: ImportType) {
         logger.info("Loading {} preview of {}", type, file.path)
         scope.launch {
-            val pages = attempt {
-                type.open(file).use { source ->
-                    if (type == ImportType.Scan) {
-                        source.scanPages().also { scans[scanKey(key, file.path)] = it }.map { it.preview(_draft.value.scanThreshold) }
-                    } else {
-                        source.pageSizes.indices.map { page -> source.previewPage(page) }
-                    }
-                }
-            }
-            _draft.update { draft ->
-                when {
-                    draft.key != key || draft.files.none { it.path == file.path } -> draft
-                    pages == null -> draft.copy(failedPreviews = draft.failedPreviews + file.path)
-                    else -> draft.copy(previews = draft.previews + (file.path to pages))
-                }
+            if (type == ImportType.Scan) {
+                val scanned = attempt { type.open(file).use { it.scanPages() }.also { scans[scanKey(key, file.path)] = it }.map { it.scanPreview() } }
+                publishPreview(key, file, scanned?.let { pages -> { copy(scans = scans + (file.path to pages)) } })
+            } else {
+                val pages = attempt { type.open(file).use { source -> source.pageSizes.indices.map { page -> source.previewPage(page) } } }
+                publishPreview(key, file, pages?.let { loaded -> { copy(previews = previews + (file.path to loaded)) } })
             }
         }
     }
 
-    private suspend fun ScanPage.preview(threshold: Float) = BitmapPageSource(binarized(threshold)).use { it.previewPage(0) }
+    private fun publishPreview(key: String, file: PlatformFile, loaded: (PartDraft.() -> PartDraft)?) = _draft.update { draft ->
+        when {
+            draft.key != key || draft.files.none { it.path == file.path } -> draft
+            loaded == null -> draft.copy(failedPreviews = draft.failedPreviews + file.path)
+            else -> draft.loaded()
+        }
+    }
+
+    private suspend fun ScanPage.scanPreview(): ScanPreview {
+        val image = binarized(_draft.value.scanThreshold)
+        val crop = BitmapPageSource(image).use { it.contentCrop(0) }
+        return ScanPreview(previewImage(image), size, crop)
+    }
+
+    private suspend fun ScanPage.previewImage(image: ImageBitmap) = withContext(Dispatchers.Default) {
+        BitmapPageSource(image).use { it.render(0, Rect(Offset.Zero, size), previewSize(size.width, size.height)) }
+    }
 
     private suspend fun ImportType.open(file: PlatformFile): PageSource = when (this) {
         ImportType.Images -> openImageSource(file)

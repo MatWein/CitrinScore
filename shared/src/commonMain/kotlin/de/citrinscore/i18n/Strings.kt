@@ -122,6 +122,9 @@ interface Strings {
     val takePhoto: String
     val addScans: String
     val scanThreshold: String
+    val scanCrop: String
+    val scanEraser: String
+    val eraserSize: String
     val moveUp: String
     val moveDown: String
     val remove: String

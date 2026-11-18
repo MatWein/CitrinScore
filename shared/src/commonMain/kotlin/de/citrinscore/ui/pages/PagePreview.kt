@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,24 +27,36 @@ fun PagePreview(
     modifier: Modifier = Modifier,
     controls: @Composable () -> Unit = {},
 ) {
+    PreviewFrame(isLoading, failed, modifier, controls) {
+        val maxWidth = pages.maxOfOrNull { it.crop.size.width } ?: 1f
+        pages.forEach { page ->
+            Image(
+                page.image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth(page.crop.size.width / maxWidth),
+                contentScale = ContentScale.FillWidth,
+            )
+        }
+    }
+}
+
+@Composable
+fun PreviewFrame(
+    isLoading: Boolean,
+    failed: Boolean,
+    modifier: Modifier = Modifier,
+    controls: @Composable () -> Unit = {},
+    pages: @Composable ColumnScope.() -> Unit,
+) {
     val strings = LocalStrings.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
         Text(strings.previewLabel, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         controls()
-        val maxWidth = pages.maxOfOrNull { it.crop.size.width } ?: 1f
         Column(
             modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Color.White).padding(Spacing.ExtraSmall),
             verticalArrangement = Arrangement.spacedBy(Spacing.Small),
-        ) {
-            pages.forEach { page ->
-                Image(
-                    page.image,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(page.crop.size.width / maxWidth),
-                    contentScale = ContentScale.FillWidth,
-                )
-            }
-        }
+            content = pages,
+        )
         if (isLoading) CircularProgressIndicator()
         if (failed) Text(strings.previewFailed, color = MaterialTheme.colorScheme.error)
     }

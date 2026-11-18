@@ -2,15 +2,10 @@ package de.citrinscore.ui.importer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import de.citrinscore.i18n.LocalStrings
-import de.citrinscore.score.scan.ScanThresholdRange
 import de.citrinscore.ui.components.AddButton
 import de.citrinscore.ui.components.NumberedRow
 import de.citrinscore.ui.components.WizardStep
@@ -38,10 +33,10 @@ fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEdito
         PagesLayout(
             list = { modifier -> FileList(draft, editor, modifier) },
             preview = { modifier ->
-                if (draft.files.isNotEmpty()) {
-                    PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, modifier) {
-                        if (draft.type == ImportType.Scan) ScanThresholdSlider(draft.scanThreshold, editor::updateScanThreshold)
-                    }
+                when {
+                    draft.files.isEmpty() -> Unit
+                    draft.type == ImportType.Scan -> ScanPreviewPanel(draft, editor, modifier)
+                    else -> PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, modifier)
                 }
             },
         )
@@ -82,10 +77,3 @@ private fun FileList(draft: PartDraft, editor: PartDraftEditor, modifier: Modifi
     }
 }
 
-@Composable
-private fun ScanThresholdSlider(threshold: Float, onChange: (Float) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.Large)) {
-        Text(LocalStrings.current.scanThreshold, style = MaterialTheme.typography.bodyLarge)
-        Slider(value = threshold, onValueChange = onChange, valueRange = ScanThresholdRange, modifier = Modifier.weight(1f))
-    }
-}

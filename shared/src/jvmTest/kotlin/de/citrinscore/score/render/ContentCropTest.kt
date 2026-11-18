@@ -36,6 +36,15 @@ class ContentCropTest {
     }
 
     @Test
+    fun `ink outside the selected area is ignored and the rest is trimmed`() = runTest {
+        val file = image(2000, 2800) { fillRect(400, 600, 1200, 1600); fillRect(100, 100, 50, 50) }
+
+        val crop = openImageSource(PlatformFile(file)).use { it.contentCrop(0, within = PageCrop(200f, 200f, 1800f, 2600f)) }
+
+        assertEquals(PageCrop(380f, 580f, 1620f, 2220f), crop)
+    }
+
+    @Test
     fun `an empty page keeps its full size`() = runTest {
         val file = image(800, 600) {}
 

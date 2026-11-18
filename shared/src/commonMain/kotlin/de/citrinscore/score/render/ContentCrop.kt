@@ -11,17 +11,17 @@ import kotlin.math.min
 
 private const val PADDING_FRACTION = 0.01f
 
-suspend fun PageSource.contentCrop(page: Int): PageCrop = withContext(Dispatchers.Default) {
+suspend fun PageSource.contentCrop(page: Int, within: PageCrop? = null): PageCrop = withContext(Dispatchers.Default) {
     val size = pageSizes[page]
-    val full = PageCrop(0f, 0f, size.width, size.height)
+    val area = within ?: PageCrop(0f, 0f, size.width, size.height)
     val scale = SCAN_WIDTH / size.width
-    val bounds = render(page, full.rect, scanSize(size, scale)).let(::InkScan).inkBounds() ?: return@withContext full
+    val bounds = render(page, area.rect, scanSize(area.size, scale)).let(::InkScan).inkBounds() ?: return@withContext area
     val padding = size.width * PADDING_FRACTION
     PageCrop(
-        left = max(0f, floor(bounds.left / scale - padding)),
-        top = max(0f, floor(bounds.top / scale - padding)),
-        right = min(size.width, ceil(bounds.right / scale + padding)),
-        bottom = min(size.height, ceil(bounds.bottom / scale + padding)),
+        left = max(area.left, floor(area.left + bounds.left / scale - padding)),
+        top = max(area.top, floor(area.top + bounds.top / scale - padding)),
+        right = min(area.right, ceil(area.left + bounds.right / scale + padding)),
+        bottom = min(area.bottom, ceil(area.top + bounds.bottom / scale + padding)),
     )
 }
 
