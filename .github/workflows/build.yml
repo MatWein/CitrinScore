@@ -76,7 +76,9 @@ jobs:
 
       - name: Archive portable Linux app
         if: matrix.platform == 'linux'
-        run: tar -czf "citrinScore-${{ needs.prepare.outputs.version }}-linux-x86_64.tar.gz" -C desktopApp/build/compose/binaries/main-release/app citrinScore
+        run: |
+          ./gradlew :desktopApp:createReleaseDistributable
+          tar -czf "citrinScore-${{ needs.prepare.outputs.version }}-linux-x86_64.tar.gz" -C desktopApp/build/compose/binaries/main-release/app citrinScore
 
       - uses: actions/upload-artifact@v7
         with:
