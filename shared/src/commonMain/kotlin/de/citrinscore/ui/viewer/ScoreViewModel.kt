@@ -13,6 +13,7 @@ import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScorePart
 import de.citrinscore.score.PlaybackPreferences
+import de.citrinscore.score.Recognition
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.isReflowable
 import de.citrinscore.score.musicxml.EngravedPage
@@ -21,6 +22,8 @@ import de.citrinscore.score.musicxml.MeasureAnchors
 import de.citrinscore.score.musicxml.MusicXmlEngraver
 import de.citrinscore.score.musicxml.NotePositions
 import de.citrinscore.score.musicxml.ScorePerformance
+import de.citrinscore.score.musicxml.notePositions
+import de.citrinscore.score.musicxml.openMusicXmlEngraver
 import de.citrinscore.score.render.PageSourceRenderer
 import de.citrinscore.score.render.ScoreRenderer
 import de.citrinscore.score.render.ScoreRenderers
@@ -179,7 +182,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         } ?: return run { _state.value = ScoreViewerState.Failed }
         if (_part.value != ref) return
         _anchors.value = engraved?.let { pages -> MeasureAnchors(pages.map { it.staves }) }
-        _notes.value = engraved?.let(::NotePositions)
+        _notes.value = engraved?.let(::NotePositions) ?: part.recognition?.let { recognized(ref, it, renderer.pageSizes.size) }
         val breaks = part.systemBreaks?.takeIf { !content.isReflowable && it.size == renderer.pageSizes.size }
         _systemBreaks.value = breaks.orEmpty()
         _state.value = ScoreViewerState.Ready(
@@ -189,6 +192,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             pageSizes = renderer.pageSizes,
             view = if (content.isReflowable) part.view?.copy(zoom = DEFAULT_REFLOW_SCALE) else part.view,
             reflowScale = part.reflowScale.takeIf { content.isReflowable },
+            isPlayable = engraved != null || _notes.value != null,
         )
         if (breaks == null) detection = viewModelScope.launch { detectSystemBreaks(ref, renderer, persist = !content.isReflowable) }
     }
@@ -199,6 +203,14 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         val renderer = PageSourceRenderer(pages.pageSource())
         renderers.put(part.directory, renderer)?.close()
         return renderer to pages
+    }
+
+    private suspend fun recognized(part: PartRef, recognition: Recognition, pages: Int): NotePositions? = attempt {
+        val music = repository.recognition(part, recognition) ?: return@attempt null
+        engravers.remove(part.directory)?.close()
+        engravers[part.directory] = openMusicXmlEngraver(music.musicXml.encodeToByteArray(), compressed = false)
+        performances.remove(part.directory)
+        music.layout.notePositions(pages)
     }
 
     private fun layout(viewport: Size, scale: Float): EngravingLayout {

@@ -21,8 +21,8 @@ your own device as plain files: no account, no cloud, no lock-in.
 ## Features
 
 - **Import** images, SVGs, PDFs and MusicXML, or scan pages with the camera. Margins are cropped automatically.
-- **Music recognition** – turn imported images, scans and PDFs into an additional MusicXML part that can be played
-  back. It runs on your device with the models of [homr](https://github.com/liebharc/homr).
+- **Music recognition** – make images, scans and PDFs playable: the notes are recognized on your device with the models
+  of [homr](https://github.com/liebharc/homr) and highlighted in the original pages during playback and play-along.
 - **Parts** – keep several parts per score, for example one per instrument.
 - **Viewer** with smooth zooming, page turning by staff systems and support for keyboards and Bluetooth page turners.
 - **Notes** – draw and write on your scores with finger, stylus or mouse.

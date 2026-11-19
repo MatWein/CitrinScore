@@ -21,11 +21,12 @@ private const val NO_NOTE_TOKEN = 0L
 
 private val BRANCH_INPUTS = listOf("rhythms", "pitchs", "lifts", "articulations", "slurs")
 private val BRANCH_OUTPUTS = listOf("out_rhythms", "out_pitchs", "out_lifts", "out_articulations", "out_slurs", "out_positions")
+private const val ATTENTION_OUTPUT = "attention"
 
 internal class Transformer(private val environment: OrtEnvironment, encoderModel: String, decoderModel: String) : AutoCloseable {
     private val encoder = environment.createSession(encoderModel, OrtSession.SessionOptions())
     private val decoder = environment.createSession(decoderModel, OrtSession.SessionOptions())
-    private val requestedOutputs = (BRANCH_OUTPUTS + List(CACHE_TENSORS) { "cache_out$it" }).toSet()
+    private val requestedOutputs = (BRANCH_OUTPUTS + ATTENTION_OUTPUT + List(CACHE_TENSORS) { "cache_out$it" }).toSet()
 
     fun predict(canvas: Mat): List<EncodedSymbol> {
         val pixels = canvas.bytes()
@@ -76,6 +77,7 @@ internal class Transformer(private val environment: OrtEnvironment, encoderModel
                     articulation = Vocabulary.articulation[samples[3]],
                     slur = Vocabulary.slur[samples[4]],
                     position = Vocabulary.position[samples[5]],
+                    location = location(result.get(ATTENTION_OUTPUT).get() as OnnxTensor),
                 )
                 tokens = samples.take(BRANCH_INPUTS.size).map { it.toLong() }
             }
@@ -85,6 +87,14 @@ internal class Transformer(private val environment: OrtEnvironment, encoderModel
             reducedContext.close()
         }
         return symbols
+    }
+
+    private fun location(attention: OnnxTensor): SymbolLocation? {
+        val values = attention.floatBuffer
+        if (values.remaining() < 2) return null
+        val x = values[0].toDouble()
+        val y = values[1].toDouble()
+        return if (x.isNaN() || y.isNaN()) null else SymbolLocation(x, y)
     }
 
     private fun argmaxOfLastStep(tensor: OnnxTensor): Int {

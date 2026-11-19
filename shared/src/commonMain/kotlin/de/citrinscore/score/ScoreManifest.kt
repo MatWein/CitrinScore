@@ -59,6 +59,7 @@ data class ScorePart(
     val view: ScoreViewState? = null,
     val playback: PlaybackPreferences? = null,
     val systemBreaks: List<List<Float>>? = null,
+    val recognition: Recognition? = null,
 )
 
 @Serializable

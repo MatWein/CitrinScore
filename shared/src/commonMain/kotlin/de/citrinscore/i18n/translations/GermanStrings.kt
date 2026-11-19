@@ -138,11 +138,11 @@ object GermanStrings : Strings {
 
     override val previewLabel = "Vorschau"
     override val previewFailed = "Die Bilder konnten nicht geladen werden."
-    override val omrCreatePart = "Zusätzliche Stimme über OMR erzeugen"
+    override val omrCreatePart = "Noten per OMR erkennen, damit sie abspielbar sind"
     override val omrPreviewLabel = "Erkannte Noten (OMR)"
     override val omrRecognizing = "Noten werden erkannt …"
     override val omrFailed = "Auf den Seiten konnten keine Noten erkannt werden."
-    override val omrPartSummary = "mit OMR-Stimme"
+    override val omrPartSummary = "abspielbar (OMR)"
 
     override val importMetadataTitle = "Details"
     override val importMetadataSubtitle = "Gib deinen Noten einen Titel, damit du sie später wiederfindest."

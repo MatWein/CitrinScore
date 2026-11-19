@@ -97,6 +97,8 @@ Etude.citscore/
     ├── pages/001.png        original images (image and scan imports)
     ├── score.pdf            original document (PDF imports)
     ├── score.musicxml       original file (MusicXML imports, also .xml or .mxl)
+    ├── recognition.musicxml notes recognized with OMR, which make an image or PDF part playable
+    ├── recognition.json     position of every recognized note and measure on the pages, in cropped page coordinates
     ├── audio/               audio attachments (WAV, MP3)
     └── files/               other attached files
 ```

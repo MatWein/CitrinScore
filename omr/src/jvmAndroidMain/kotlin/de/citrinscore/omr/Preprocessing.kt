@@ -49,7 +49,9 @@ private fun medianChromaticity(pixels: List<Int>, bgr: ByteArray): Chromaticity 
 
 private fun Byte.u() = toInt() and 0xFF
 
-internal fun autocrop(image: Mat): Mat {
+internal class Cropped(val image: Mat, val left: Int, val top: Int)
+
+internal fun autocrop(image: Mat): Cropped {
     val width = image.cols()
     val height = image.rows()
     val bgr = image.bytes()
@@ -73,9 +75,9 @@ internal fun autocrop(image: Mat): Mat {
             sheet = contour
         }
     }
-    val contour = sheet ?: return image
+    val contour = sheet ?: return Cropped(image, 0, 0)
     val rect = boundingRect(contour)
-    if (rect.width < width * FULL_PAGE_SHARE || rect.height < height * FULL_PAGE_SHARE) return image
+    if (rect.width < width * FULL_PAGE_SHARE || rect.height < height * FULL_PAGE_SHARE) return Cropped(image, 0, 0)
     val paper = buildList {
         var counter = 0
         for (y in rect.y until rect.y + rect.height) {
@@ -87,7 +89,7 @@ internal fun autocrop(image: Mat): Mat {
             }
         }
     }
-    if (paper.isEmpty()) return image
+    if (paper.isEmpty()) return Cropped(image, 0, 0)
     val paperChromaticity = medianChromaticity(paper, bgr)
     val margin = max(5, max(width, height) / 100)
     val x0 = max(0, rect.x - margin)
@@ -102,10 +104,10 @@ internal fun autocrop(image: Mat): Mat {
     val right = if (isPaper(x1, y0, width, y1)) width else x1
     val top = if (isPaper(x0, 0, x1, y0)) 0 else y0
     val bottom = if (isPaper(x0, y1, x1, height)) height else y1
-    if (left == 0 && top == 0 && right == width && bottom == height) return image
+    if (left == 0 && top == 0 && right == width && bottom == height) return Cropped(image, 0, 0)
     val crop = image.region(left, top, right, bottom).clone()
     val shiftedSheet = IntArray(contour.size) { if (it % 2 == 0) contour[it] - left else contour[it] - top }
-    return crop.use { removeSurroundings(it, shiftedSheet, paper, bgr) }
+    return Cropped(crop.use { removeSurroundings(it, shiftedSheet, paper, bgr) }, left, top)
 }
 
 private fun removeSurroundings(crop: Mat, sheet: IntArray, paper: List<Int>, bgr: ByteArray): Mat {

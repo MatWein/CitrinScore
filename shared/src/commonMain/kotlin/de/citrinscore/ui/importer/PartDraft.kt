@@ -36,14 +36,18 @@ data class PartDraft(
     val isOmrRequested get() = omrEnabled && supportsOmr
 
     val omrInput get() = OmrInput(
+        key = key,
         files = files.map { it.path },
         crops = pages.map { it.crop },
         scans = scanPages.map { (page, scan) -> OmrScan(page, scan.crop, scan.erased) },
+        scanThreshold = scanThreshold,
     )
 
     val recognized get() = (omr as? OmrState.Done)?.takeIf { isOmrRequested && it.input == omrInput }
 
-    val isRecognizing get() = isOmrRequested && omr.let { it == null || it is OmrState.Running || it.input != omrInput }
+    val isRecognizing get() = isRecognizing(isOmrRequested, omr, omrInput)
+
+    val omrDisplay get() = omrDisplay(isOmrRequested, isPreviewReady, omr, omrInput)
 
     val isComplete get() = isPreviewReady && !isRecognizing
 

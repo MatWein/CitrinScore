@@ -97,7 +97,23 @@ private class GroupClock {
     }
 }
 
-internal fun generateMusicXml(voices: List<List<EncodedSymbol>>, inheritedTimes: List<TimeSignature?>?): Document {
+internal class NoteLocation(val location: SymbolLocation, val isRest: Boolean)
+
+internal class GeneratedScore(val document: Document, val locations: Map<String, NoteLocation>)
+
+private class NoteIds(private val prefix: String) {
+    private var next = 0
+    val locations = LinkedHashMap<String, NoteLocation>()
+
+    fun register(symbol: EncodedSymbol, isRest: Boolean): String {
+        val id = "${prefix}n${next++}"
+        symbol.location?.let { locations[id] = NoteLocation(it, isRest) }
+        return id
+    }
+}
+
+internal fun generateMusicXml(voices: List<List<EncodedSymbol>>, inheritedTimes: List<TimeSignature?>?, idPrefix: String = ""): GeneratedScore {
+    val ids = NoteIds(idPrefix)
     val document = newDocument()
     val root = document.createElement("score-partwise").apply { setAttribute("version", "4.0") }
     document.appendChild(root)
@@ -107,9 +123,9 @@ internal fun generateMusicXml(voices: List<List<EncodedSymbol>>, inheritedTimes:
     val hasTwoStaves = voices.map { voice -> voice.any { isLowerPosition(it.position) } }
     val partList = root.add("part-list")
     hasTwoStaves.forEachIndexed { index, twoStaves -> addScorePart(partList, index, twoStaves) }
-    val parts = voices.mapIndexed { index, voice -> buildPart(root, voice, index, hasTwoStaves[index], inheritedTimes?.getOrNull(index)) }
+    val parts = voices.mapIndexed { index, voice -> buildPart(root, voice, index, hasTwoStaves[index], inheritedTimes?.getOrNull(index), ids) }
     shortenMeasureRestsInPickup(parts)
-    return document
+    return GeneratedScore(document, ids.locations)
 }
 
 private fun partId(index: Int) = "P${index + 1}"
@@ -189,9 +205,9 @@ internal fun lastTimeSignatures(root: Element): List<TimeSignature?> = root.desc
     part.descendants("time").lastOrNull()?.let { it.findText("beats") to it.findText("beat-type") }
 }
 
-private fun buildPart(root: Element, voice: List<EncodedSymbol>, index: Int, hasTwoStaves: Boolean, inheritedTime: TimeSignature?): Element {
+private fun buildPart(root: Element, voice: List<EncodedSymbol>, index: Int, hasTwoStaves: Boolean, inheritedTime: TimeSignature?, ids: NoteIds): Element {
     val part = root.add("part", null, "id" to partId(index))
-    MeasureBuilder(part, voice, hasTwoStaves, inheritedTime).build().forEach { part.appendChild(it) }
+    MeasureBuilder(part, voice, hasTwoStaves, inheritedTime, ids).build().forEach { part.appendChild(it) }
     convertTies(part)
     addStems(part)
     convertBeams(part)
@@ -199,7 +215,13 @@ private fun buildPart(root: Element, voice: List<EncodedSymbol>, index: Int, has
     return part
 }
 
-private class MeasureBuilder(private val part: Element, voice: List<EncodedSymbol>, private val hasTwoStaves: Boolean, private var inheritedTime: TimeSignature?) {
+private class MeasureBuilder(
+    private val part: Element,
+    voice: List<EncodedSymbol>,
+    private val hasTwoStaves: Boolean,
+    private var inheritedTime: TimeSignature?,
+    private val ids: NoteIds,
+) {
     private val groups = splitMixedChords(TupletParser.parse(sortTokenChords(voice).map { SymbolChord(it) }))
     private val division: Int
     private val nominators: List<Fraction>
@@ -389,6 +411,7 @@ private class MeasureBuilder(private val part: Element, voice: List<EncodedSymbo
 
     private fun noteOrRest(symbol: EncodedSymbol, layer: Int, isChord: Boolean, tupletMark: String): Element {
         val note = current.element("note")
+        note.setAttribute("id", ids.register(symbol, isRest = symbol.pitch == EMPTY || symbol.pitch == NO_NOTE))
         if (isChord) note.add("chord")
         val duration = symbol.duration
         val isGrace = "G" in symbol.rhythm

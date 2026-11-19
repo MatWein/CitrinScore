@@ -8,6 +8,7 @@ import de.citrinscore.library.LibraryRepository
 import de.citrinscore.library.PageEdit
 import de.citrinscore.library.PartEdit
 import de.citrinscore.library.PartRef
+import de.citrinscore.library.RecognitionEdit
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreMetadata
@@ -15,9 +16,14 @@ import de.citrinscore.score.pageCount
 import de.citrinscore.score.render.ScoreRenderer
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.openImageSource
+import de.citrinscore.score.omr.RecognitionPage
+import de.citrinscore.score.omr.musicXmlPreview
 import de.citrinscore.ui.importer.PartDraft
 import de.citrinscore.ui.importer.PartDraftEditor
+import de.citrinscore.ui.importer.OmrState
 import de.citrinscore.ui.importer.importType
+import de.citrinscore.ui.importer.launchMusicRecognition
+import de.citrinscore.ui.importer.recognitionPage
 import de.citrinscore.ui.pages.PreviewPage
 import de.citrinscore.ui.pages.previewPage
 import de.citrinscore.ui.pages.previewSize
@@ -49,6 +55,12 @@ class EditScoreViewModel(
     private var manifest: ScoreManifest? = null
 
     init {
+        viewModelScope.launchMusicRecognition(
+            requests = _state.map { it.omrRequest },
+            current = { _state.value.pagesDraft?.omr },
+            pages = { input -> recognitionPages(input as EditOmrInput) },
+            publish = { input, omr -> _state.update { state -> if (state.omrRequest == input) state.copy(pagesDraft = state.pagesDraft?.copy(omr = omr)) else state } },
+        )
         logger.info("Editing score {}", score.path)
         viewModelScope.logChanges(_state.map { it.step }, logger, "Edit step {}")
         viewModelScope.launch {
@@ -63,7 +75,7 @@ class EditScoreViewModel(
                 it.copy(
                     isLoaded = true,
                     parts = loadedManifest.parts.map { part ->
-                        EditablePart.Existing(part.directory, part.name, part.content.importType, part.content.pageCount)
+                        EditablePart.Existing(part.directory, part.name, part.content.importType, part.content.pageCount, storedRecognition = part.recognition != null)
                     },
                     title = loadedManifest.metadata.title,
                     composer = loadedManifest.metadata.composer,
@@ -92,11 +104,20 @@ class EditScoreViewModel(
                 _state.update { it.copy(step = EditStep.Files, editingPart = index) }
             }
             is EditablePart.Existing -> {
-                val pages = part.pages ?: (0 until (part.pageCount ?: 0)).map(EditablePage::Existing)
-                _state.update {
-                    it.copy(step = EditStep.Pages, editingPart = index, pagesDraft = PagesDraft(part.directory, part.name, part.type, pages))
-                }
+                val original = (0 until (part.pageCount ?: 0)).map(EditablePage::Existing)
+                val draft = PagesDraft(
+                    directory = part.directory,
+                    name = part.name,
+                    type = part.type,
+                    pages = part.pages ?: original,
+                    originalPages = original,
+                    storedRecognition = part.storedRecognition,
+                    omrEnabled = part.omrEnabled,
+                    omr = part.omr,
+                )
+                _state.update { it.copy(step = EditStep.Pages, editingPart = index, pagesDraft = draft) }
                 if (part.pageCount != null) loadExistingPreviews(part.directory)
+                if (part.storedRecognition) loadStoredRecognition(part.directory)
             }
         }
     }
@@ -120,6 +141,8 @@ class EditScoreViewModel(
         updatePages { it.copy(pages = it.pages + added) }
         added.forEach { page -> loadPreview(previewKey(draft.directory, page)) { openImageSource(page.file).use { it.previewPage(0) } } }
     }
+
+    fun enableOmr(enabled: Boolean) = updatePages { it.copy(omrEnabled = enabled, omr = it.omr as? OmrState.Done) }
 
     fun movePage(from: Int, to: Int) = updatePages { draft ->
         draft.copy(pages = draft.pages.toMutableList().apply { add(to, removeAt(from)) })
@@ -150,7 +173,7 @@ class EditScoreViewModel(
             EditStep.Pages -> {
                 val pages = current.pagesDraft ?: return
                 val part = current.editingPart?.let { current.parts[it] } as? EditablePart.Existing ?: return
-                commit(part.copy(name = pages.name, pages = pages.pages.takeIf { pages.canEditPages }))
+                commit(part.copy(name = pages.name, pages = pages.pages.takeIf { pages.canEditPages }, omrEnabled = pages.omrEnabled, omr = current.recognizedPages))
             }
             EditStep.Parts -> save(current, onSaved)
         }
@@ -187,6 +210,26 @@ class EditScoreViewModel(
         }
     }
 
+    private fun loadStoredRecognition(directory: String) {
+        val recognition = manifest?.part(directory)?.recognition ?: return
+        viewModelScope.launch {
+            val preview = attempt { repository.recognition(PartRef(score, directory), recognition)?.let { musicXmlPreview(it.musicXml) } } ?: return@launch
+            updatePages { draft -> if (draft.directory == directory) draft.copy(storedPreview = preview) else draft }
+        }
+    }
+
+    private suspend fun recognitionPages(input: EditOmrInput): List<RecognitionPage> {
+        val part = manifest?.part(input.directory) ?: error("Unknown part ${input.directory}")
+        return ScoreRenderers.open(PartRef(score, input.directory).root, part.content).use { renderer ->
+            input.pages.zip(input.crops).map { (page, crop) ->
+                when (page) {
+                    is EditablePage.Existing -> renderer.recognitionPage(page.index)
+                    is EditablePage.Added -> openImageSource(page.file).use { it.recognitionPage(0, crop.rect) }
+                }
+            }
+        }
+    }
+
     private fun loadPreview(key: String, render: suspend () -> PreviewPage) {
         viewModelScope.launch { publishPreview(key, attempt { render() }) }
     }
@@ -217,6 +260,12 @@ class EditScoreViewModel(
         is EditablePart.Existing -> listOf(PartEdit.Keep(
             directory = directory,
             name = name.trim(),
+            recognition = when {
+                omrEnabled && omr != null -> RecognitionEdit.Replace(omr.music)
+                omrEnabled -> RecognitionEdit.Unchanged
+                storedRecognition -> RecognitionEdit.Remove
+                else -> RecognitionEdit.Unchanged
+            },
             pages = pages?.map { page ->
                 when (page) {
                     is EditablePage.Existing -> PageEdit.Keep(page.index)
@@ -224,6 +273,6 @@ class EditScoreViewModel(
                 }
             },
         ))
-        is EditablePart.New -> editor.newParts(draft).map(PartEdit::Add)
+        is EditablePart.New -> listOf(PartEdit.Add(editor.newPart(draft)))
     }
 }

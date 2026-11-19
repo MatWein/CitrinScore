@@ -91,7 +91,7 @@ class ImportViewModel(
         viewModelScope.launch {
             val saved = attempt {
                 val metadata = ScoreMetadata(current.title.trim(), current.composer.trim(), current.description.trim())
-                val parts = current.parts.flatMap { editor.newParts(it) }
+                val parts = current.parts.map { editor.newPart(it) }
                 repository.importScore(folder, metadata, parts)
             }
             if (saved == null) _state.update { it.copy(isSaving = false, saveFailed = true) } else onImported()

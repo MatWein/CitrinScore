@@ -2,6 +2,7 @@ package de.citrinscore.score.musicxml
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import de.citrinscore.score.RecognitionLayout
 import kotlin.math.hypot
 import kotlin.math.max
 
@@ -11,11 +12,12 @@ private const val TAP_DISTANCE = 4f
 
 data class PageRegion(val page: Int, val bounds: Rect)
 
-class NotePositions(pages: List<EngravedPage>) {
-    private val notes = pages.flatMapIndexed { page, engraved -> engraved.notes.map { it.id to Placement(page, it) } }.toMap()
-    private val notesByPage = pages.map { it.notes }
-    private val systems = pages.mapIndexed { page, engraved ->
-        engraved.staves.groupBy { it.measure }.mapValues { (_, staves) -> System(staves.map { it.bounds }.reduce { a, b -> a.union(b) }, staves.maxOf { it.space }) }
+class NotePositions(private val notesByPage: List<List<NoteBox>>, stavesByPage: List<List<StaffBox>>) {
+    constructor(pages: List<EngravedPage>) : this(pages.map { it.notes }, pages.map { it.staves })
+
+    private val notes = notesByPage.flatMapIndexed { page, boxes -> boxes.map { it.id to Placement(page, it) } }.toMap()
+    private val systems = stavesByPage.map { staves ->
+        staves.groupBy { it.measure }.mapValues { (_, measure) -> System(measure.map { it.bounds }.reduce { a, b -> a.union(b) }, measure.maxOf { it.space }) }
     }
 
     fun note(id: String): PageRegion? = notes[id]?.let { PageRegion(it.page, it.box.bounds) }
@@ -61,3 +63,10 @@ class NotePositions(pages: List<EngravedPage>) {
 
     private fun Rect.distanceTo(point: Offset) = hypot(max(max(left - point.x, point.x - right), 0f), max(max(top - point.y, point.y - bottom), 0f))
 }
+
+fun RecognitionLayout.notePositions(pages: Int) = NotePositions(
+    notesByPage = List(pages) { page -> notes.filter { it.page == page }.map { NoteBox(it.id, it.measure, Rect(it.left, it.top, it.right, it.bottom)) } },
+    stavesByPage = List(pages) { page ->
+        measures.filter { it.page == page }.map { StaffBox(it.measure, 1, Rect(it.left, it.top, it.right, it.bottom), it.space) }
+    },
+)

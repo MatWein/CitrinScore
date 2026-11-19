@@ -8,6 +8,10 @@ import de.citrinscore.score.InkStroke
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
 import de.citrinscore.score.PlaybackPreferences
+import de.citrinscore.score.RecognitionLayout
+import de.citrinscore.score.RecognizedMeasure
+import de.citrinscore.score.RecognizedMusic
+import de.citrinscore.score.RecognizedNote
 import de.citrinscore.score.playback.Instrument
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
@@ -167,6 +171,31 @@ class LibraryRepositoryTest {
         val part = repository.open(PlatformFile(score)).parts.single()
         assertEquals(ScoreContent.Images(listOf(ImagePage("pages/001.png", crop), ImagePage("pages/002.png", crop))), part.content)
         assertContentEquals(scan, File(score, "${part.directory}/pages/002.png").readBytes())
+    }
+
+    @Test
+    fun `recognized music is stored with the part and removed again`() = runTest {
+        val scan = File(root, "scan.png").also { ImageIO.write(sheet(400, 500, 100, 100, 300, 400), "png", it) }.readBytes()
+        val crop = PageCrop(90f, 90f, 310f, 410f)
+        val layout = RecognitionLayout(
+            notes = listOf(RecognizedNote("p1n0", 0, 1, 10f, 20f, 14f, 24f)),
+            measures = listOf(RecognizedMeasure(0, 1, 5f, 15f, 100f, 60f, 4f)),
+        )
+        val music = RecognizedMusic("<score-partwise/>", layout)
+
+        repository.importScore(PlatformFile(root), ScoreMetadata(title = "Etude"), listOf(NewPart("", PartSource.Scans(listOf(scan), listOf(crop)), music)))
+
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = repository.open(score).parts.single()
+        val stored = assertNotNull(repository.recognition(PartRef(score, part.directory), assertNotNull(part.recognition)))
+        assertEquals(music.musicXml, stored.musicXml)
+        assertEquals(layout, stored.layout)
+
+        repository.updateScore(PlatformFile(root), score, ScoreMetadata(title = "Etude"), listOf(PartEdit.Keep(part.directory, "", recognition = RecognitionEdit.Remove)))
+
+        assertNull(repository.open(score).parts.single().recognition)
+        assertFalse(File(root, "Etude.citscore/${part.directory}/${CitScore.RECOGNITION_MUSICXML_FILE}").exists())
+        assertFalse(File(root, "Etude.citscore/${part.directory}/${CitScore.RECOGNITION_LAYOUT_FILE}").exists())
     }
 
     @Test

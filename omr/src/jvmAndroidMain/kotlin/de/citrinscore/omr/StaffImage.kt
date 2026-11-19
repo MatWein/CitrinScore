@@ -212,7 +212,30 @@ private fun spanAndOptimalPoints(staff: Staff, image: Mat): Pair<List<List<Point
     return span to optimal
 }
 
-private fun dewarp(image: Mat, staff: Staff): Mat {
+private class Dewarping(private val triangles: List<Triangle>?) {
+    fun apply(image: Mat): Mat = if (triangles == null) image.clone() else warp(image, triangles)
+
+    fun undo(x: Double, y: Double): Pair<Double, Double> {
+        val point = Point(x, y)
+        for (triangle in triangles.orEmpty()) {
+            if (isDegenerate(triangle.source) || isDegenerate(triangle.destination) || !contains(triangle.destination, point)) continue
+            val matrix = affineTransform(triangle.source, triangle.destination) ?: continue
+            val inverse = Mat()
+            matrix.use { Imgproc.invertAffineTransform(it, inverse) }
+            val values = DoubleArray(6).also { inverse.use { mat -> mat.get(0, 0, it) } }
+            return values[0] * x + values[1] * y + values[2] to values[3] * x + values[4] * y + values[5]
+        }
+        return x to y
+    }
+
+    private fun contains(triangle: List<Point>, point: Point): Boolean {
+        fun cross(a: Point, b: Point) = (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)
+        val signs = listOf(cross(triangle[0], triangle[1]), cross(triangle[1], triangle[2]), cross(triangle[2], triangle[0]))
+        return !(signs.any { it < 0 } && signs.any { it > 0 })
+    }
+}
+
+private fun dewarping(image: Mat, staff: Staff): Dewarping {
     val triangles = try {
         val (span, optimal) = spanAndOptimalPoints(staff, image)
         val width = image.cols().toDouble()
@@ -223,12 +246,14 @@ private fun dewarp(image: Mat, staff: Staff): Mat {
         }
         triangulate(complete(span), complete(optimal))
     } catch (_: Exception) {
-        return image.clone()
+        null
     }
-    return warp(image, triangles)
+    return Dewarping(triangles)
 }
 
-internal fun prepareStaffImage(staff: Staff, page: Mat, regions: StaffRegions): Mat {
+internal class StaffImage(val canvas: Mat, val toPage: (Double, Double) -> Pair<Double, Double>)
+
+internal fun prepareStaffImage(staff: Staff, page: Mat, regions: StaffRegions): StaffImage {
     val unit = staff.averageUnitSize
     val region = listOf(
         (staff.minX - REGION_UNITS_X * unit).toInt(),
@@ -238,7 +263,9 @@ internal fun prepareStaffImage(staff: Staff, page: Mat, regions: StaffRegions): 
     )
     val dimensions = canvasSize(region[3] - region[1], region[2] - region[0])
     val scaling = dimensions.second.toDouble() / (region[3] - region[1])
-    val scaled = Mat().also { Imgproc.resize(page, it, Size((page.cols() * scaling).toInt().toDouble(), (page.rows() * scaling).toInt().toDouble())) }
+    val scaledWidth = (page.cols() * scaling).toInt()
+    val scaledHeight = (page.rows() * scaling).toInt()
+    val scaled = Mat().also { Imgproc.resize(page, it, Size(scaledWidth.toDouble(), scaledHeight.toDouble())) }
     val scaledRegion = region.map { Math.rint(it * scaling) }
     val (cropped, topLeft) = scaled.use {
         cropAndReturnTop(it, scaledRegion[0] - CROP_MARGIN_X, scaledRegion[1] - CROP_MARGIN_Y, scaledRegion[2] + CROP_MARGIN_X, scaledRegion[3] + CROP_MARGIN_Y)
@@ -246,10 +273,21 @@ internal fun prepareStaffImage(staff: Staff, page: Mat, regions: StaffRegions): 
     val left = topLeft.first / scaling
     val top = topLeft.second / scaling
     val transformed = staff.transform { x, y -> (x - left) * scaling to (y - top) * scaling }
-    val dewarped = cropped.use { dewarp(it, transformed) }
-    val (staffImage, _) = dewarped.use {
+    val dewarping = dewarping(cropped, transformed)
+    val dewarped = cropped.use { dewarping.apply(it) }
+    val (staffImage, innerTopLeft) = dewarped.use {
         cropAndReturnTop(it, scaledRegion[0] - topLeft.first, scaledRegion[1] - topLeft.second, scaledRegion[2] - topLeft.first, scaledRegion[3] - topLeft.second)
     }
     removeBlackContoursAtEdges(staffImage, transformed.averageUnitSize)
-    return staffImage.use { centerOnCanvas(it, dimensions) }
+    val contentWidth = staffImage.cols()
+    val contentHeight = staffImage.rows()
+    val yOffset = (CANVAS_HEIGHT - dimensions.second) / 2
+    val canvas = staffImage.use { centerOnCanvas(it, dimensions) }
+    return StaffImage(canvas) { x, y ->
+        val (dewarpedX, dewarpedY) = dewarping.undo(
+            x * contentWidth / dimensions.first + innerTopLeft.first,
+            (y - yOffset) * contentHeight / dimensions.second + innerTopLeft.second,
+        )
+        (dewarpedX + topLeft.first) * page.cols() / scaledWidth to (dewarpedY + topLeft.second) * page.rows() / scaledHeight
+    }
 }

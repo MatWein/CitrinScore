@@ -7,6 +7,9 @@ import de.citrinscore.score.ImagePage
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.PdfPage
 import de.citrinscore.score.PlaybackPreferences
+import de.citrinscore.score.Recognition
+import de.citrinscore.score.RecognitionLayout
+import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreDeviceState
@@ -109,7 +112,7 @@ class LibraryRepository(
             when (edit) {
                 is PartEdit.Keep -> previous.part(edit.directory).let { part ->
                     edit.pages?.let { pages -> editPages(score, part, pages) } ?: part
-                }.copy(name = edit.name)
+                }.let { part -> editRecognition(PartRef(score, part.directory).root, part, edit.recognition) }.copy(name = edit.name)
                 is PartEdit.Add -> createPart(score, edit.part)
             }
         }
@@ -190,7 +193,13 @@ class LibraryRepository(
         try {
             root.createDirectories()
             val content = writeContent(root, part.source)
-            return ScorePart(directory, part.name, content, systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(root, it) })
+            return ScorePart(
+                directory,
+                part.name,
+                content,
+                systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(root, it) },
+                recognition = part.recognition?.let { writeRecognition(root, it) },
+            )
         } catch (e: Exception) {
             root.delete(mustExist = false, recursively = true)
             throw e
@@ -209,11 +218,6 @@ class LibraryRepository(
         is PartSource.MusicXml -> {
             val name = "${CitScore.MUSICXML_FILE_NAME}.${source.file.extension.lowercase()}"
             (root / name) write source.file
-            ScoreContent.MusicXml(name)
-        }
-        is PartSource.RecognizedMusicXml -> {
-            val name = "${CitScore.MUSICXML_FILE_NAME}.${CitScore.MUSICXML_EXTENSION}"
-            (root / name).write(source.content.encodeToByteArray())
             ScoreContent.MusicXml(name)
         }
     }
@@ -275,6 +279,31 @@ class LibraryRepository(
         (score / kind.directory).createDirectories()
         CitScore.resolve(score, attachment.path).atomicMove(CitScore.resolve(score, moved.path))
         return moved
+    }
+
+    suspend fun recognition(part: PartRef, recognition: Recognition): RecognizedMusic? {
+        val musicXml = read(CitScore.resolve(part.root, recognition.musicXml)) { readString() } ?: return null
+        val layout = read(CitScore.resolve(part.root, recognition.layout)) { readString() } ?: return null
+        return RecognizedMusic(musicXml, json.decodeFromString(RecognitionLayout.serializer(), layout))
+    }
+
+    private suspend fun writeRecognition(root: PlatformFile, music: RecognizedMusic): Recognition {
+        val recognition = Recognition()
+        CitScore.resolve(root, recognition.musicXml).writeString(music.musicXml)
+        CitScore.resolve(root, recognition.layout).writeString(json.encodeToString(RecognitionLayout.serializer(), music.layout))
+        return recognition
+    }
+
+    private suspend fun editRecognition(root: PlatformFile, part: ScorePart, edit: RecognitionEdit): ScorePart = when (edit) {
+        RecognitionEdit.Unchanged -> part
+        RecognitionEdit.Remove -> {
+            part.recognition?.let { recognition ->
+                CitScore.resolve(root, recognition.musicXml).delete(mustExist = false)
+                CitScore.resolve(root, recognition.layout).delete(mustExist = false)
+            }
+            part.copy(recognition = null)
+        }
+        is RecognitionEdit.Replace -> part.copy(recognition = writeRecognition(root, edit.music))
     }
 
     private suspend fun deletePart(score: PlatformFile, part: ScorePart) {
@@ -362,12 +391,11 @@ class LibraryRepository(
             is PartSource.Scans -> "${images.size} scans"
             is PartSource.Pdf -> "PDF ${file.path}"
             is PartSource.MusicXml -> "MusicXML ${file.path}"
-            is PartSource.RecognizedMusicXml -> "recognized MusicXML with ${content.length} characters"
         }
 
     private val PartEdit.description
         get() = when (this) {
-            is PartEdit.Keep -> "keep $directory" + pages?.let { " with ${it.size} pages" }.orEmpty()
+            is PartEdit.Keep -> "keep $directory" + pages?.let { " with ${it.size} pages" }.orEmpty() + " and recognition ${recognition::class.simpleName}"
             is PartEdit.Add -> "add ${part.source.description}"
         }
 }

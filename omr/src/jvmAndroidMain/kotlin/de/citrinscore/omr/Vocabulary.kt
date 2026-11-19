@@ -140,6 +140,7 @@ internal data class EncodedSymbol(
     val articulation: String = NO_NOTE,
     val slur: String = NO_NOTE,
     val position: String = NO_NOTE,
+    val location: SymbolLocation? = null,
 ) {
     val duration: SymbolDuration by lazy {
         if (!isNoteOrRest) SymbolDuration(Fraction.ZERO, 0, 1, 1, 1) else kernToSymbolDuration(rhythm.split("_")[1])
@@ -163,8 +164,16 @@ internal data class EncodedSymbol(
 
     fun toUpperPosition() = if (!isLowerPosition(position)) this else copy(position = position.replace("lower", "upper"))
 
-    override fun toString() = listOf(rhythm, pitch, lift, articulation, slur, position).joinToString(" ")
+    override fun equals(other: Any?) = other is EncodedSymbol && fields == other.fields
+
+    override fun hashCode() = fields.hashCode()
+
+    override fun toString() = fields.joinToString(" ")
+
+    private val fields get() = listOf(rhythm, pitch, lift, articulation, slur, position)
 }
+
+internal data class SymbolLocation(val x: Double, val y: Double, val system: Int = -1, val lineY: Double? = null, val head: Bounds? = null)
 
 internal fun sortTokenChords(symbols: List<EncodedSymbol>): List<List<EncodedSymbol>> = groupIntoChords(symbols).map { chord ->
     chord.sortedWith(compareByDescending { it.toString() })

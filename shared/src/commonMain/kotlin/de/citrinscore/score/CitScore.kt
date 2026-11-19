@@ -9,6 +9,8 @@ object CitScore {
     const val DEVICE_STATE_FILE = "device.json"
     const val THUMBNAIL_FILE = "thumbnail.jpg"
     const val ANNOTATIONS_FILE = "annotations.json"
+    const val RECOGNITION_MUSICXML_FILE = "recognition.musicxml"
+    const val RECOGNITION_LAYOUT_FILE = "recognition.json"
     const val PAGES_DIRECTORY = "pages"
     const val PDF_FILE = "score.pdf"
     const val PARTS_DIRECTORY = "parts"
@@ -18,7 +20,7 @@ object CitScore {
     const val SCAN_EXTENSION = "png"
     const val RECORDING_EXTENSION = "wav"
     val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")
-    val ROOT_PART_ENTRIES = listOf(PAGES_DIRECTORY, PDF_FILE, ANNOTATIONS_FILE)
+    val ROOT_PART_ENTRIES = listOf(PAGES_DIRECTORY, PDF_FILE, ANNOTATIONS_FILE, RECOGNITION_MUSICXML_FILE, RECOGNITION_LAYOUT_FILE)
     const val THUMBNAIL_WIDTH = 600
     const val PAGE_ASPECT_RATIO = 210f / 297f
 

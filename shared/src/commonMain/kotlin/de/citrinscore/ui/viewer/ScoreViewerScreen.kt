@@ -393,7 +393,7 @@ private fun PartAction(toolbar: ToolbarState) {
 
 @Composable
 private fun PlaybackAction(toolbar: ToolbarState) {
-    if (toolbar.ready?.isReflowable != true) return
+    if (toolbar.ready?.isPlayable != true) return
     val audio by toolbar.audio.state.collectAsStateWithLifecycle()
     IconAction(
         Res.drawable.ic_music_note,

@@ -3,6 +3,7 @@ package de.citrinscore.ui.editor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import de.citrinscore.ui.parts.PartNameField
 import de.citrinscore.ui.parts.PartRowModel
 import de.citrinscore.ui.parts.PartsStep
 import de.citrinscore.ui.parts.partName
+import de.citrinscore.ui.importer.OmrSection
 import de.citrinscore.ui.importer.summary
 import de.citrinscore.ui.parts.partSummary
 import de.citrinscore.ui.theme.ContentWidth
@@ -104,7 +106,7 @@ fun EditScoreScreen(
 
 private fun EditablePart.row(strings: Strings, index: Int): PartRowModel {
     val summary = when (this) {
-        is EditablePart.Existing -> strings.partSummary(type.title(strings), pages?.size ?: pageCount)
+        is EditablePart.Existing -> strings.partSummary(type.title(strings), pages?.size ?: pageCount).let { if (isPlayable) "$it · ${strings.omrPartSummary}" else it }
         is EditablePart.New -> draft.summary(strings)
     }
     return PartRowModel(strings.partName(name.trim(), index), summary)
@@ -141,7 +143,12 @@ private fun EditPagesStep(state: EditScoreState, viewModel: EditScoreViewModel) 
                     if (draft.canAddPages) AddButton(strings.addImages, picker::launch)
                 }
             },
-            preview = { modifier -> PagePreview(state.previewPages, state.isLoadingPreview, state.previewFailed, modifier) },
+            preview = { modifier ->
+                Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.Section)) {
+                    PagePreview(state.previewPages, state.isLoadingPreview, state.previewFailed, Modifier.fillMaxWidth())
+                    if (draft.supportsOmr) OmrSection(draft.omrEnabled, state.omrDisplay, viewModel::enableOmr, Modifier.fillMaxWidth())
+                }
+            },
         )
     }
 }

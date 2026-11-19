@@ -15,8 +15,7 @@ import de.citrinscore.score.render.openMusicXmlSource
 import de.citrinscore.score.render.openPageSource
 import de.citrinscore.score.render.openPdfSource
 import de.citrinscore.score.render.scanSize
-import de.citrinscore.score.omr.musicXmlPreview
-import de.citrinscore.score.omr.recognizeMusicXml
+import de.citrinscore.score.omr.RecognitionPage
 import de.citrinscore.score.scan.ScanPage
 import de.citrinscore.score.scan.scanPages
 import de.citrinscore.ui.pages.previewPage
@@ -33,8 +32,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -42,9 +39,6 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 private const val THRESHOLD_DELAY_MILLIS = 300L
-private const val OMR_DELAY_MILLIS = 500L
-private const val OMR_RESOLUTION = 2000f
-private const val OMR_PART_SUFFIX = "OMR"
 private val logger = LoggerFactory.getLogger(PartDraftEditor::class.java)
 
 class PartDraftEditor(private val scope: CoroutineScope) {
@@ -56,17 +50,12 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     private var thresholdJob: Job? = null
 
     init {
-        scope.launch {
-            _draft.map { draft -> draft.takeIf { it.isOmrRequested && it.isPreviewReady }?.let { it.key to it.omrInput } }
-                .distinctUntilChanged()
-                .collectLatest { request ->
-                    val (key, input) = request ?: return@collectLatest
-                    val finished = _draft.value.omr?.takeIf { it !is OmrState.Running }
-                    if (finished?.input == input) return@collectLatest
-                    delay(OMR_DELAY_MILLIS)
-                    recognize(key, input)
-                }
-        }
+        scope.launchMusicRecognition(
+            requests = _draft.map { draft -> draft.takeIf { it.isOmrRequested && it.isPreviewReady }?.omrInput },
+            current = { _draft.value.omr },
+            pages = { omrPages(_draft.value) },
+            publish = { input, state -> _draft.update { draft -> if (draft.isOmrRequested && draft.omrInput == input) draft.copy(omr = state) else draft } },
+        )
     }
 
     fun edit(draft: PartDraft) {
@@ -155,38 +144,18 @@ class PartDraftEditor(private val scope: CoroutineScope) {
         }
     }
 
-    suspend fun newParts(draft: PartDraft): List<NewPart> {
-        val name = draft.name.trim()
-        val recognized = draft.recognized ?: return listOf(NewPart(name, source(draft)))
-        val omrName = if (name.isEmpty()) OMR_PART_SUFFIX else "$name ($OMR_PART_SUFFIX)"
-        return listOf(NewPart(name, source(draft)), NewPart(omrName, PartSource.RecognizedMusicXml(recognized.musicXml)))
-    }
+    suspend fun newPart(draft: PartDraft) = NewPart(draft.name.trim(), source(draft), draft.recognized?.music)
 
-    private suspend fun recognize(key: String, input: OmrInput) {
-        logger.info("Recognizing the music of part {}", key)
-        publishOmr(key, input, OmrState.Running(input, 0f))
-        val result = attempt {
-            val musicXml = recognizeMusicXml(omrPages(_draft.value)) { progress -> publishOmr(key, input, OmrState.Running(input, progress)) }
-            OmrState.Done(input, musicXml, musicXmlPreview(musicXml))
-        }
-        publishOmr(key, input, result ?: OmrState.Failed(input))
-    }
-
-    private fun publishOmr(key: String, input: OmrInput, state: OmrState) = _draft.update { draft ->
-        if (draft.key == key && draft.isOmrRequested && draft.omrInput == input) draft.copy(omr = state) else draft
-    }
-
-    private suspend fun omrPages(draft: PartDraft): List<ImageBitmap> = when (draft.type) {
+    private suspend fun omrPages(draft: PartDraft): List<RecognitionPage> = when (draft.type) {
         ImportType.Scan -> draft.scanPages.map { (page, scan) ->
-            val image = scans.getValue(scanKey(draft.key, page.path))[page.index].grayscale(scan.erased)
-            withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, scan.crop.rect, scanSize(scan.crop.size, 1f)) } }
+            val scanPage = scans.getValue(scanKey(draft.key, page.path))[page.index]
+            val crop = BitmapPageSource(scanPage.binarized(draft.scanThreshold, scan.erased)).use { it.contentCrop(0, within = scan.crop) }
+            val image = scanPage.grayscale(scan.erased)
+            RecognitionPage(withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, crop.rect, scanSize(crop.size, 1f)) } }, 1f)
         }
         ImportType.Images, ImportType.Pdf -> draft.files.flatMap { file ->
             draft.type.open(file).use { source ->
-                draft.previews.getValue(file.path).mapIndexed { page, preview ->
-                    val crop = preview.crop
-                    withContext(Dispatchers.Default) { source.render(page, crop.rect, scanSize(crop.size, OMR_RESOLUTION / crop.size.width)) }
-                }
+                draft.previews.getValue(file.path).mapIndexed { page, preview -> source.recognitionPage(page, preview.crop.rect) }
             }
         }
         ImportType.MusicXml, null -> error("Music recognition is not supported for ${draft.type}")

@@ -17,6 +17,14 @@ class OmrImage(val width: Int, val height: Int, val argb: IntArray) {
 
 class OmrException(message: String) : Exception(message)
 
+data class OmrBox(val left: Float, val top: Float, val right: Float, val bottom: Float)
+
+data class OmrNote(val id: String, val page: Int, val measure: Int, val bounds: OmrBox)
+
+data class OmrMeasure(val page: Int, val measure: Int, val bounds: OmrBox, val space: Float)
+
+class OmrResult(val musicXml: String, val notes: List<OmrNote>, val measures: List<OmrMeasure>)
+
 class Omr(modelDirectory: File) : AutoCloseable {
     private val environment = OrtEnvironment.getEnvironment()
     private val segnet: Segnet
@@ -31,27 +39,50 @@ class Omr(modelDirectory: File) : AutoCloseable {
         transformer = Transformer(environment, models.getValue(OmrModelFiles.ENCODER), models.getValue(OmrModelFiles.DECODER))
     }
 
-    fun recognize(pages: List<OmrImage>, onProgress: (Float) -> Unit = {}): String {
+    fun recognize(pages: List<OmrImage>, onProgress: (Float) -> Unit = {}): OmrResult {
         val recognizer = PageRecognizer(segnet, relations, transformer)
-        val documents = mutableListOf<Document>()
+        val results = mutableMapOf<Int, PageResult>()
         var inheritedTimes: List<TimeSignature?>? = null
         pages.forEachIndexed { index, page ->
             onProgress(index.toFloat() / pages.size)
-            val document = page.toBgr().use { image ->
+            val result = page.toBgr().use { image ->
                 try {
-                    recognizer.recognize(image, inheritedTimes) { done, total -> onProgress((index + done.toFloat() / total) / pages.size) }
+                    recognizer.recognize(image, inheritedTimes, "p${index + 1}") { done, total -> onProgress((index + done.toFloat() / total) / pages.size) }
                 } catch (e: NoStaffsFoundException) {
                     logger.info("Skipping page {}: {}", index + 1, e.message)
                     null
                 }
             } ?: return@forEachIndexed
-            documents += document
-            inheritedTimes = lastTimeSignatures(document.documentElement)
+            results[index] = result
+            inheritedTimes = lastTimeSignatures(result.document.documentElement)
         }
         onProgress(1f)
-        if (documents.isEmpty()) throw OmrException("No staffs found on any page")
-        return mergePages(documents).serialize()
+        if (results.isEmpty()) throw OmrException("No staffs found on any page")
+        val merged = mergePages(results.values.map { it.document })
+        val measureOf = measuresOfNotes(merged)
+        val notes = results.flatMap { (page, result) ->
+            result.notes.mapNotNull { (id, located) -> measureOf[id]?.let { measure -> Triple(OmrNote(id, page, measure, located.first.toBox()), located.second, result) } }
+        }
+        val measures = notes.groupBy { (note, system, _) -> Triple(note.page, note.measure, system) }.mapNotNull { (key, members) ->
+            val system = members.first().third.systems.getOrNull(key.third) ?: return@mapNotNull null
+            val space = system.space
+            val left = maxOf(system.bounds.left, members.minOf { it.first.bounds.left } - space)
+            val right = minOf(system.bounds.right, members.maxOf { it.first.bounds.right } + space)
+            OmrMeasure(key.first, key.second, Bounds(left, system.bounds.top, right, system.bounds.bottom).toBox(), space.toFloat())
+        }
+        return OmrResult(merged.serialize(), notes.map { it.first }, measures)
     }
+
+    private fun measuresOfNotes(document: Document): Map<String, Int> = buildMap {
+        document.documentElement.children("part").forEach { part ->
+            part.children("measure").forEach { measure ->
+                val number = measure.getAttribute("number").toInt()
+                measure.children("note").forEach { note -> if (note.hasAttribute("id")) put(note.getAttribute("id"), number) }
+            }
+        }
+    }
+
+    private fun Bounds.toBox() = OmrBox(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
 
     override fun close() {
         segnet.close()

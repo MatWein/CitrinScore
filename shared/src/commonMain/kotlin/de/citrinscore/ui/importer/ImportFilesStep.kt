@@ -41,7 +41,7 @@ fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEdito
                         } else {
                             PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, Modifier.fillMaxWidth())
                         }
-                        if (draft.supportsOmr) OmrSection(draft, editor, Modifier.fillMaxWidth())
+                        if (draft.supportsOmr) OmrSection(draft.omrEnabled, draft.omrDisplay, editor::enableOmr, Modifier.fillMaxWidth())
                     }
                 }
             },

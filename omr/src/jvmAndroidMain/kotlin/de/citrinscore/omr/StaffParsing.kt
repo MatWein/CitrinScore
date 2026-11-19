@@ -56,7 +56,9 @@ private fun measureRestsLike(symbols: List<EncodedSymbol>, isGrandstaff: Boolean
 
 private val keyOrder = compareBy<Pair<Int, Int>>({ it.first }, { it.second })
 
-internal fun parseStaffs(systems: List<MultiStaff>, page: Mat, transformer: Transformer, onStaff: (Int, Int) -> Unit): List<List<EncodedSymbol>> {
+internal class ParsedStaffs(val voices: List<List<EncodedSymbol>>, val systems: List<MultiStaff>)
+
+internal fun parseStaffs(systems: List<MultiStaff>, page: Mat, noteheads: List<BoundingEllipse>, transformer: Transformer, onStaff: (Int, Int) -> Unit): ParsedStaffs {
     var staffs = systems
     var parts = staffs.map { row -> row.staffs.indices.toList() }
     if (staffs.map { it.staffs.size }.toSet().size > 1) {
@@ -76,11 +78,15 @@ internal fun parseStaffs(systems: List<MultiStaff>, page: Mat, transformer: Tran
     jobs.forEachIndexed { done, (staffIndex, voice) ->
         onStaff(done, jobs.size)
         val staff = staffs[staffIndex].staffs[parts[staffIndex].indexOf(voice)]
-        val predicted = prepareStaffImage(staff, page, regions).use { transformer.predict(it) }
+        val staffImage = prepareStaffImage(staff, page, regions)
+        val predicted = staffImage.canvas.use { transformer.predict(it) }.map { symbol ->
+            val location = symbol.location?.takeUnless { symbol.rhythm.startsWith("chord") }
+            symbol.copy(location = location?.let { staffImage.toPage(it.x, it.y) }?.let { (x, y) -> SymbolLocation(x, y, staffIndex) })
+        }.let { alignToNoteheads(placeOnStaffLines(it, staff), staff, noteheads) }
         val result = if (staff.isGrandstaff) predicted else predicted.filterNot { isLowerPosition(it.position) }
         if (result.isNotEmpty()) results[staffIndex to voice] = result
     }
-    return (0 until numberOfVoices).map { voice ->
+    val voices = (0 until numberOfVoices).map { voice ->
         val symbols = mutableListOf<EncodedSymbol>()
         parts.forEachIndexed { staffIndex, slots ->
             var staffSymbols = results[staffIndex to voice]
@@ -96,4 +102,5 @@ internal fun parseStaffs(systems: List<MultiStaff>, page: Mat, transformer: Tran
         }
         restoreUnmarkedTriplets(removeDuplicatedSymbols(symbols))
     }
+    return ParsedStaffs(voices, staffs)
 }

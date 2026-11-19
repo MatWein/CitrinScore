@@ -18,28 +18,26 @@ import de.citrinscore.ui.pages.PagePreview
 import de.citrinscore.ui.theme.Spacing
 
 @Composable
-fun OmrSection(draft: PartDraft, editor: PartDraftEditor, modifier: Modifier = Modifier) {
+fun OmrSection(enabled: Boolean, display: OmrDisplay, onEnabledChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val strings = LocalStrings.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
         Row(
-            modifier = Modifier.fillMaxWidth().toggleable(value = draft.omrEnabled, role = Role.Checkbox, onValueChange = editor::enableOmr),
+            modifier = Modifier.fillMaxWidth().toggleable(value = enabled, role = Role.Checkbox, onValueChange = onEnabledChange),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.Small),
         ) {
-            Checkbox(checked = draft.omrEnabled, onCheckedChange = null)
+            Checkbox(checked = enabled, onCheckedChange = null)
             Text(strings.omrCreatePart, style = MaterialTheme.typography.bodyLarge)
         }
-        if (!draft.isOmrRequested) return@Column
-        val recognized = draft.recognized
-        val omr = draft.omr
-        when {
-            recognized != null -> PagePreview(recognized.preview, isLoading = false, failed = false, label = strings.omrPreviewLabel)
-            omr is OmrState.Failed && omr.input == draft.omrInput -> Text(strings.omrFailed, color = MaterialTheme.colorScheme.error)
-            draft.isPreviewReady -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
+        when (display) {
+            OmrDisplay.Idle -> Unit
+            is OmrDisplay.Recognized -> PagePreview(display.preview, isLoading = false, failed = false, label = strings.omrPreviewLabel)
+            OmrDisplay.Failed -> Text(strings.omrFailed, color = MaterialTheme.colorScheme.error)
+            is OmrDisplay.Recognizing -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
                 Text(strings.omrRecognizing, style = MaterialTheme.typography.bodyMedium)
-                val running = omr as? OmrState.Running
-                if (running != null && running.input == draft.omrInput) {
-                    LinearProgressIndicator(progress = { running.progress }, modifier = Modifier.fillMaxWidth())
+                val progress = display.progress
+                if (progress != null) {
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                 } else {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
