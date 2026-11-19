@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
 
-private const val SCAN_RESOLUTION = 2000f
+const val SCAN_PAGE_WIDTH = 2000f
 private const val WINDOW_FRACTION = 1f / 16
 private const val BLACK: Byte = 0
 private const val WHITE: Byte = -1
@@ -92,9 +92,9 @@ private fun eraserPaint(width: Float) = Paint().apply {
 
 suspend fun PageSource.scanPages(): List<ScanPage> = pageSizes.indices.map { scanPage(it) }
 
-private suspend fun PageSource.scanPage(page: Int): ScanPage = withContext(Dispatchers.Default) {
+suspend fun PageSource.scanPage(page: Int): ScanPage = withContext(Dispatchers.Default) {
     val size = pageSizes[page]
-    val target = scanSize(size, SCAN_RESOLUTION / size.width)
+    val target = scanSize(size, SCAN_PAGE_WIDTH / size.width)
     val pixels = IntArray(target.width * target.height).also { render(page, Rect(Offset.Zero, size), target).readPixels(it) }
     ScanPage(target.width, target.height, ByteArray(pixels.size) { pixels[it].luminanceOnWhite().toByte() }).dewarped()
 }

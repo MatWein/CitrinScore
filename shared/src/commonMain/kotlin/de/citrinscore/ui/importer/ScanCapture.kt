@@ -3,10 +3,7 @@ package de.citrinscore.ui.importer
 import androidx.compose.runtime.Composable
 import io.github.vinceglb.filekit.PlatformFile
 
-expect val scanUsesCamera: Boolean
-
 @Composable
-expect fun isScanAvailable(): Boolean
+expect fun rememberCameraLauncher(onCaptured: (PlatformFile) -> Unit): (() -> Unit)?
 
-@Composable
-expect fun rememberScanLauncher(onCaptured: (List<PlatformFile>) -> Unit): () -> Unit
+expect val importPickerExtensions: List<String>?

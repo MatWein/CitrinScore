@@ -75,6 +75,12 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         }
     }
 
+    fun export(score: PlatformFile, target: PlatformFile) {
+        viewModelScope.launch {
+            attempt { repository.exportScore(score, target) } ?: report(LibraryError.Export)
+        }
+    }
+
     fun dismissError() = _state.update { it.copy(error = null) }
 
     fun reload() {

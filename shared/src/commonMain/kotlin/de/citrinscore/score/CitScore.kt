@@ -12,7 +12,7 @@ object CitScore {
     const val RECOGNITION_MUSICXML_FILE = "recognition.musicxml"
     const val RECOGNITION_LAYOUT_FILE = "recognition.json"
     const val PAGES_DIRECTORY = "pages"
-    const val PDF_FILE = "score.pdf"
+    const val SOURCES_DIRECTORY = "sources"
     const val PARTS_DIRECTORY = "parts"
     const val MUSICXML_FILE_NAME = "score"
     const val COMPRESSED_MUSICXML_EXTENSION = "mxl"
@@ -20,7 +20,6 @@ object CitScore {
     const val SCAN_EXTENSION = "png"
     const val RECORDING_EXTENSION = "wav"
     val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")
-    val ROOT_PART_ENTRIES = listOf(PAGES_DIRECTORY, PDF_FILE, ANNOTATIONS_FILE, RECOGNITION_MUSICXML_FILE, RECOGNITION_LAYOUT_FILE)
     const val THUMBNAIL_WIDTH = 600
     const val PAGE_ASPECT_RATIO = 210f / 297f
 
@@ -37,6 +36,4 @@ object CitScore {
     fun resolvePath(directory: String, relativePath: String) = listOf(directory, relativePath).filter { it.isNotEmpty() }.joinToString("/")
 
     fun partDirectory(id: String) = "$PARTS_DIRECTORY/$id"
-
-    fun pageFileName(index: Int, extension: String) = "${(index + 1).toString().padStart(3, '0')}.${extension.lowercase()}"
 }

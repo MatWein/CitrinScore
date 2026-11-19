@@ -89,13 +89,13 @@ A score holds one or more parts, each in its own directory:
 
 ```
 Etude.citscore/
-├── manifest.json            metadata and the parts with their page lists, crop boxes, staff system positions and attachments
+├── manifest.json            metadata and the parts with their pages (source, crop, cleanup settings), staff system positions and attachments
 ├── device.json              last opened time, selected part and view state of this device, not synchronized
 ├── thumbnail.jpg            preview of the first part used by the library
 └── parts/<id>/
     ├── annotations.json     drawings and text notes, in page coordinates or anchored to measures for MusicXML
-    ├── pages/001.png        original images (image and scan imports)
-    ├── score.pdf            original document (PDF imports)
+    ├── sources/<id>.<ext>   imported images, photos and PDFs, unchanged
+    ├── pages/<id>.png       cleaned up (straightened, black and white) pages, if enabled for a page
     ├── score.musicxml       original file (MusicXML imports, also .xml or .mxl)
     ├── recognition.musicxml notes recognized with OMR, which make an image or PDF part playable
     ├── recognition.json     position of every recognized note and measure on the pages, in cropped page coordinates
@@ -103,8 +103,8 @@ Etude.citscore/
     └── files/               other attached files
 ```
 
-Scores created before parts existed keep their single part directly in the score directory. Unknown keys in
-`manifest.json` are ignored, missing optional values are recomputed when a score is opened.
+Every page refers to its source file and page number, so a page can be cropped or cleaned up again from the original
+at any time. Unknown keys in `manifest.json` are ignored.
 
 ## Library location and synchronization
 

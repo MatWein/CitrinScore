@@ -3,22 +3,26 @@ package de.citrinscore.ui.importer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
+import de.citrinscore.library.NewNormalization
+import de.citrinscore.library.NewPage
 import de.citrinscore.library.NewPart
+import de.citrinscore.library.PageOrigin
 import de.citrinscore.library.PartSource
+import de.citrinscore.score.CitScore
 import de.citrinscore.score.PageCrop
-import de.citrinscore.score.scan.EraserStroke
-import de.citrinscore.score.render.BitmapPageSource
-import de.citrinscore.score.render.PageSource
-import de.citrinscore.score.render.contentCrop
-import de.citrinscore.score.render.openImageSource
-import de.citrinscore.score.render.openMusicXmlSource
-import de.citrinscore.score.render.openPageSource
-import de.citrinscore.score.render.openPdfSource
-import de.citrinscore.score.render.scanSize
+import de.citrinscore.score.ScoreContent
+import de.citrinscore.score.ScorePart
 import de.citrinscore.score.omr.RecognitionPage
+import de.citrinscore.score.render.BitmapPageSource
+import de.citrinscore.score.render.contentCrop
+import de.citrinscore.score.render.openPageSource
+import de.citrinscore.score.render.scanSize
+import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
+import de.citrinscore.score.scan.EraserStroke
+import de.citrinscore.score.scan.SCAN_PAGE_WIDTH
 import de.citrinscore.score.scan.ScanPage
-import de.citrinscore.score.scan.scanPages
-import de.citrinscore.ui.pages.previewPage
+import de.citrinscore.score.scan.scanPage
+import de.citrinscore.ui.pages.PreviewPage
 import de.citrinscore.ui.pages.previewSize
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.ImageFormat
@@ -46,14 +50,14 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     private val _draft = MutableStateFlow(PartDraft())
     val draft: StateFlow<PartDraft> = _draft.asStateFlow()
 
-    private val scans = mutableMapOf<String, List<ScanPage>>()
+    private val scanPages = mutableMapOf<String, ScanPage>()
     private var thresholdJob: Job? = null
 
     init {
         scope.launchMusicRecognition(
             requests = _draft.map { draft -> draft.takeIf { it.isOmrRequested && it.isPreviewReady }?.omrInput },
             current = { _draft.value.omr },
-            pages = { omrPages(_draft.value) },
+            pages = { recognitionPages(_draft.value) },
             publish = { input, state -> _draft.update { draft -> if (draft.isOmrRequested && draft.omrInput == input) draft.copy(omr = state) else draft } },
         )
     }
@@ -61,165 +65,181 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     fun edit(draft: PartDraft) {
         thresholdJob?.cancel()
         _draft.value = draft
+        draft.pages.filter { it.view == null && !it.failed }.forEach { loadPage(draft.key, it.key) }
+    }
+
+    fun load(root: PlatformFile, part: ScorePart, loadRecognition: suspend () -> List<PreviewPage>?) {
+        val draft = when (val content = part.content) {
+            is ScoreContent.MusicXml -> PartDraft(name = part.name, musicXml = DraftMusicXml(CitScore.resolve(root, content.path), stored = true))
+            is ScoreContent.Pages -> PartDraft(
+                name = part.name,
+                pages = content.pages.mapIndexed { index, page ->
+                    DraftPage(
+                        file = CitScore.resolve(root, page.source),
+                        page = page.page,
+                        pageCount = content.pages.count { it.source == page.source },
+                        normalize = page.normalization != null,
+                        storedPath = page.source,
+                        previousIndex = index,
+                        crop = page.crop,
+                        erased = page.normalization?.erased.orEmpty(),
+                    )
+                },
+                threshold = content.pages.firstNotNullOfOrNull { it.normalization?.threshold } ?: DEFAULT_SCAN_THRESHOLD,
+                omrEnabled = part.recognition != null,
+            )
+        }
+        val stored = draft.takeIf { part.recognition != null }?.let { StoredRecognition(it.omrInput) }
+        edit(draft.copy(storedRecognition = stored))
+        if (stored == null) return
+        scope.launch {
+            val preview = attempt { loadRecognition() } ?: return@launch
+            _draft.update { current -> if (current.key == draft.key) current.copy(storedRecognition = current.storedRecognition?.copy(preview = preview)) else current }
+        }
     }
 
     fun discard(draft: PartDraft) {
-        scans.keys.removeAll { it.startsWith(scanKeyPrefix(draft)) }
-    }
-
-    fun selectType(type: ImportType) {
-        val current = _draft.value
-        if (current.type == type) return
-        logger.info("Selecting import type {}", type)
-        discard(current)
-        _draft.value = current.copy(type = type, files = emptyList(), previews = emptyMap(), failedPreviews = emptySet(), scans = emptyMap(), erasedPages = emptyList(), omr = null)
+        draft.pages.forEach { scanPages.remove(it.key) }
     }
 
     fun updateName(name: String) = _draft.update { it.copy(name = name) }
 
-    fun enableOmr(enabled: Boolean) = _draft.update { draft ->
-        draft.copy(omrEnabled = enabled, omr = draft.omr as? OmrState.Done)
-    }
+    fun enableOmr(enabled: Boolean) = _draft.update { draft -> draft.copy(omrEnabled = enabled, omr = draft.omr as? OmrState.Done) }
 
-    fun addFiles(files: List<PlatformFile>) {
-        val current = _draft.value
-        val type = current.type ?: return
-        if (type.singleFile) {
-            val file = files.firstOrNull() ?: return
-            _draft.value = current.copy(files = listOf(file), previews = emptyMap(), failedPreviews = emptySet(), scans = emptyMap(), erasedPages = emptyList())
-            loadPreview(current.key, file, type)
+    fun addFiles(files: List<PlatformFile>, fromCamera: Boolean = false) {
+        val key = _draft.value.key
+        val musicXml = files.firstOrNull { SourceKind.of(it) == SourceKind.MusicXml }
+        if (musicXml != null) {
+            logger.info("Using MusicXML {}", musicXml.path)
+            discard(_draft.value)
+            _draft.update { it.copy(pages = emptyList(), musicXml = DraftMusicXml(musicXml), erasedPages = emptyList(), omr = null) }
             return
         }
-        val known = current.files.map { it.path }.toSet()
-        val added = files.distinctBy { it.path }.filter { it.path !in known }
-        _draft.value = current.copy(files = current.files + added)
-        added.forEach { loadPreview(current.key, it, type) }
+        scope.launch {
+            files.filter { SourceKind.of(it) != null }.forEach { file ->
+                logger.info("Adding pages of {}", file.path)
+                val count = attempt { openPageSource(file).use { it.pageSizes.size } }
+                val added = if (count == null) {
+                    listOf(DraftPage(file, 0, 1, fromCamera, failed = true))
+                } else {
+                    List(count) { page -> DraftPage(file, page, count, fromCamera) }
+                }
+                _draft.update { draft -> if (draft.key == key) draft.copy(pages = draft.pages + added, musicXml = null) else draft }
+                added.filterNot { it.failed }.forEach { loadPage(key, it.key) }
+            }
+        }
     }
 
-    fun moveFile(from: Int, to: Int) = _draft.update { draft ->
-        draft.copy(files = draft.files.toMutableList().apply { add(to, removeAt(from)) })
+    fun movePage(from: Int, to: Int) = _draft.update { draft -> draft.copy(pages = draft.pages.toMutableList().apply { add(to, removeAt(from)) }) }
+
+    fun removePage(index: Int) = _draft.update { draft ->
+        val page = draft.pages[index]
+        scanPages.remove(page.key)
+        draft.copy(pages = draft.pages.filterIndexed { i, _ -> i != index }, erasedPages = draft.erasedPages.filterNot { it == page.key })
     }
 
-    fun removeFile(index: Int) {
-        val current = _draft.value
-        val path = current.files[index].path
-        _draft.value = current.copy(
-            files = current.files.filterIndexed { i, _ -> i != index },
-            previews = current.previews - path,
-            failedPreviews = current.failedPreviews - path,
-            scans = current.scans - path,
-            erasedPages = current.erasedPages.filterNot { it.path == path },
-        )
+    fun removeMusicXml() = _draft.update { it.copy(musicXml = null) }
+
+    fun setNormalize(key: String, normalize: Boolean) {
+        val draft = _draft.value
+        val page = draft.pages.firstOrNull { it.key == key }?.takeIf { it.normalize != normalize } ?: return
+        val factor = page.sourceSize?.let { SCAN_PAGE_WIDTH / it.width } ?: 1f
+        val crop = page.crop?.let { if (normalize) it.scaled(factor) else it.scaled(1 / factor) }
+        _draft.update { current ->
+            current.withPage(key) { it.copy(normalize = normalize, crop = crop, erased = emptyList(), image = null, size = null) }
+                .copy(erasedPages = current.erasedPages.filterNot { it == key })
+        }
+        loadPage(draft.key, key)
     }
 
-    fun cropScan(page: ScanPageRef, crop: PageCrop) = _draft.update { draft -> draft.withScan(page) { it.copy(crop = crop) } }
+    fun cropPage(key: String, crop: PageCrop) = _draft.update { draft -> draft.withPage(key) { it.copy(crop = crop) } }
 
-    fun eraseScan(page: ScanPageRef, stroke: EraserStroke) = _draft.update { draft ->
-        draft.withScan(page) { it.copy(erased = it.erased + stroke) }.copy(erasedPages = draft.erasedPages + page)
+    fun erasePage(key: String, stroke: EraserStroke) = _draft.update { draft ->
+        draft.withPage(key) { it.copy(erased = it.erased + stroke) }.copy(erasedPages = draft.erasedPages + key)
     }
 
     fun undoErase() = _draft.update { draft ->
-        val page = draft.erasedPages.lastOrNull() ?: return@update draft
-        draft.withScan(page) { it.copy(erased = it.erased.dropLast(1)) }.copy(erasedPages = draft.erasedPages.dropLast(1))
+        val key = draft.erasedPages.lastOrNull() ?: return@update draft
+        draft.withPage(key) { it.copy(erased = it.erased.dropLast(1)) }.copy(erasedPages = draft.erasedPages.dropLast(1))
     }
 
-    fun updateScanThreshold(threshold: Float) {
+    fun updateThreshold(threshold: Float) {
         val key = _draft.value.key
-        _draft.update { it.copy(scanThreshold = threshold) }
+        _draft.update { it.copy(threshold = threshold) }
         thresholdJob?.cancel()
         thresholdJob = scope.launch {
             delay(THRESHOLD_DELAY_MILLIS)
-            _draft.value.files.forEach { file ->
-                val pages = scans[scanKey(key, file.path)] ?: return@forEach
-                val images = attempt { pages.map { it.previewImage(it.binarized(threshold)) } } ?: return@forEach
-                _draft.update { draft ->
-                    val current = draft.scans[file.path]
-                    if (draft.key != key || current == null) {
-                        draft
+            _draft.value.pages.filter { it.normalize }.forEach { page ->
+                val scan = scanPages[page.key] ?: return@forEach
+                val image = attempt { previewImage(scan.binarized(threshold), scan) } ?: return@forEach
+                _draft.update { draft -> if (draft.key == key) draft.withPage(page.key) { it.copy(image = image) } else draft }
+            }
+        }
+    }
+
+    suspend fun newPart(draft: PartDraft) = NewPart(draft.name.trim(), checkNotNull(source(draft)), draft.recognized?.music)
+
+    suspend fun source(draft: PartDraft): PartSource? {
+        val musicXml = draft.musicXml
+        if (musicXml != null) return PartSource.MusicXml(musicXml.file).takeUnless { musicXml.stored }
+        return PartSource.Pages(draft.pages.map { page -> newPage(draft, page) })
+    }
+
+    private suspend fun newPage(draft: PartDraft, page: DraftPage): NewPage {
+        val origin = page.storedPath?.let(PageOrigin::Stored) ?: PageOrigin.File(page.file)
+        val normalization = if (page.normalize) {
+            val image = scanPages.getValue(page.key).binarized(draft.threshold, page.erased)
+            NewNormalization(withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) }, draft.threshold, page.erased)
+        } else {
+            null
+        }
+        return NewPage(origin, page.page, checkNotNull(page.crop), normalization, page.previousIndex)
+    }
+
+    private suspend fun recognitionPages(draft: PartDraft): List<RecognitionPage> = draft.pages.map { page ->
+        val crop = checkNotNull(page.crop)
+        if (page.normalize) {
+            val image = scanPages.getValue(page.key).grayscale(page.erased)
+            RecognitionPage(withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, crop.rect, scanSize(crop.size, 1f)) } }, 1f)
+        } else {
+            openPageSource(page.file).use { it.recognitionPage(page.page, crop.rect) }
+        }
+    }
+
+    private fun loadPage(draftKey: String, pageKey: String) {
+        val page = _draft.value.pages.firstOrNull { it.key == pageKey } ?: return
+        scope.launch {
+            val loaded = attempt {
+                openPageSource(page.file).use { source ->
+                    val sourceSize = source.pageSizes[page.page]
+                    if (page.normalize) {
+                        val scan = scanPages[page.key] ?: source.scanPage(page.page).also { scanPages[page.key] = it }
+                        val binarized = scan.binarized(_draft.value.threshold)
+                        val crop = page.crop ?: BitmapPageSource(binarized).use { it.contentCrop(0) }
+                        page.copy(sourceSize = sourceSize, image = previewImage(binarized, scan), size = scan.size, crop = crop)
                     } else {
-                        draft.copy(scans = draft.scans + (file.path to current.zip(images) { scan, image -> scan.copy(image = image) }))
+                        val crop = page.crop ?: source.contentCrop(page.page)
+                        val image = withContext(Dispatchers.Default) {
+                            source.render(page.page, Rect(Offset.Zero, sourceSize), previewSize(sourceSize.width, sourceSize.height))
+                        }
+                        page.copy(sourceSize = sourceSize, image = image, size = sourceSize, crop = crop)
                     }
+                }
+            }
+            _draft.update { draft ->
+                val current = draft.pages.firstOrNull { it.key == pageKey }
+                when {
+                    draft.key != draftKey || current == null || current.normalize != page.normalize -> draft
+                    loaded == null -> draft.withPage(pageKey) { it.copy(failed = true) }
+                    else -> draft.withPage(pageKey) { it.copy(sourceSize = loaded.sourceSize, image = loaded.image, size = loaded.size, crop = it.crop ?: loaded.crop) }
                 }
             }
         }
     }
 
-    suspend fun newPart(draft: PartDraft) = NewPart(draft.name.trim(), source(draft), draft.recognized?.music)
-
-    private suspend fun omrPages(draft: PartDraft): List<RecognitionPage> = when (draft.type) {
-        ImportType.Scan -> draft.scanPages.map { (page, scan) ->
-            val scanPage = scans.getValue(scanKey(draft.key, page.path))[page.index]
-            val crop = BitmapPageSource(scanPage.binarized(draft.scanThreshold, scan.erased)).use { it.contentCrop(0, within = scan.crop) }
-            val image = scanPage.grayscale(scan.erased)
-            RecognitionPage(withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, crop.rect, scanSize(crop.size, 1f)) } }, 1f)
-        }
-        ImportType.Images, ImportType.Pdf -> draft.files.flatMap { file ->
-            draft.type.open(file).use { source ->
-                draft.previews.getValue(file.path).mapIndexed { page, preview -> source.recognitionPage(page, preview.crop.rect) }
-            }
-        }
-        ImportType.MusicXml, null -> error("Music recognition is not supported for ${draft.type}")
+    private suspend fun previewImage(image: ImageBitmap, scan: ScanPage) = withContext(Dispatchers.Default) {
+        BitmapPageSource(image).use { it.render(0, Rect(Offset.Zero, scan.size), previewSize(scan.size.width, scan.size.height)) }
     }
 
-    suspend fun source(draft: PartDraft): PartSource {
-        val crops = draft.pages.map { it.crop }
-        return when (draft.type) {
-            ImportType.Images -> PartSource.Images(draft.files, crops)
-            ImportType.Pdf -> PartSource.Pdf(draft.files.single(), crops)
-            ImportType.Scan -> scanSource(draft)
-            ImportType.MusicXml -> PartSource.MusicXml(draft.files.single())
-            null -> error("No import type selected")
-        }
-    }
-
-    private suspend fun scanSource(draft: PartDraft): PartSource {
-        val (images, crops) = draft.scanPages.map { (page, scan) ->
-            val image = scans.getValue(scanKey(draft.key, page.path))[page.index].binarized(draft.scanThreshold, scan.erased)
-            val crop = BitmapPageSource(image).use { it.contentCrop(0, within = scan.crop) }
-            withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) } to crop
-        }.unzip()
-        return PartSource.Scans(images, crops)
-    }
-
-    private fun loadPreview(key: String, file: PlatformFile, type: ImportType) {
-        logger.info("Loading {} preview of {}", type, file.path)
-        scope.launch {
-            if (type == ImportType.Scan) {
-                val scanned = attempt { type.open(file).use { it.scanPages() }.also { scans[scanKey(key, file.path)] = it }.map { it.scanPreview() } }
-                publishPreview(key, file, scanned?.let { pages -> { copy(scans = scans + (file.path to pages)) } })
-            } else {
-                val pages = attempt { type.open(file).use { source -> source.pageSizes.indices.map { page -> source.previewPage(page) } } }
-                publishPreview(key, file, pages?.let { loaded -> { copy(previews = previews + (file.path to loaded)) } })
-            }
-        }
-    }
-
-    private fun publishPreview(key: String, file: PlatformFile, loaded: (PartDraft.() -> PartDraft)?) = _draft.update { draft ->
-        when {
-            draft.key != key || draft.files.none { it.path == file.path } -> draft
-            loaded == null -> draft.copy(failedPreviews = draft.failedPreviews + file.path)
-            else -> draft.loaded()
-        }
-    }
-
-    private suspend fun ScanPage.scanPreview(): ScanPreview {
-        val image = binarized(_draft.value.scanThreshold)
-        val crop = BitmapPageSource(image).use { it.contentCrop(0) }
-        return ScanPreview(previewImage(image), size, crop)
-    }
-
-    private suspend fun ScanPage.previewImage(image: ImageBitmap) = withContext(Dispatchers.Default) {
-        BitmapPageSource(image).use { it.render(0, Rect(Offset.Zero, size), previewSize(size.width, size.height)) }
-    }
-
-    private suspend fun ImportType.open(file: PlatformFile): PageSource = when (this) {
-        ImportType.Images -> openImageSource(file)
-        ImportType.Scan -> openPageSource(file)
-        ImportType.Pdf -> openPdfSource(file)
-        ImportType.MusicXml -> openMusicXmlSource(file)
-    }
-
-    private fun scanKeyPrefix(draft: PartDraft) = "${draft.key}/"
-
-    private fun scanKey(draftKey: String, path: String) = "$draftKey/$path"
+    private fun PageCrop.scaled(factor: Float) = PageCrop(left * factor, top * factor, right * factor, bottom * factor)
 }

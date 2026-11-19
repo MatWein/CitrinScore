@@ -42,14 +42,14 @@ private const val SCRIM_ALPHA = 0.45f
 private const val MIN_CROP_FRACTION = 0.05f
 
 @Composable
-fun ScanPageEditor(
-    scan: ScanPreview,
-    tool: ScanTool,
+fun PageEditor(
+    page: PageView,
+    tool: PageTool,
     eraserWidth: Float,
     onCrop: (PageCrop) -> Unit,
     onErase: (EraserStroke) -> Unit,
 ) {
-    val currentScan by rememberUpdatedState(scan)
+    val currentPage by rememberUpdatedState(page)
     val currentOnCrop by rememberUpdatedState(onCrop)
     val currentOnErase by rememberUpdatedState(onErase)
     var stroke by remember { mutableStateOf<EraserStroke?>(null) }
@@ -57,24 +57,24 @@ fun ScanPageEditor(
     Canvas(
         Modifier
             .fillMaxWidth()
-            .aspectRatio(scan.size.width / scan.size.height)
+            .aspectRatio(page.size.width / page.size.height)
             .pointerInput(tool, eraserWidth) {
                 when (tool) {
-                    ScanTool.Crop -> dragCrop({ currentScan }, HandleTouchRadius.toPx()) { currentOnCrop(it) }
-                    ScanTool.Eraser -> erase({ currentScan }, eraserWidth, onStroke = { stroke = it }) { currentOnErase(it) }
+                    PageTool.Crop -> dragCrop({ currentPage }, HandleTouchRadius.toPx()) { currentOnCrop(it) }
+                    PageTool.Eraser -> erase({ currentPage }, eraserWidth, onStroke = { stroke = it }) { currentOnErase(it) }
                 }
             },
     ) {
-        val scale = size.width / scan.size.width
+        val scale = size.width / page.size.width
         drawImage(
-            scan.image,
+            page.image,
             dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
             filterQuality = FilterQuality.Medium,
         )
-        (scan.erased + listOfNotNull(stroke)).forEach { erased ->
+        (page.erased + listOfNotNull(stroke)).forEach { erased ->
             drawPath(erased.path(scale), Color.White, style = Stroke(erased.width * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
-        drawCrop(scan.crop.rect.scaled(scale), accent)
+        drawCrop(page.crop.rect.scaled(scale), accent)
     }
 }
 
@@ -90,9 +90,9 @@ private fun DrawScope.drawCrop(crop: Rect, accent: Color) {
         .forEach { drawCircle(accent, HandleRadius.toPx(), it) }
 }
 
-private suspend fun PointerInputScope.dragCrop(scan: () -> ScanPreview, touchRadius: Float, onCrop: (PageCrop) -> Unit) = awaitEachGesture {
+private suspend fun PointerInputScope.dragCrop(current: () -> PageView, touchRadius: Float, onCrop: (PageCrop) -> Unit) = awaitEachGesture {
     val down = awaitFirstDown()
-    val page = scan()
+    val page = current()
     val scale = size.width / page.size.width
     val handle = CropHandle.at(page.crop.rect.scaled(scale), down.position, touchRadius) ?: return@awaitEachGesture
     down.consume()
@@ -105,13 +105,13 @@ private suspend fun PointerInputScope.dragCrop(scan: () -> ScanPreview, touchRad
 }
 
 private suspend fun PointerInputScope.erase(
-    scan: () -> ScanPreview,
+    current: () -> PageView,
     eraserWidth: Float,
     onStroke: (EraserStroke?) -> Unit,
     onErase: (EraserStroke) -> Unit,
 ) = awaitEachGesture {
     val down = awaitFirstDown()
-    val page = scan()
+    val page = current()
     val scale = size.width / page.size.width
     val width = eraserWidth * page.size.width
     down.consume()

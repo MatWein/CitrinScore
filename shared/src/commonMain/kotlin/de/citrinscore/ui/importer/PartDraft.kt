@@ -1,71 +1,104 @@
 package de.citrinscore.ui.importer
 
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
 import de.citrinscore.i18n.Strings
+import de.citrinscore.library.RecognitionEdit
+import de.citrinscore.score.PageCrop
 import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
-import de.citrinscore.ui.parts.partSummary
+import de.citrinscore.score.scan.EraserStroke
 import de.citrinscore.ui.pages.PreviewPage
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.name
 import kotlin.uuid.Uuid
+
+data class DraftPage(
+    val file: PlatformFile,
+    val page: Int,
+    val pageCount: Int,
+    val normalize: Boolean,
+    val key: String = Uuid.random().toString(),
+    val storedPath: String? = null,
+    val previousIndex: Int? = null,
+    val crop: PageCrop? = null,
+    val erased: List<EraserStroke> = emptyList(),
+    val sourceSize: Size? = null,
+    val image: ImageBitmap? = null,
+    val size: Size? = null,
+    val failed: Boolean = false,
+) {
+    val view get() = if (image != null && size != null && crop != null) PageView(image, size, crop, erased) else null
+
+    val label get() = file.name
+}
+
+data class DraftMusicXml(val file: PlatformFile, val stored: Boolean = false)
+
+data class StoredRecognition(val input: OmrInput, val preview: List<PreviewPage>? = null)
 
 data class PartDraft(
     val key: String = Uuid.random().toString(),
     val name: String = "",
-    val type: ImportType? = null,
-    val files: List<PlatformFile> = emptyList(),
-    val previews: Map<String, List<PreviewPage>> = emptyMap(),
-    val failedPreviews: Set<String> = emptySet(),
-    val scanThreshold: Float = DEFAULT_SCAN_THRESHOLD,
-    val scans: Map<String, List<ScanPreview>> = emptyMap(),
-    val erasedPages: List<ScanPageRef> = emptyList(),
+    val pages: List<DraftPage> = emptyList(),
+    val musicXml: DraftMusicXml? = null,
+    val threshold: Float = DEFAULT_SCAN_THRESHOLD,
+    val erasedPages: List<String> = emptyList(),
     val omrEnabled: Boolean = false,
     val omr: OmrState? = null,
+    val storedRecognition: StoredRecognition? = null,
 ) {
-    val pages get() = files.flatMap { previews[it.path].orEmpty() }
+    val isLoadingPreview get() = pages.any { it.view == null && !it.failed }
 
-    val scanPages get() = files.flatMap { file -> scans[file.path].orEmpty().mapIndexed { index, scan -> ScanPageRef(file.path, index) to scan } }
+    val previewFailed get() = pages.any { it.failed }
 
-    val isLoadingPreview get() = files.any { it.path !in previews && it.path !in scans && it.path !in failedPreviews }
+    val isPreviewReady get() = pages.isNotEmpty() && !isLoadingPreview && !previewFailed
 
-    val previewFailed get() = files.any { it.path in failedPreviews }
+    val hasNormalizedPages get() = pages.any { it.normalize }
 
-    val isPreviewReady get() = files.isNotEmpty() && !isLoadingPreview && !previewFailed
+    val supportsOmr get() = musicXml == null && pages.isNotEmpty()
 
-    val supportsOmr get() = type?.supportsOmr == true
+    val omrInput get() = OmrInput(key, pages.map { OmrPageInput(it.key, it.normalize, it.crop, it.erased) })
 
-    val isOmrRequested get() = omrEnabled && supportsOmr
+    val keepsStoredRecognition get() = omrEnabled && storedRecognition?.input == omrInput
 
-    val omrInput get() = OmrInput(
-        key = key,
-        files = files.map { it.path },
-        crops = pages.map { it.crop },
-        scans = scanPages.map { (page, scan) -> OmrScan(page, scan.crop, scan.erased) },
-        scanThreshold = scanThreshold,
-    )
+    val isOmrRequested get() = omrEnabled && supportsOmr && !keepsStoredRecognition
 
     val recognized get() = (omr as? OmrState.Done)?.takeIf { isOmrRequested && it.input == omrInput }
 
     val isRecognizing get() = isRecognizing(isOmrRequested, omr, omrInput)
 
-    val omrDisplay get() = omrDisplay(isOmrRequested, isPreviewReady, omr, omrInput)
+    val isPlayable get() = keepsStoredRecognition || recognized != null
 
-    val isComplete get() = isPreviewReady && !isRecognizing
+    val omrDisplay: OmrDisplay
+        get() {
+            val stored = storedRecognition
+            if (keepsStoredRecognition && stored != null) return stored.preview?.let(OmrDisplay::Recognized) ?: OmrDisplay.Recognizing(null)
+            return omrDisplay(isOmrRequested, isPreviewReady, omr, omrInput)
+        }
 
-    val pageCount get() = when (type) {
-        ImportType.MusicXml -> null
-        ImportType.Scan -> scanPages.size
-        else -> pages.size
-    }
+    val isComplete get() = if (musicXml != null) pages.isEmpty() else isPreviewReady && !isRecognizing
 
-    fun withScan(page: ScanPageRef, transform: (ScanPreview) -> ScanPreview) = copy(
-        scans = scans + (page.path to scans.getValue(page.path).mapIndexed { index, scan -> if (index == page.index) transform(scan) else scan }),
-    )
+    val pageCount get() = if (musicXml != null) null else pages.size
+
+    val recognitionEdit: RecognitionEdit
+        get() {
+            val music = recognized?.music
+            return when {
+                music != null -> RecognitionEdit.Replace(music)
+                keepsStoredRecognition || storedRecognition == null -> RecognitionEdit.Unchanged
+                else -> RecognitionEdit.Remove
+            }
+        }
+
+    fun withPage(key: String, transform: (DraftPage) -> DraftPage) = copy(pages = pages.map { if (it.key == key) transform(it) else it })
 }
 
-fun PartDraft.summary(strings: Strings): String {
-    val summary = strings.partSummary(type?.title(strings).orEmpty(), pageCount)
-    return if (recognized == null) summary else "$summary · ${strings.omrPartSummary}"
+fun Strings.contentSummary(musicXml: Boolean, pages: Int?, playable: Boolean): String {
+    val summary = if (musicXml) musicXmlLabel else pageCount(pages ?: 0)
+    return if (playable) "$summary · $omrPartSummary" else summary
 }
+
+fun PartDraft.summary(strings: Strings) = strings.contentSummary(musicXml != null, pageCount, isPlayable)
 
 fun partNameTaken(name: String, otherNames: List<String>): Boolean {
     val trimmed = name.trim()

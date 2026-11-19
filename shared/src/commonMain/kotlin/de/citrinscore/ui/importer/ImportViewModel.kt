@@ -45,7 +45,7 @@ class ImportViewModel(
 
     fun addPart() {
         editor.edit(PartDraft())
-        _state.update { it.copy(step = ImportStep.Type, editingPart = null) }
+        _state.update { it.copy(step = ImportStep.Files, editingPart = null) }
     }
 
     fun editPart(index: Int) {
@@ -65,8 +65,7 @@ class ImportViewModel(
     fun back() = _state.update { state ->
         when (state.step) {
             ImportStep.Details -> state
-            ImportStep.Type -> state.copy(step = if (state.parts.isEmpty()) ImportStep.Details else ImportStep.Parts)
-            ImportStep.Files -> state.copy(step = if (state.editingPart == null) ImportStep.Type else ImportStep.Parts)
+            ImportStep.Files -> state.copy(step = if (state.parts.isEmpty()) ImportStep.Details else ImportStep.Parts)
             ImportStep.Parts -> state.copy(step = ImportStep.Details)
         }
     }
@@ -77,7 +76,6 @@ class ImportViewModel(
         if (!current.canAdvance(draft)) return
         when (current.step) {
             ImportStep.Details -> if (current.parts.isEmpty()) addPart() else _state.update { it.copy(step = ImportStep.Parts) }
-            ImportStep.Type -> _state.update { it.copy(step = ImportStep.Files) }
             ImportStep.Files -> _state.update { state ->
                 val parts = state.editingPart?.let { index -> state.parts.toMutableList().apply { set(index, draft) } } ?: (state.parts + draft)
                 state.copy(step = ImportStep.Parts, parts = parts, editingPart = null)

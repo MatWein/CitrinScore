@@ -24,9 +24,9 @@ import kotlinx.coroutines.withContext
 
 private const val OMR_DELAY_MILLIS = 500L
 
-data class OmrScan(val page: ScanPageRef, val crop: PageCrop, val erased: List<EraserStroke>)
+data class OmrPageInput(val key: String, val normalize: Boolean, val crop: PageCrop?, val erased: List<EraserStroke>)
 
-data class OmrInput(val key: String, val files: List<String>, val crops: List<PageCrop>, val scans: List<OmrScan>, val scanThreshold: Float)
+data class OmrInput(val key: String, val pages: List<OmrPageInput>)
 
 sealed interface OmrState {
     val input: Any

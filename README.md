@@ -20,7 +20,7 @@ your own device as plain files: no account, no cloud, no lock-in.
 
 ## Features
 
-- **Import** images, SVGs, PDFs and MusicXML, or scan pages with the camera. Margins are cropped automatically.
+- **Import** images, SVGs, PDFs and MusicXML, or take photos with the camera, all in one step. Margins are cropped automatically, photos are straightened and turned into clean black and white pages, and the originals are kept.
 - **Music recognition** – make images, scans and PDFs playable: the notes are recognized on your device with the models
   of [homr](https://github.com/liebharc/homr) and highlighted in the original pages during playback and play-along.
 - **Parts** – keep several parts per score, for example one per instrument.

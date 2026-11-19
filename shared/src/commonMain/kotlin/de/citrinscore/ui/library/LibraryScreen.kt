@@ -69,6 +69,7 @@ import de.citrinscore.resources.ic_check
 import de.citrinscore.resources.ic_close
 import de.citrinscore.resources.ic_create_new_folder
 import de.citrinscore.resources.ic_delete
+import de.citrinscore.resources.ic_download
 import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_folder
 import de.citrinscore.resources.ic_library_music
@@ -89,6 +90,8 @@ import de.citrinscore.ui.components.Tile
 import de.citrinscore.ui.components.VerticalScrollIndicator
 import de.citrinscore.ui.theme.Spacing
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.compose.rememberFileSaverLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.path
 import org.jetbrains.compose.resources.DrawableResource
@@ -99,6 +102,7 @@ private val TileMinWidth = 160.dp
 private val TilePadding = PaddingValues(Spacing.Medium)
 private val TileMenuSize = Spacing.Section
 private val WideToolbarWidth = 600.dp
+private const val ZIP_EXTENSION = "zip"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +121,12 @@ fun LibraryScreen(
     val strings = LocalStrings.current
     var showNewFolderDialog by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
+    var exporting by remember { mutableStateOf<PlatformFile?>(null) }
+    val exporter = rememberFileSaverLauncher(FileKitDialogSettings.createDefault()) { target ->
+        val score = exporting
+        exporting = null
+        if (target != null && score != null) viewModel.export(score, target)
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var query by rememberSaveable(state.currentFolder.path) { mutableStateOf<String?>(null) }
     var searchOpened by remember { mutableStateOf(false) }
@@ -134,6 +144,7 @@ fun LibraryScreen(
                     LibraryError.Load -> strings.folderLoadFailed
                     LibraryError.CreateFolder -> strings.createFolderFailed
                     LibraryError.Delete -> strings.deleteFailed
+                    LibraryError.Export -> strings.exportFailed
                     LibraryError.SaveSettings -> strings.settingsSaveFailed
                 },
             )
@@ -207,6 +218,10 @@ fun LibraryScreen(
                         onOpenFolder = viewModel::open,
                         onOpenScore = onOpenScore,
                         onEdit = onEditScore,
+                        onExport = { score ->
+                            exporting = score
+                            exporter.launch(suggestedName = score.name, defaultExtension = ZIP_EXTENSION)
+                        },
                         onDelete = { pendingDelete = it },
                         loadThumbnail = viewModel::thumbnail,
                     )
@@ -248,6 +263,7 @@ private fun LibraryGrid(
     onOpenFolder: (PlatformFile) -> Unit,
     onOpenScore: (PlatformFile) -> Unit,
     onEdit: (PlatformFile) -> Unit,
+    onExport: (PlatformFile) -> Unit,
     onDelete: (LibraryItem) -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
 ) {
@@ -278,6 +294,7 @@ private fun LibraryGrid(
                     item = item,
                     onClick = { onClick(item.file) },
                     onEdit = { onEdit(item.file) }.takeIf { item is LibraryItem.Score },
+                    onExport = { onExport(item.file) }.takeIf { item is LibraryItem.Score },
                     onDelete = { onDelete(item) },
                     loadThumbnail = loadThumbnail,
                 )
@@ -292,6 +309,7 @@ private fun LibraryTile(
     item: LibraryItem,
     onClick: () -> Unit,
     onEdit: (() -> Unit)?,
+    onExport: (() -> Unit)?,
     onDelete: () -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
 ) {
@@ -305,7 +323,7 @@ private fun LibraryTile(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(top = Spacing.ExtraSmall),
             )
-            TileMenu(onEdit, onDelete)
+            TileMenu(onEdit, onExport, onDelete)
         }
         Box(
             modifier = Modifier
@@ -400,7 +418,7 @@ private fun LibrarySort.label(strings: Strings) = when (this) {
 }
 
 @Composable
-private fun TileMenu(onEdit: (() -> Unit)?, onDelete: () -> Unit) {
+private fun TileMenu(onEdit: (() -> Unit)?, onExport: (() -> Unit)?, onDelete: () -> Unit) {
     val strings = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
     val item: @Composable (String, DrawableResource, () -> Unit) -> Unit = { label, icon, action ->
@@ -417,6 +435,7 @@ private fun TileMenu(onEdit: (() -> Unit)?, onDelete: () -> Unit) {
         IconAction(Res.drawable.ic_more_vert, strings.moreOptions, onClick = { expanded = true }, modifier = Modifier.size(TileMenuSize))
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             onEdit?.let { item(strings.edit, Res.drawable.ic_edit, it) }
+            onExport?.let { item(strings.export, Res.drawable.ic_download, it) }
             item(strings.delete, Res.drawable.ic_delete, onDelete)
         }
     }

@@ -82,6 +82,8 @@ interface Strings {
     fun deleteScoreText(name: String): String
     fun deleteFolderText(name: String): String
     val deleteFailed: String
+    val export: String
+    val exportFailed: String
     val createFolderFailed: String
     val folderLoadFailed: String
     val settingsSaveFailed: String
@@ -95,32 +97,13 @@ interface Strings {
     val nameReservedExtension: String
     val nameExists: String
 
-    val importTypeTitle: String
-    val importTypeSubtitle: String
-    val importTypeImages: String
-    val importTypeImagesText: String
-    val importTypePdf: String
-    val importTypePdfText: String
-    val importTypeScan: String
-    val importTypeMusicXml: String
-    val importTypeMusicXmlText: String
-    val importTypeScanCameraText: String
-    val importTypeScanFilesText: String
-    val noCameraAvailable: String
 
     val importFilesTitle: String
     val importFilesSubtitle: String
-    val addImages: String
-    val importPdfTitle: String
-    val importPdfSubtitle: String
-    val choosePdf: String
-    val importMusicXmlTitle: String
-    val importMusicXmlSubtitle: String
-    val chooseMusicXml: String
-    val importScanTitle: String
-    val importScanSubtitle: String
+    val addFiles: String
+    val normalizePage: String
+    val musicXmlLabel: String
     val takePhoto: String
-    val addScans: String
     val scanThreshold: String
     val scanCrop: String
     val scanEraser: String
@@ -145,11 +128,7 @@ interface Strings {
     val importAction: String
     val importFailed: String
     val edit: String
-    val editPagesTitle: String
-    val editPagesSubtitle: String
     val editDetailsTitle: String
-    val editPartTitle: String
-    val editPartSubtitle: String
     val editDetailsSubtitle: String
     val save: String
     fun pageNumber(number: Int): String

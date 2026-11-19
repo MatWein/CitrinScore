@@ -3,33 +3,29 @@ package de.citrinscore.library
 import de.citrinscore.score.Attachment
 import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
-import de.citrinscore.score.ImagePage
-import de.citrinscore.score.PageCrop
-import de.citrinscore.score.PdfPage
 import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.Recognition
 import de.citrinscore.score.RecognitionLayout
 import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.ScoreAnnotations
+import de.citrinscore.score.Normalization
 import de.citrinscore.score.ScoreContent
+import de.citrinscore.score.ScorePage
 import de.citrinscore.score.ScoreDeviceState
 import de.citrinscore.score.deviceState
 import de.citrinscore.score.shared
 import de.citrinscore.score.withDeviceState
 import de.citrinscore.score.ScoreManifest
-import de.citrinscore.score.ScoreManifestSerializer
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScorePart
 import de.citrinscore.score.ScoreThumbnail
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.isReflowable
 import de.citrinscore.score.render.ScoreRenderers
-import de.citrinscore.score.render.contentCrop
-import de.citrinscore.score.render.openImageSource
 import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.serialization.AppJson
+import de.citrinscore.util.zip
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.atomicMove
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
@@ -85,10 +81,10 @@ class LibraryRepository(
 
     suspend fun open(score: PlatformFile): ScoreManifest {
         logger.info("Opening score {}", score.path)
-        return updateManifest(score) { manifest -> manifest.withCrops(score).copy(lastOpenedAt = clock.now()) }
+        return updateManifest(score) { manifest -> manifest.copy(lastOpenedAt = clock.now()) }
     }
 
-    suspend fun load(score: PlatformFile): ScoreManifest = readManifest(score).withCrops(score)
+    suspend fun load(score: PlatformFile): ScoreManifest = readManifest(score)
 
     suspend fun importScore(folder: PlatformFile, metadata: ScoreMetadata, parts: List<NewPart>) {
         val score = folder / CitScore.directoryName(metadata.title)
@@ -111,7 +107,7 @@ class LibraryRepository(
         val parts = edits.map { edit ->
             when (edit) {
                 is PartEdit.Keep -> previous.part(edit.directory).let { part ->
-                    edit.pages?.let { pages -> editPages(score, part, pages) } ?: part
+                    edit.source?.let { source -> editContent(score, part, source) } ?: part
                 }.let { part -> editRecognition(PartRef(score, part.directory).root, part, edit.recognition) }.copy(name = edit.name)
                 is PartEdit.Add -> createPart(score, edit.part)
             }
@@ -121,7 +117,6 @@ class LibraryRepository(
         val removed = previous.parts.filterNot { it.directory in kept }
         updateManifest(score) { manifest ->
             manifest.copy(metadata = metadata, parts = parts, currentPart = manifest.currentPart?.takeIf { it in kept })
-                .withAttachmentsMovedOutOf(score, removed.map { it.directory })
         }
         removed.forEach { deletePart(score, it) }
         return if (metadata.title == previous.metadata.title) score else score.renameDirectory(folder, CitScore.directoryName(metadata.title))
@@ -185,6 +180,18 @@ class LibraryRepository(
         target write CitScore.resolve(score, attachment.path)
     }
 
+    suspend fun exportScore(score: PlatformFile, target: PlatformFile) {
+        logger.info("Exporting score {} to {}", score.path, target.path)
+        val deviceState = "${score.name}/${CitScore.DEVICE_STATE_FILE}"
+        val entries = withContext(Dispatchers.IO) { files(score, score.name).filterNot { it.first == deviceState } }
+        target.write(withContext(Dispatchers.Default) { zip(entries) })
+    }
+
+    private suspend fun files(directory: PlatformFile, prefix: String): List<Pair<String, ByteArray>> = directory.list().flatMap { child ->
+        val path = "$prefix/${child.name}"
+        if (child.isDirectory()) files(child, path) else listOf(path to child.readBytes())
+    }
+
     suspend fun thumbnail(score: PlatformFile): ByteArray? = read(score / CitScore.THUMBNAIL_FILE) { readBytes() }
 
     private suspend fun createPart(score: PlatformFile, part: NewPart): ScorePart {
@@ -192,7 +199,7 @@ class LibraryRepository(
         val root = CitScore.resolve(score, directory)
         try {
             root.createDirectories()
-            val content = writeContent(root, part.source)
+            val content = writeContent(root, part.source, previous = null)
             return ScorePart(
                 directory,
                 part.name,
@@ -206,79 +213,49 @@ class LibraryRepository(
         }
     }
 
-    private suspend fun writeContent(root: PlatformFile, source: PartSource): ScoreContent = when (source) {
-        is PartSource.Images -> writePages(root, source.files.map { it.extension }, source.crops) { index, target -> target write source.files[index] }
-        is PartSource.Scans -> writePages(root, source.images.map { CitScore.SCAN_EXTENSION }, source.crops) { index, target ->
-            target.write(source.images[index])
-        }
-        is PartSource.Pdf -> {
-            (root / CitScore.PDF_FILE) write source.file
-            ScoreContent.Pdf(CitScore.PDF_FILE, source.crops.mapIndexed(::PdfPage))
-        }
+    private suspend fun writeContent(root: PlatformFile, source: PartSource, previous: ScoreContent?): ScoreContent = when (source) {
+        is PartSource.Pages -> writePages(root, source.pages, previous as? ScoreContent.Pages)
         is PartSource.MusicXml -> {
             val name = "${CitScore.MUSICXML_FILE_NAME}.${source.file.extension.lowercase()}"
             (root / name) write source.file
+            (previous as? ScoreContent.MusicXml)?.takeIf { it.path != name }?.let { CitScore.resolve(root, it.path).delete(mustExist = false) }
             ScoreContent.MusicXml(name)
         }
     }
 
-    private suspend fun writePages(
-        root: PlatformFile,
-        extensions: List<String>,
-        crops: List<PageCrop>,
-        writePage: suspend (index: Int, target: PlatformFile) -> Unit,
-    ): ScoreContent {
-        val pages = root / CitScore.PAGES_DIRECTORY
-        pages.createDirectories()
-        val names = extensions.mapIndexed { index, extension -> CitScore.pageFileName(index, extension) }
-        names.forEachIndexed { index, name -> writePage(index, pages / name) }
-        return ScoreContent.Images(names.zip(crops) { name, crop -> ImagePage("${CitScore.PAGES_DIRECTORY}/$name", crop) })
+    private suspend fun writePages(root: PlatformFile, pages: List<NewPage>, previous: ScoreContent.Pages?): ScoreContent.Pages {
+        val copied = mutableMapOf<String, String>()
+        val written = pages.map { page ->
+            val source = when (val origin = page.origin) {
+                is PageOrigin.Stored -> origin.path
+                is PageOrigin.File -> copied.getOrPut(origin.file.path) { storeFile(root, CitScore.SOURCES_DIRECTORY, origin.file.extension) { it write origin.file } }
+            }
+            val normalization = page.normalization?.let { normalized ->
+                Normalization(storeFile(root, CitScore.PAGES_DIRECTORY, CitScore.SCAN_EXTENSION) { it.write(normalized.image) }, normalized.threshold, normalized.erased)
+            }
+            ScorePage(source, page.page, page.crop, normalization)
+        }
+        val referenced = written.flatMap { listOfNotNull(it.source, it.normalization?.image) }.toSet()
+        previous?.pages.orEmpty().flatMap { listOfNotNull(it.source, it.normalization?.image) }.filterNot { it in referenced }.distinct()
+            .forEach { CitScore.resolve(root, it).delete(mustExist = false) }
+        return ScoreContent.Pages(written)
     }
 
-    private suspend fun editPages(score: PlatformFile, part: ScorePart, pages: List<PageEdit>): ScorePart {
+    private suspend fun storeFile(root: PlatformFile, directory: String, extension: String, write: suspend (PlatformFile) -> Unit): String {
+        val path = "$directory/${Uuid.random()}.${extension.lowercase()}"
+        (root / directory).createDirectories()
+        write(CitScore.resolve(root, path))
+        return path
+    }
+
+    private suspend fun editContent(score: PlatformFile, part: ScorePart, source: PartSource): ScorePart {
         val ref = PartRef(score, part.directory)
-        val root = ref.root
-        val content = when (val current = part.content) {
-            is ScoreContent.Images -> ScoreContent.Images(
-                pages.map { page ->
-                    when (page) {
-                        is PageEdit.Keep -> current.pages[page.index]
-                        is PageEdit.Add -> addPage(root, page)
-                    }
-                },
-            )
-            is ScoreContent.Pdf -> ScoreContent.Pdf(
-                current.path,
-                pages.map { page ->
-                    require(page is PageEdit.Keep) { "Pages cannot be added to a PDF part" }
-                    current.pages[page.index]
-                },
-            )
-            is ScoreContent.MusicXml -> throw IllegalArgumentException("The pages of a MusicXML part cannot be edited")
+        val content = writeContent(ref.root, source, part.content)
+        if (source is PartSource.Pages && (ref.root / CitScore.ANNOTATIONS_FILE).exists()) {
+            val newIndexByOldIndex = source.pages.withIndex().mapNotNull { (index, page) -> page.previousIndex?.let { it to index } }.toMap()
+            saveAnnotations(ref, annotations(ref).remapPages(newIndexByOldIndex))
         }
-        if (content == part.content) return part
-        removedImages(part.content, content).forEach { CitScore.resolve(root, it.path).delete(mustExist = false) }
-        val newIndexByOldIndex = pages.withIndex().mapNotNull { (index, page) -> (page as? PageEdit.Keep)?.let { it.index to index } }.toMap()
-        if ((root / CitScore.ANNOTATIONS_FILE).exists()) saveAnnotations(ref, annotations(ref).remapPages(newIndexByOldIndex))
-        return part.copy(content = content, systemBreaks = systemBreaks(root, content), view = null)
-    }
-
-    private suspend fun ScoreManifest.withAttachmentsMovedOutOf(score: PlatformFile, directories: List<String>) =
-        AttachmentKind.entries.fold(this) { manifest, kind ->
-            manifest.withAttachments(
-                kind,
-                manifest.attachments(kind).map { attachment ->
-                    if (directories.any { attachment.path.startsWith("$it/") }) moveAttachment(score, kind, attachment) else attachment
-                },
-            )
-        }
-
-    private suspend fun moveAttachment(score: PlatformFile, kind: AttachmentKind, attachment: Attachment): Attachment {
-        val moved = attachment.copy(path = kind.path(attachment.path.substringAfterLast('/')))
-        logger.info("Moving attachment {} of {} to {}", attachment.path, score.path, moved.path)
-        (score / kind.directory).createDirectories()
-        CitScore.resolve(score, attachment.path).atomicMove(CitScore.resolve(score, moved.path))
-        return moved
+        return part.copy(content = content, systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(ref.root, it) }, view = null)
     }
 
     suspend fun recognition(part: PartRef, recognition: Recognition): RecognizedMusic? {
@@ -307,12 +284,7 @@ class LibraryRepository(
     }
 
     private suspend fun deletePart(score: PlatformFile, part: ScorePart) {
-        val root = PartRef(score, part.directory).root
-        if (part.directory.isEmpty()) {
-            CitScore.ROOT_PART_ENTRIES.forEach { (root / it).delete(mustExist = false, recursively = true) }
-        } else {
-            root.delete(mustExist = false, recursively = true)
-        }
+        PartRef(score, part.directory).root.delete(mustExist = false, recursively = true)
     }
 
     private suspend fun systemBreaks(root: PlatformFile, content: ScoreContent): List<List<Float>> =
@@ -323,29 +295,6 @@ class LibraryRepository(
             (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
         }
     }
-
-    private suspend fun addPage(root: PlatformFile, page: PageEdit.Add): ImagePage {
-        val path = "${CitScore.PAGES_DIRECTORY}/${Uuid.random()}.${page.image.extension.lowercase()}"
-        (root / CitScore.PAGES_DIRECTORY).createDirectories()
-        CitScore.resolve(root, path) write page.image
-        return ImagePage(path, page.crop)
-    }
-
-    private fun removedImages(previous: ScoreContent, current: ScoreContent): List<ImagePage> {
-        if (previous !is ScoreContent.Images || current !is ScoreContent.Images) return emptyList()
-        val kept = current.pages.map { it.path }.toSet()
-        return previous.pages.filterNot { it.path in kept }
-    }
-
-    private suspend fun ScoreManifest.withCrops(score: PlatformFile) =
-        copy(parts = parts.map { part -> part.copy(content = part.content.withCrops(PartRef(score, part.directory).root)) })
-
-    private suspend fun ScoreContent.withCrops(root: PlatformFile): ScoreContent = when (this) {
-        is ScoreContent.Images -> copy(pages = pages.map { page -> page.crop?.let { page } ?: page.copy(crop = imageCrop(CitScore.resolve(root, page.path))) })
-        is ScoreContent.Pdf, is ScoreContent.MusicXml -> this
-    }
-
-    private suspend fun imageCrop(image: PlatformFile) = openImageSource(image).use { it.contentCrop(0) }
 
     private suspend fun updatePart(part: PartRef, transform: (ScorePart) -> ScorePart) {
         updateManifest(part.score) { it.updatePart(part.directory, transform) }
@@ -364,7 +313,7 @@ class LibraryRepository(
     }
 
     private suspend fun manifest(score: PlatformFile): ScoreManifest? {
-        val manifest = read(score / CitScore.MANIFEST_FILE) { readString() }?.let { decode(ScoreManifestSerializer, it) } ?: return null
+        val manifest = read(score / CitScore.MANIFEST_FILE) { readString() }?.let { decode(ScoreManifest.serializer(), it) } ?: return null
         val state = read(score / CitScore.DEVICE_STATE_FILE) { readString() }?.let { decode(ScoreDeviceState.serializer(), it) }
         return state?.let(manifest::withDeviceState) ?: manifest
     }
@@ -387,15 +336,13 @@ class LibraryRepository(
 
     private val PartSource.description
         get() = when (this) {
-            is PartSource.Images -> "${files.size} images"
-            is PartSource.Scans -> "${images.size} scans"
-            is PartSource.Pdf -> "PDF ${file.path}"
+            is PartSource.Pages -> "${pages.size} pages"
             is PartSource.MusicXml -> "MusicXML ${file.path}"
         }
 
     private val PartEdit.description
         get() = when (this) {
-            is PartEdit.Keep -> "keep $directory" + pages?.let { " with ${it.size} pages" }.orEmpty() + " and recognition ${recognition::class.simpleName}"
+            is PartEdit.Keep -> "keep $directory" + source?.let { " with ${it.description}" }.orEmpty() + " and recognition ${recognition::class.simpleName}"
             is PartEdit.Add -> "add ${part.source.description}"
         }
 }

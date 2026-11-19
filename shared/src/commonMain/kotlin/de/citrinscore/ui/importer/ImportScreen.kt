@@ -50,7 +50,6 @@ fun ImportScreen(
                 onComposerChange = viewModel::updateComposer,
                 onDescriptionChange = viewModel::updateDescription,
             )
-            ImportStep.Type -> ImportTypeStep(draft.type, viewModel.editor::selectType)
             ImportStep.Files -> ImportFilesStep(draft, partNameTaken(draft.name, state.otherPartNames()), viewModel.editor)
             ImportStep.Parts -> PartsStep(
                 subtitle = strings.importPartsSubtitle,

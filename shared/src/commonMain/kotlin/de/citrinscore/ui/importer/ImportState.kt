@@ -2,7 +2,7 @@ package de.citrinscore.ui.importer
 
 import de.citrinscore.library.validateName
 
-enum class ImportStep { Details, Type, Files, Parts }
+enum class ImportStep { Details, Files, Parts }
 
 data class ImportState(
     val step: ImportStep = ImportStep.Details,
@@ -21,7 +21,6 @@ data class ImportState(
 
     fun canAdvance(draft: PartDraft) = when (step) {
         ImportStep.Details -> titleError == null
-        ImportStep.Type -> draft.type != null
         ImportStep.Files -> draft.isComplete && !partNameTaken(draft.name, otherPartNames())
         ImportStep.Parts -> !isSaving && parts.isNotEmpty()
     }

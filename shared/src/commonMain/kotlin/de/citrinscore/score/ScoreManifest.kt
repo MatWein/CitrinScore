@@ -4,18 +4,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonTransformingSerializer
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import de.citrinscore.score.playback.Instrument
+import de.citrinscore.score.scan.EraserStroke
 import kotlin.time.Instant
 
 @Serializable
@@ -96,88 +86,35 @@ data class PlaybackPreferences(val tempo: Float = 1f, val instrument: Instrument
 @Serializable
 sealed interface ScoreContent {
     @Serializable
-    @SerialName("images")
-    data class Images(val pages: List<@Serializable(with = ImagePageSerializer::class) ImagePage>) : ScoreContent
-
-    @Serializable
-    @SerialName("pdf")
-    data class Pdf(val path: String, @Serializable(with = PdfPagesSerializer::class) val pages: List<PdfPage>) : ScoreContent
+    @SerialName("pages")
+    data class Pages(val pages: List<ScorePage>) : ScoreContent
 
     @Serializable
     @SerialName("musicxml")
     data class MusicXml(val path: String) : ScoreContent
 }
 
+@Serializable
+data class ScorePage(val source: String, val page: Int = 0, val crop: PageCrop, val normalization: Normalization? = null) {
+    val shown get() = normalization?.image ?: source
+
+    val shownPage get() = if (normalization == null) page else 0
+}
+
+@Serializable
+data class Normalization(val image: String, val threshold: Float, val erased: List<EraserStroke> = emptyList())
+
 val ScoreContent.pageCount: Int?
     get() = when (this) {
-        is ScoreContent.Images -> pages.size
-        is ScoreContent.Pdf -> pages.size
+        is ScoreContent.Pages -> pages.size
         is ScoreContent.MusicXml -> null
     }
 
 val ScoreContent.isReflowable get() = this is ScoreContent.MusicXml
 
 @Serializable
-data class PdfPage(val index: Int, val crop: PageCrop)
-
-@Serializable
-data class ImagePage(val path: String, val crop: PageCrop? = null)
-
-@Serializable
 data class PageCrop(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val size get() = Size(right - left, bottom - top)
 
     val rect get() = Rect(left, top, right, bottom)
-}
-
-private object PdfPagesSerializer : JsonTransformingSerializer<List<PdfPage>>(ListSerializer(PdfPage.serializer())) {
-    override fun transformDeserialize(element: JsonElement): JsonElement = JsonArray(
-        element.jsonArray.mapIndexed { index, page ->
-            if (PdfPage::crop.name in page.jsonObject) {
-                page
-            } else {
-                buildJsonObject {
-                    put(PdfPage::index.name, index)
-                    put(PdfPage::crop.name, page)
-                }
-            }
-        },
-    )
-}
-
-private object ImagePageSerializer : JsonTransformingSerializer<ImagePage>(ImagePage.serializer()) {
-    override fun transformDeserialize(element: JsonElement): JsonElement =
-        if (element is JsonPrimitive) buildJsonObject { put("path", element) } else element
-}
-
-object ScoreManifestSerializer : JsonTransformingSerializer<ScoreManifest>(ScoreManifest.serializer()) {
-    private val singlePartKeys = listOf(ScorePart::content.name, ScorePart::view.name, ScorePart::systemBreaks.name)
-    private val attachmentKeys = listOf(ScoreManifest::audio.name, ScoreManifest::files.name)
-
-    override fun transformDeserialize(element: JsonElement): JsonElement {
-        val manifest = element.jsonObject
-        val parts = manifest[ScoreManifest::parts.name]?.jsonArray ?: return singlePart(manifest)
-        val lifted = attachmentKeys.associateWith { key ->
-            JsonArray(manifest[key]?.jsonArray.orEmpty() + parts.flatMap { part -> part.jsonObject.attachmentsInScore(key) })
-        }
-        val partsWithoutAttachments = JsonArray(parts.map { JsonObject(it.jsonObject - attachmentKeys.toSet()) })
-        return JsonObject(manifest + lifted + (ScoreManifest::parts.name to partsWithoutAttachments))
-    }
-
-    private fun singlePart(manifest: JsonObject): JsonObject {
-        val part = buildJsonObject {
-            put(ScorePart::directory.name, "")
-            put(ScorePart::name.name, "")
-            singlePartKeys.forEach { key -> manifest[key]?.let { put(key, it) } }
-        }
-        return JsonObject(manifest - singlePartKeys.toSet() + (ScoreManifest::parts.name to JsonArray(listOf(part))))
-    }
-
-    private fun JsonObject.attachmentsInScore(key: String): List<JsonElement> {
-        val directory = getValue(ScorePart::directory.name).jsonPrimitive.content
-        return this[key]?.jsonArray.orEmpty().map { attachment ->
-            val path = attachment.jsonObject.getValue(Attachment::path.name).jsonPrimitive.content
-            JsonObject(attachment.jsonObject + (Attachment::path.name to JsonPrimitive(CitScore.resolvePath(directory, path))))
-        }
-    }
 }
