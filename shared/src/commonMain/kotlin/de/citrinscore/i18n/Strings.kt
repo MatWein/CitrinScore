@@ -131,6 +131,11 @@ interface Strings {
 
     val previewLabel: String
     val previewFailed: String
+    val omrCreatePart: String
+    val omrPreviewLabel: String
+    val omrRecognizing: String
+    val omrFailed: String
+    val omrPartSummary: String
 
     val importMetadataTitle: String
     val importMetadataSubtitle: String

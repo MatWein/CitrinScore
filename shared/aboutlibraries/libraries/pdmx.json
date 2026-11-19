@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.zenodo:pdmx",
+  "name": "PDMX",
+  "description": "Public domain MusicXML dataset by Phillip Long, Zachary Novack, Taylor Berg-Kirkpatrick and Julian McAuley, part of the training data of the homr models.",
+  "website": "https://zenodo.org/records/15571083",
+  "developers": [
+    {
+      "name": "Phillip Long"
+    }
+  ],
+  "licenses": [
+    "CC-BY-4.0"
+  ]
+}

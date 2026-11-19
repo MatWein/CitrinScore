@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.github.liebharc:homr",
+  "name": "homr",
+  "description": "Optical music recognition. citrinScore contains a Kotlin port of its pipeline and its model weights.",
+  "website": "https://github.com/liebharc/homr",
+  "developers": [
+    {
+      "name": "Christian Liebhardt and contributors"
+    }
+  ],
+  "licenses": [
+    "AGPL-3.0-only"
+  ]
+}

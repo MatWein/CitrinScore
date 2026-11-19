@@ -18,6 +18,8 @@ Requirements:
   `sdk.dir` in `local.properties` or `ANDROID_HOME`).
 - CMake 3.24 or newer and a C++20 compiler to build Verovio and FluidSynth for the desktop.
 - The third party sources, checked out as git submodules: `git submodule update --init --recursive`.
+- Internet access for the first build: the `omr` module downloads the homr models (about 140 MB) from the
+  [homr releases](https://github.com/liebharc/homr/releases/tag/onnx_checkpoints) and bundles them into the app.
 - `dpkg-deb` and `rpmbuild` to package the desktop app on Linux, since jpackage builds both a `.deb` and an `.rpm`
   (on Arch Linux: `pacman -S dpkg rpm-tools`).
 
@@ -54,6 +56,7 @@ with their stack trace.
 | `androidApp` | Android entry point |
 | `verovio` | Android library that builds the native Verovio engraver with the NDK |
 | `fluidsynth` | Android library that builds the native FluidSynth synthesizer with the NDK |
+| `omr` | Optical music recognition for desktop and Android, a Kotlin port of [homr](https://github.com/liebharc/homr) including its MusicXML generation (AGPL-3.0) |
 | `desktopApp` | Desktop entry point and packaging |
 | `branding` | App icon source and the script that generates all platform icons |
 
@@ -70,7 +73,9 @@ The main building blocks are [Compose Multiplatform](https://www.jetbrains.com/c
 [FluidSynth](https://www.fluidsynth.org/) with the [GeneralUser GS](https://www.schristiancollins.com/generaluser) sound
 font for playback, [JGit](https://www.eclipse.org/jgit/) for synchronization, [Apache PDFBox](https://pdfbox.apache.org/)
 and [Apache Batik](https://xmlgraphics.apache.org/batik/) on desktop and [AndroidSVG](https://github.com/BigBadaboom/androidsvg)
-on Android.
+on Android. The music recognition runs the homr models with [ONNX Runtime](https://onnxruntime.ai/) and processes images
+with [OpenCV](https://opencv.org/). The telemetry provider that ONNX Runtime registers on Android is removed in
+[`omr/src/androidMain/AndroidManifest.xml`](omr/src/androidMain/AndroidManifest.xml).
 
 The licenses of all libraries are collected at build time with [AboutLibraries](https://github.com/mikepenz/AboutLibraries)
 and shown in the app. Native components that are not Maven dependencies are described in

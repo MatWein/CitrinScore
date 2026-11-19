@@ -21,6 +21,8 @@ your own device as plain files: no account, no cloud, no lock-in.
 ## Features
 
 - **Import** images, SVGs, PDFs and MusicXML, or scan pages with the camera. Margins are cropped automatically.
+- **Music recognition** – turn imported images, scans and PDFs into an additional MusicXML part that can be played
+  back. It runs on your device with the models of [homr](https://github.com/liebharc/homr).
 - **Parts** – keep several parts per score, for example one per instrument.
 - **Viewer** with smooth zooming, page turning by staff systems and support for keyboards and Bluetooth page turners.
 - **Notes** – draw and write on your scores with finger, stylus or mouse.
@@ -64,4 +66,6 @@ How to build the app, the score format and the release process are described in 
 ## License
 
 citrinScore is licensed under the [GNU General Public License v3.0](LICENSE). The libraries, fonts and the sound font it
-uses keep their own licenses, which are listed in the app under Settings → About.
+uses keep their own licenses, which are listed in the app under Settings → About. The music recognition in the `omr`
+module is a port of [homr](https://github.com/liebharc/homr) and, like homr and its model weights, licensed under the
+[GNU Affero General Public License v3.0](omr/LICENSE).

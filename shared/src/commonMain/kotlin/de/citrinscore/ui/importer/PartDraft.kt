@@ -1,6 +1,8 @@
 package de.citrinscore.ui.importer
 
+import de.citrinscore.i18n.Strings
 import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
+import de.citrinscore.ui.parts.partSummary
 import de.citrinscore.ui.pages.PreviewPage
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
@@ -16,6 +18,8 @@ data class PartDraft(
     val scanThreshold: Float = DEFAULT_SCAN_THRESHOLD,
     val scans: Map<String, List<ScanPreview>> = emptyMap(),
     val erasedPages: List<ScanPageRef> = emptyList(),
+    val omrEnabled: Boolean = false,
+    val omr: OmrState? = null,
 ) {
     val pages get() = files.flatMap { previews[it.path].orEmpty() }
 
@@ -25,7 +29,23 @@ data class PartDraft(
 
     val previewFailed get() = files.any { it.path in failedPreviews }
 
-    val isComplete get() = files.isNotEmpty() && !isLoadingPreview && !previewFailed
+    val isPreviewReady get() = files.isNotEmpty() && !isLoadingPreview && !previewFailed
+
+    val supportsOmr get() = type?.supportsOmr == true
+
+    val isOmrRequested get() = omrEnabled && supportsOmr
+
+    val omrInput get() = OmrInput(
+        files = files.map { it.path },
+        crops = pages.map { it.crop },
+        scans = scanPages.map { (page, scan) -> OmrScan(page, scan.crop, scan.erased) },
+    )
+
+    val recognized get() = (omr as? OmrState.Done)?.takeIf { isOmrRequested && it.input == omrInput }
+
+    val isRecognizing get() = isOmrRequested && omr.let { it == null || it is OmrState.Running || it.input != omrInput }
+
+    val isComplete get() = isPreviewReady && !isRecognizing
 
     val pageCount get() = when (type) {
         ImportType.MusicXml -> null
@@ -36,6 +56,11 @@ data class PartDraft(
     fun withScan(page: ScanPageRef, transform: (ScanPreview) -> ScanPreview) = copy(
         scans = scans + (page.path to scans.getValue(page.path).mapIndexed { index, scan -> if (index == page.index) transform(scan) else scan }),
     )
+}
+
+fun PartDraft.summary(strings: Strings): String {
+    val summary = strings.partSummary(type?.title(strings).orEmpty(), pageCount)
+    return if (recognized == null) summary else "$summary · ${strings.omrPartSummary}"
 }
 
 fun partNameTaken(name: String, otherNames: List<String>): Boolean {

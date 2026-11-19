@@ -106,6 +106,7 @@ kotlin {
             implementation("org.slf4j:slf4j-api:$slf4jVersion")
         }
         named("jvmAndroidMain").dependencies {
+            implementation(project(":omr"))
             compileOnly("net.java.dev.jna:jna:$jnaVersion")
             implementation("dev.atsushieno:ktmidi:$ktmidiVersion")
             implementation("org.eclipse.jgit:org.eclipse.jgit:$jgitVersion")
@@ -234,9 +235,9 @@ aboutLibraries {
     }
     license {
         strictMode = StrictMode.FAIL
-        allowedLicenses.addAll("Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "LGPL-2.1-or-later", "LGPL-3.0-or-later", "MIT", "OFL-1.1", "generaluser-gs", "6f2d5d14a0a0caf9830496e9db99e0d3")
+        allowedLicenses.addAll("AGPL-3.0-only", "Apache-2.0", "CC-BY-4.0", "CC0-1.0", "BSD-2-Clause", "BSD-3-Clause", "LGPL-2.1-or-later", "LGPL-3.0-or-later", "MIT", "OFL-1.1", "generaluser-gs", "6f2d5d14a0a0caf9830496e9db99e0d3")
         val logback = listOf("ch.qos.logback:logback-classic", "ch.qos.logback:logback-core")
-        allowedLicensesMap.putAll(mapOf("EPL-2.0" to logback, "LGPL-2.1-only" to logback))
+        allowedLicensesMap.putAll(mapOf("EPL-2.0" to logback, "LGPL-2.1-only" to logback, "BSD License" to listOf("org.openpnp:opencv")))
     }
 }
 

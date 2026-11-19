@@ -25,9 +25,11 @@ fun PagePreview(
     isLoading: Boolean,
     failed: Boolean,
     modifier: Modifier = Modifier,
+    label: String = LocalStrings.current.previewLabel,
+    failureMessage: String = LocalStrings.current.previewFailed,
     controls: @Composable () -> Unit = {},
 ) {
-    PreviewFrame(isLoading, failed, modifier, controls) {
+    PreviewFrame(isLoading, failed, modifier, label, failureMessage, controls) {
         val maxWidth = pages.maxOfOrNull { it.crop.size.width } ?: 1f
         pages.forEach { page ->
             Image(
@@ -45,12 +47,13 @@ fun PreviewFrame(
     isLoading: Boolean,
     failed: Boolean,
     modifier: Modifier = Modifier,
+    label: String = LocalStrings.current.previewLabel,
+    failureMessage: String = LocalStrings.current.previewFailed,
     controls: @Composable () -> Unit = {},
     pages: @Composable ColumnScope.() -> Unit,
 ) {
-    val strings = LocalStrings.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Large)) {
-        Text(strings.previewLabel, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         controls()
         Column(
             modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Color.White).padding(Spacing.ExtraSmall),
@@ -58,6 +61,6 @@ fun PreviewFrame(
             content = pages,
         )
         if (isLoading) CircularProgressIndicator()
-        if (failed) Text(strings.previewFailed, color = MaterialTheme.colorScheme.error)
+        if (failed) Text(failureMessage, color = MaterialTheme.colorScheme.error)
     }
 }

@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.praig:grandstaff",
+  "name": "GrandStaff",
+  "description": "Piano score dataset by the PRAIG group, University of Alicante, part of the training data of the homr models.",
+  "website": "https://huggingface.co/datasets/PRAIG/grandstaff",
+  "developers": [
+    {
+      "name": "PRAIG, University of Alicante"
+    }
+  ],
+  "licenses": [
+    "MIT"
+  ]
+}

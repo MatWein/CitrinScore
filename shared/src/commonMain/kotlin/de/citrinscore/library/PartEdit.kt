@@ -13,6 +13,8 @@ sealed interface PartSource {
     data class Pdf(val file: PlatformFile, val crops: List<PageCrop>) : PartSource
 
     data class MusicXml(val file: PlatformFile) : PartSource
+
+    data class RecognizedMusicXml(val content: String) : PartSource
 }
 
 sealed interface PartEdit {

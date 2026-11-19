@@ -211,6 +211,11 @@ class LibraryRepository(
             (root / name) write source.file
             ScoreContent.MusicXml(name)
         }
+        is PartSource.RecognizedMusicXml -> {
+            val name = "${CitScore.MUSICXML_FILE_NAME}.${CitScore.MUSICXML_EXTENSION}"
+            (root / name).write(source.content.encodeToByteArray())
+            ScoreContent.MusicXml(name)
+        }
     }
 
     private suspend fun writePages(
@@ -357,6 +362,7 @@ class LibraryRepository(
             is PartSource.Scans -> "${images.size} scans"
             is PartSource.Pdf -> "PDF ${file.path}"
             is PartSource.MusicXml -> "MusicXML ${file.path}"
+            is PartSource.RecognizedMusicXml -> "recognized MusicXML with ${content.length} characters"
         }
 
     private val PartEdit.description

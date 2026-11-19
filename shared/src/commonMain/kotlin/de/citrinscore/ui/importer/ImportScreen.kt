@@ -14,7 +14,6 @@ import de.citrinscore.ui.pages.ScoreDetailsStep
 import de.citrinscore.ui.parts.PartRowModel
 import de.citrinscore.ui.parts.PartsStep
 import de.citrinscore.ui.parts.partName
-import de.citrinscore.ui.parts.partSummary
 import de.citrinscore.ui.theme.ContentWidth
 import io.github.vinceglb.filekit.PlatformFile
 
@@ -67,4 +66,4 @@ fun ImportScreen(
 }
 
 private fun PartDraft.row(strings: Strings, index: Int) =
-    PartRowModel(strings.partName(name.trim(), index), strings.partSummary(type?.title(strings).orEmpty(), pageCount))
+    PartRowModel(strings.partName(name.trim(), index), summary(strings))

@@ -3,7 +3,6 @@ package de.citrinscore.ui.importer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
-import de.citrinscore.library.NewPart
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.util.attempt
 import de.citrinscore.util.logChanges
@@ -92,7 +91,7 @@ class ImportViewModel(
         viewModelScope.launch {
             val saved = attempt {
                 val metadata = ScoreMetadata(current.title.trim(), current.composer.trim(), current.description.trim())
-                val parts = current.parts.map { NewPart(it.name.trim(), editor.source(it)) }
+                val parts = current.parts.flatMap { editor.newParts(it) }
                 repository.importScore(folder, metadata, parts)
             }
             if (saved == null) _state.update { it.copy(isSaving = false, saveFailed = true) } else onImported()

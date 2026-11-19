@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.openpnp:opencv",
+  "name": "OpenCV",
+  "description": "Computer vision library, used for optical music recognition on the desktop.",
+  "website": "https://opencv.org",
+  "developers": [
+    {
+      "name": "OpenCV team"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ]
+}

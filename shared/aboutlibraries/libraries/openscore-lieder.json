@@ -1,0 +1,14 @@
+{
+  "uniqueId": "org.openscore:lieder",
+  "name": "OpenScore Lieder",
+  "description": "Corpus of art songs including the OpenScore String Quartets, part of the training data of the homr models.",
+  "website": "https://github.com/OpenScore/Lieder",
+  "developers": [
+    {
+      "name": "OpenScore"
+    }
+  ],
+  "licenses": [
+    "CC0-1.0"
+  ]
+}

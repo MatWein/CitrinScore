@@ -2,6 +2,7 @@ package de.citrinscore.ui.importer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,10 +34,15 @@ fun ImportFilesStep(draft: PartDraft, nameTaken: Boolean, editor: PartDraftEdito
         PagesLayout(
             list = { modifier -> FileList(draft, editor, modifier) },
             preview = { modifier ->
-                when {
-                    draft.files.isEmpty() -> Unit
-                    draft.type == ImportType.Scan -> ScanPreviewPanel(draft, editor, modifier)
-                    else -> PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, modifier)
+                if (draft.files.isNotEmpty()) {
+                    Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.Section)) {
+                        if (draft.type == ImportType.Scan) {
+                            ScanPreviewPanel(draft, editor, Modifier.fillMaxWidth())
+                        } else {
+                            PagePreview(draft.pages, draft.isLoadingPreview, draft.previewFailed, Modifier.fillMaxWidth())
+                        }
+                        if (draft.supportsOmr) OmrSection(draft, editor, Modifier.fillMaxWidth())
+                    }
                 }
             },
         )

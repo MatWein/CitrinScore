@@ -5,7 +5,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
-import de.citrinscore.library.NewPart
 import de.citrinscore.library.PageEdit
 import de.citrinscore.library.PartEdit
 import de.citrinscore.library.PartRef
@@ -207,15 +206,15 @@ class EditScoreViewModel(
         viewModelScope.launch {
             val saved = attempt {
                 val metadata = ScoreMetadata(current.title.trim(), current.composer.trim(), current.description.trim())
-                val edits = current.parts.map { part -> part.edit(current) }
+                val edits = current.parts.flatMap { part -> part.edits(current) }
                 repository.updateScore(folder, score, metadata, edits)
             }
             if (saved == null) _state.update { it.copy(isSaving = false, saveFailed = true) } else onSaved(saved)
         }
     }
 
-    private suspend fun EditablePart.edit(current: EditScoreState): PartEdit = when (this) {
-        is EditablePart.Existing -> PartEdit.Keep(
+    private suspend fun EditablePart.edits(current: EditScoreState): List<PartEdit> = when (this) {
+        is EditablePart.Existing -> listOf(PartEdit.Keep(
             directory = directory,
             name = name.trim(),
             pages = pages?.map { page ->
@@ -224,7 +223,7 @@ class EditScoreViewModel(
                     is EditablePage.Added -> PageEdit.Add(page.file, current.previews.getValue(previewKey(directory, page)).crop)
                 }
             },
-        )
-        is EditablePart.New -> PartEdit.Add(NewPart(draft.name.trim(), editor.source(draft)))
+        ))
+        is EditablePart.New -> editor.newParts(draft).map(PartEdit::Add)
     }
 }

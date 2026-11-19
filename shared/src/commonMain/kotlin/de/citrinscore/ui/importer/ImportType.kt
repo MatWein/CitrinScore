@@ -6,11 +6,11 @@ private val ImageExtensions = listOf("png", "jpg", "jpeg", "webp", "bmp", "svg")
 private val PdfExtensions = listOf("pdf")
 private val MusicXmlExtensions = listOf("musicxml", "xml", "mxl")
 
-enum class ImportType(val extensions: List<String>, val singleFile: Boolean = false) {
+enum class ImportType(val extensions: List<String>, val singleFile: Boolean = false, val supportsOmr: Boolean = true) {
     Images(ImageExtensions),
     Scan(ImageExtensions + PdfExtensions),
     Pdf(PdfExtensions, singleFile = true),
-    MusicXml(MusicXmlExtensions, singleFile = true),
+    MusicXml(MusicXmlExtensions, singleFile = true, supportsOmr = false),
 }
 
 expect val ImportType.pickerExtensions: List<String>?

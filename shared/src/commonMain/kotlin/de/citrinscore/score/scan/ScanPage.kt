@@ -36,6 +36,11 @@ class ScanPage(private val width: Int, private val height: Int, private val lumi
         if (erased.isEmpty()) image else image.erased(erased)
     }
 
+    suspend fun grayscale(erased: List<EraserStroke>): ImageBitmap = withContext(Dispatchers.Default) {
+        val image = grayscaleImageBitmap(width, height, luminance)
+        if (erased.isEmpty()) image else image.erased(erased)
+    }
+
     suspend fun dewarped(): ScanPage = withContext(Dispatchers.Default) {
         StaffDewarping(width, height, inkMask(DEFAULT_SCAN_THRESHOLD)).apply(luminance)?.let { ScanPage(width, height, it) } ?: this@ScanPage
     }

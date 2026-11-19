@@ -33,6 +33,7 @@ import de.citrinscore.ui.parts.PartNameField
 import de.citrinscore.ui.parts.PartRowModel
 import de.citrinscore.ui.parts.PartsStep
 import de.citrinscore.ui.parts.partName
+import de.citrinscore.ui.importer.summary
 import de.citrinscore.ui.parts.partSummary
 import de.citrinscore.ui.theme.ContentWidth
 import de.citrinscore.ui.theme.Spacing
@@ -104,7 +105,7 @@ fun EditScoreScreen(
 private fun EditablePart.row(strings: Strings, index: Int): PartRowModel {
     val summary = when (this) {
         is EditablePart.Existing -> strings.partSummary(type.title(strings), pages?.size ?: pageCount)
-        is EditablePart.New -> strings.partSummary(draft.type?.title(strings).orEmpty(), draft.pageCount)
+        is EditablePart.New -> draft.summary(strings)
     }
     return PartRowModel(strings.partName(name.trim(), index), summary)
 }
