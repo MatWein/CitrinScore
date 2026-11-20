@@ -87,6 +87,38 @@ class ScanPageTest {
     }
 
     @Test
+    fun `staff lines interrupted on a tilted page are straightened without a step`() = runTest {
+        val photo = File(root, "interrupted.png")
+        val staffTops = listOf(200, 600, 1000)
+        ImageIO.write(
+            BufferedImage(1000, 1400, BufferedImage.TYPE_INT_RGB).apply {
+                createGraphics().apply {
+                    color = Color.WHITE
+                    fillRect(0, 0, 1000, 1400)
+                    color = Color.BLACK
+                    for (x in 0 until 1000) {
+                        val bend = (0.04 * x).roundToInt()
+                        staffTops.forEach { top ->
+                            if (top == staffTops.last() && x in 400 until 600) return@forEach
+                            repeat(5) { line -> fillRect(x, top + line * 10 + bend, 1, 2) }
+                        }
+                    }
+                    dispose()
+                }
+            },
+            "png",
+            photo,
+        )
+
+        val image = openPageSource(PlatformFile(photo)).use { it.scanPages() }.single().binarized(DEFAULT_SCAN_THRESHOLD).toAwtImage()
+
+        staffTops.forEach { top ->
+            val heights = listOf(100, 300, 500, 700, 1300, 1500, 1700, 1900).map { x -> (top * 2 - 100 until top * 2 + 200).first { image.getRGB(x, it) == Color.BLACK.rgb } }
+            assertTrue(heights.max() - heights.min() <= 3, "staff at $top has line heights $heights")
+        }
+    }
+
+    @Test
     fun `erased strokes turn ink white`() = runTest {
         val scan = File(root, "ink.png")
         ImageIO.write(

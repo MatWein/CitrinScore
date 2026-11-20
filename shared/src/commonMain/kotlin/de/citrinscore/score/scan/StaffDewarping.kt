@@ -13,6 +13,7 @@ private const val MAX_STRIP_GAP = 3
 private const val MIN_TRACK_COVERAGE = 0.3f
 private const val MIN_TRACKS = 5
 private const val SMOOTHING_RADIUS = 1
+private const val SLOPE_GRID = 8
 private const val WHITE = 255
 
 internal class StaffDewarping(private val width: Int, private val height: Int, private val ink: BooleanArray) {
@@ -22,8 +23,9 @@ internal class StaffDewarping(private val width: Int, private val height: Int, p
     fun apply(luminance: ByteArray): ByteArray? {
         val tracks = tracks().filter { it.size >= STRIP_COUNT * MIN_TRACK_COVERAGE }
         if (tracks.size < MIN_TRACKS || stripWidth == 0) return null
-        val columns = displacementColumns(tracks.map(::displacements))
-        return remap(luminance, columns)
+        val slopes = tracks.map(::smoothed).flatMap(::slopes)
+        if (slopes.isEmpty()) return null
+        return remap(luminance, displacementColumns(SlopeField(slopes)))
     }
 
     private fun tracks(): List<Map<Int, Float>> {
@@ -74,8 +76,7 @@ internal class StaffDewarping(private val width: Int, private val height: Int, p
         return last + slope * (strip - recent[0])
     }
 
-    private fun displacements(track: Map<Int, Float>): Pair<Float, Map<Int, Float>> {
-        val target = track.values.average().toFloat()
+    private fun smoothed(track: Map<Int, Float>): Map<Int, Float> {
         val strips = track.keys.sorted()
         val filled = (strips.first()..strips.last()).associateWith { strip ->
             track[strip] ?: run {
@@ -84,27 +85,57 @@ internal class StaffDewarping(private val width: Int, private val height: Int, p
                 lerp(track.getValue(before), track.getValue(after), (strip - before).toFloat() / (after - before))
             }
         }
-        val smoothed = filled.mapValues { (strip, _) ->
-            ((strip - SMOOTHING_RADIUS)..(strip + SMOOTHING_RADIUS)).mapNotNull { filled[it] }.average().toFloat() - target
-        }
-        return target to smoothed
-    }
-
-    private fun displacementColumns(tracks: List<Pair<Float, Map<Int, Float>>>): List<FloatArray> {
-        val samples = (0 until STRIP_COUNT).map { strip ->
-            tracks.mapNotNull { (target, displacement) -> displacement[strip]?.let { target to it } }.sortedBy { it.first }
-        }
-        val known = samples.indices.filter { samples[it].isNotEmpty() }
-        return samples.indices.map { strip ->
-            val nearest = samples[known.minBy { abs(it - strip) }]
-            FloatArray(height) { y -> interpolate(nearest, y.toFloat()) }
+        return filled.mapValues { (strip, _) ->
+            val radius = minOf(SMOOTHING_RADIUS, strip - strips.first(), strips.last() - strip)
+            ((strip - radius)..(strip + radius)).map(filled::getValue).average().toFloat()
         }
     }
 
-    private fun interpolate(samples: List<Pair<Float, Float>>, y: Float): Float {
-        val below = samples.lastOrNull { it.first <= y } ?: return samples.first().second
-        val above = samples.firstOrNull { it.first > y } ?: return below.second
-        return lerp(below.second, above.second, (y - below.first) / (above.first - below.first))
+    private fun slopes(track: Map<Int, Float>) = track.keys.filter { it + 1 in track }.map { strip ->
+        val start = track.getValue(strip)
+        val end = track.getValue(strip + 1)
+        SlopeSample(strip, (start + end) / 2, end - start)
+    }
+
+    private fun displacementColumns(field: SlopeField): List<FloatArray> {
+        val center = STRIP_COUNT / 2
+        val columns = arrayOfNulls<FloatArray>(STRIP_COUNT)
+        columns[center] = FloatArray(height)
+        for (strip in center until STRIP_COUNT - 1) {
+            val previous = checkNotNull(columns[strip])
+            columns[strip + 1] = FloatArray(height) { y -> previous[y] + field.slope(strip, y + previous[y]) }
+        }
+        for (strip in center downTo 1) {
+            val next = checkNotNull(columns[strip])
+            columns[strip - 1] = FloatArray(height) { y -> next[y] - field.slope(strip - 1, y + next[y]) }
+        }
+        return columns.map(::checkNotNull)
+    }
+
+    private inner class SlopeField(samples: List<SlopeSample>) {
+        private val rows = height / SLOPE_GRID + 2
+        private val grid = Array(STRIP_COUNT - 1) { strip ->
+            FloatArray(rows) { row ->
+                val y = row * SLOPE_GRID.toFloat()
+                var weighted = 0f
+                var total = 0f
+                samples.forEach { sample ->
+                    val dx = (strip - sample.strip) * stripWidth.toFloat()
+                    val dy = y - sample.y
+                    val weight = 1f / (dx * dx + dy * dy + 1f)
+                    weighted += weight * sample.slope
+                    total += weight
+                }
+                weighted / total
+            }
+        }
+
+        fun slope(strip: Int, y: Float): Float {
+            val position = (y / SLOPE_GRID).coerceIn(0f, rows - 1f)
+            val row = floor(position).toInt()
+            val next = minOf(row + 1, rows - 1)
+            return lerp(grid[strip][row], grid[strip][next], position - row)
+        }
     }
 
     private fun remap(luminance: ByteArray, columns: List<FloatArray>): ByteArray {
@@ -131,4 +162,6 @@ internal class StaffDewarping(private val width: Int, private val height: Int, p
     private fun value(luminance: ByteArray, x: Int, y: Int) = if (y in 0 until height) luminance[y * width + x].toInt() and 0xFF else WHITE
 
     private fun lerp(start: Float, end: Float, fraction: Float) = start + (end - start) * fraction
+
+    private class SlopeSample(val strip: Int, val y: Float, val slope: Float)
 }
