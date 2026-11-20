@@ -80,8 +80,8 @@ import de.citrinscore.resources.ic_check
 import de.citrinscore.resources.ic_contrast
 import de.citrinscore.resources.ic_image
 import de.citrinscore.resources.ic_library_music
-import de.citrinscore.resources.ic_queue_music
-import de.citrinscore.resources.ic_edit_note
+import de.citrinscore.resources.ic_piano
+import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.musicxml.NotePositions
@@ -99,12 +99,11 @@ import de.citrinscore.ui.viewer.annotations.AnnotationInput
 import de.citrinscore.ui.viewer.annotations.AnnotationToolbar
 import de.citrinscore.ui.viewer.annotations.AnnotationViewModel
 import de.citrinscore.ui.viewer.annotations.staffSizing
-import de.citrinscore.ui.viewer.audio.AudioMenu
 import de.citrinscore.ui.viewer.audio.AudioPlayerBar
 import de.citrinscore.ui.viewer.audio.RecordingBar
 import de.citrinscore.ui.viewer.audio.OnAppBackground
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
-import de.citrinscore.ui.viewer.files.FilesMenu
+import de.citrinscore.ui.viewer.files.AttachmentsMenu
 import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -342,8 +341,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio, onOpenBar = toolbar.playback::close)
-            FilesMenu(toolbar.files)
+            AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
             PageActions(toolbar)
             ZoomAction(toolbar)
         },
@@ -365,8 +363,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
             PartAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
-            AudioMenu(toolbar.audio, onOpenBar = toolbar.playback::close)
-            FilesMenu(toolbar.files)
+            AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
             PageActions(toolbar)
             ZoomAction(toolbar)
         }
@@ -395,7 +392,7 @@ private fun PartAction(toolbar: ToolbarState) {
     val strings = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconAction(Res.drawable.ic_queue_music, strings.parts, onClick = { expanded = true })
+        IconAction(Res.drawable.ic_piano, strings.parts, onClick = { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ready.parts.forEachIndexed { index, part ->
                 val selected = part.directory == ready.part.directory
@@ -483,7 +480,7 @@ private fun playbackHighlight(cursor: PlaybackCursor?, notes: NotePositions?): S
 @Composable
 private fun AnnotationAction(toolbar: ToolbarState) {
     IconAction(
-        Res.drawable.ic_edit_note,
+        Res.drawable.ic_edit,
         LocalStrings.current.annotate,
         onClick = toolbar.annotations::toggleEditing,
         enabled = toolbar.viewport != null,

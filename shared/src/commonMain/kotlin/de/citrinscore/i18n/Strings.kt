@@ -149,9 +149,6 @@ interface Strings {
     fun zoomPercent(percent: Int): String
     val previousPage: String
     val nextPage: String
-    val audio: String
-    val noAudio: String
-    val addAudioFile: String
     val startRecording: String
     val stopRecording: String
     val recordingActive: String
