@@ -94,7 +94,7 @@ internal object GitLibrarySync : LibrarySync {
                     }
                 }
                 val merged = repository.resolve(Constants.HEAD)
-                if (localHead != null && merged != null) removeMissingScores(repository, directory, changedDocuments(repository, localHead, merged), merged)
+                if (merged != null) removeOrphanedDirectories(repository, directory, merged)
                 val downloaded = changedScores(repository, localHead, merged)
                 val uploaded = changedScores(repository, remoteHead, merged)
                 if (merged != null && merged != remoteHead) push(git, branch, remote, progress)
@@ -121,11 +121,10 @@ internal object GitLibrarySync : LibrarySync {
             Git.open(directory).use { git ->
                 val repository = git.repository
                 val synced = repository.syncedHead() ?: throw SyncException(SyncFailure.Failed, "The library was never synchronized")
-                val documents = localDocuments(git, synced)
-                logger.info("Discarding local changes in {} and resetting to {}", documents, synced.name)
+                logger.info("Discarding local changes in {} and resetting to {}", localDocuments(git, synced), synced.name)
                 git.reset().setMode(ResetType.HARD).setRef(synced.name).call()
                 git.clean().setCleanDirectories(true).call()
-                removeMissingScores(repository, directory, documents, synced)
+                removeOrphanedDirectories(repository, directory, synced)
             }
         }
     }
@@ -269,10 +268,16 @@ internal object GitLibrarySync : LibrarySync {
         }
     }
 
-    private fun removeMissingScores(repository: Repository, directory: File, documents: Set<String>, commit: ObjectId) {
+    private fun removeOrphanedDirectories(repository: Repository, directory: File, commit: ObjectId) {
         val tree = RevWalk(repository).use { it.parseCommit(commit).tree }
-        documents.filter { CitScore.isScoreDirectoryName(it.substringAfterLast(PATH_SEPARATOR)) && TreeWalk.forPath(repository, it, tree) == null }
-            .forEach { File(directory, it).deleteRecursively() }
+        directory.walkBottomUp().onEnter { it.name != Constants.DOT_GIT }
+            .filter { it.isDirectory && it != directory }
+            .filter { it.list().orEmpty().all { name -> name == CitScore.DEVICE_STATE_FILE } }
+            .filter { TreeWalk.forPath(repository, it.relativeTo(directory).invariantSeparatorsPath, tree) == null }
+            .forEach { orphan ->
+                logger.info("Removing {}, it no longer exists in the synchronized library", orphan.relativeTo(directory))
+                orphan.deleteRecursively()
+            }
     }
 
     private fun changedScores(repository: Repository, before: ObjectId?, after: ObjectId?): Int =

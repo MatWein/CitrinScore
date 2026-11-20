@@ -65,6 +65,37 @@ class GitLibrarySyncTest {
     }
 
     @Test
+    fun `folders emptied by deleted scores disappear and do not come back`() = runTest {
+        score(first, "Klassik/Etude", "one")
+        sync(first)
+        sync(second)
+        File(first, "Klassik").deleteRecursively()
+        sync(first)
+
+        sync(second)
+        sync(second)
+        sync(first)
+
+        assertFalse(File(second, "Klassik").exists())
+        assertFalse(File(first, "Klassik").exists())
+    }
+
+    @Test
+    fun `leftovers of scores deleted outside the app are removed while new empty folders are kept`() = runTest {
+        score(first, "Klassik/Etude", "one")
+        sync(first)
+        File(first, "Klassik/Etude.citscore/${CitScore.MANIFEST_FILE}").delete()
+        File(first, "Neu").mkdir()
+
+        sync(first)
+        sync(second)
+
+        assertFalse(File(first, "Klassik").exists())
+        assertTrue(File(first, "Neu").isDirectory)
+        assertTrue(File(second, "Neu").isDirectory)
+    }
+
+    @Test
     fun `both libraries keep their own scores on the first sync`() = runTest {
         score(first, "Etude", "one")
         score(second, "Sonate", "two")
