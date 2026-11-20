@@ -43,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -106,6 +107,7 @@ fun ScoreDocument(
     modifier: Modifier = Modifier,
     highlight: ScoreHighlight? = null,
     onTap: ((page: Int, position: Offset) -> Unit)? = null,
+    bottomInset: Dp = 0.dp,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
@@ -115,7 +117,7 @@ fun ScoreDocument(
         }
         val breaks = remember(layout, systemBreaks) { layout.documentBreaks(systemBreaks) }
         SideEffect {
-            viewport.setBounds(viewportSize, Size(layout.width, layout.height))
+            viewport.setBounds(viewportSize, Size(layout.width, layout.height), with(density) { bottomInset.toPx() })
             viewport.breaks = breaks
         }
         LaunchedEffect(layout, highlight?.reveal, highlight?.lookahead) {

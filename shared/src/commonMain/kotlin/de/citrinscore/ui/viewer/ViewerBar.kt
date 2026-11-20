@@ -26,7 +26,7 @@ import de.citrinscore.ui.components.IconAction
 import de.citrinscore.ui.theme.Spacing
 import org.jetbrains.compose.resources.DrawableResource
 
-private val BarHeight = TopAppBarDefaults.TopAppBarExpandedHeight / 2
+val ViewerBarHeight = TopAppBarDefaults.TopAppBarExpandedHeight / 2
 private val CompactBarWidth = 600.dp
 private val BarThumbSize = DpSize(4.dp, 20.dp)
 private val BarTrackHeight = 6.dp
@@ -45,7 +45,7 @@ fun ViewerBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(BarHeight)
+                    .height(ViewerBarHeight)
                     .padding(horizontal = Spacing.ExtraSmall),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.Small),

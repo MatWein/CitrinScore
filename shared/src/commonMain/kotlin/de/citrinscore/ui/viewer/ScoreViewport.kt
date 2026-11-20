@@ -19,10 +19,13 @@ class ScoreViewport(private val initial: ScoreViewState?) {
 
     private var viewportSize by mutableStateOf(Size.Zero)
     private var documentSize by mutableStateOf(Size.Zero)
+    private var bottomInset by mutableFloatStateOf(0f)
 
     var breaks: List<Float> = listOf(0f)
 
-    private val maxOffsetY get() = (documentSize.height * zoom - viewportSize.height).coerceAtLeast(0f)
+    private val maxOffsetY get() = (documentSize.height * zoom + bottomInset - viewportSize.height).coerceAtLeast(0f)
+
+    private val visibleHeight get() = (viewportSize.height - bottomInset).coerceAtLeast(0f)
 
     val canGoToPreviousPage get() = offset.y > 0f
     val canGoToNextPage get() = offset.y < maxOffsetY
@@ -34,11 +37,12 @@ class ScoreViewport(private val initial: ScoreViewState?) {
             y = offset.y / (documentSize.height * zoom),
         )
 
-    fun setBounds(viewport: Size, document: Size) {
-        if (viewport == viewportSize && document == documentSize) return
+    fun setBounds(viewport: Size, document: Size, bottomInset: Float = 0f) {
+        if (viewport == viewportSize && document == documentSize && bottomInset == this.bottomInset) return
         val target = view
         viewportSize = viewport
         documentSize = document
+        this.bottomInset = bottomInset
         offset = clamp(target?.let { Offset(it.x * document.width * zoom, it.y * document.height * zoom) } ?: Offset.Zero)
     }
 
@@ -50,24 +54,24 @@ class ScoreViewport(private val initial: ScoreViewState?) {
 
     fun previousPage() {
         val top = offset.y
-        val limit = top - viewportSize.height
+        val limit = top - visibleHeight
         val target = scaledBreaks.firstOrNull { it >= limit && it < top - BREAK_TOLERANCE } ?: limit
         scrollBy(Offset(0f, target - top))
     }
 
     fun nextPage() {
         val top = offset.y
-        val bottom = top + viewportSize.height
+        val bottom = top + visibleHeight
         val target = scaledBreaks.lastOrNull { it > top + BREAK_TOLERANCE && it <= bottom } ?: bottom
         scrollBy(Offset(0f, target - top))
     }
 
     fun reveal(document: Rect, ahead: Rect? = null) {
         val bounds = Rect(document.left * zoom, document.top * zoom, document.right * zoom, document.bottom * zoom)
-        val visible = Rect(offset, viewportSize)
+        val visible = Rect(offset, Size(viewportSize.width, visibleHeight))
         val bottom = maxOf(bounds.bottom, (ahead?.bottom ?: 0f) * zoom)
         val x = if (bounds.left < visible.left || bounds.right > visible.right) bounds.center.x - viewportSize.width / 2 else offset.x
-        val y = if (bounds.top < visible.top || bottom > visible.bottom) bounds.top - viewportSize.height * REVEAL_MARGIN else offset.y
+        val y = if (bounds.top < visible.top || bottom > visible.bottom) bounds.top - visibleHeight * REVEAL_MARGIN else offset.y
         offset = clamp(Offset(x, y))
     }
 

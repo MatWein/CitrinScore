@@ -225,6 +225,7 @@ private fun ViewerContent(
                         onTap = notes?.takeIf { playback.isOpen && !editing }?.let { positions ->
                             { page, position -> positions.nearest(page, position)?.let(playbackViewModel::select) }
                         },
+                        bottomInset = ViewerBarHeight,
                     )
                 }
                 PersistView(viewport, state.part, state.display, viewModel)

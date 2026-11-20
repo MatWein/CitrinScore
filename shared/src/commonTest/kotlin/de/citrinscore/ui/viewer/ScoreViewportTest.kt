@@ -35,6 +35,22 @@ class ScoreViewportTest {
     }
 
     @Test
+    fun `the bottom inset adds room below the document and is treated as hidden`() {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize, bottomInset = 100f) }
+
+        viewport.scrollBy(Offset(0f, 5000f))
+        assertEquals(2300f, viewport.offset.y)
+
+        viewport.scrollBy(Offset(0f, -5000f))
+        viewport.nextPage()
+        assertEquals(700f, viewport.offset.y)
+
+        viewport.scrollBy(Offset(0f, -5000f))
+        viewport.reveal(Rect(0f, 750f, 100f, 780f))
+        assertEquals(750f - 700f * 0.05f, viewport.offset.y)
+    }
+
+    @Test
     fun `a document narrower than the viewport is centered`() {
         val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
 
