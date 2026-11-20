@@ -39,15 +39,20 @@ class Omr(modelDirectory: File) : AutoCloseable {
         transformer = Transformer(environment, models.getValue(OmrModelFiles.ENCODER), models.getValue(OmrModelFiles.DECODER))
     }
 
-    fun recognize(pages: List<OmrImage>, onProgress: (Float) -> Unit = {}): OmrResult {
+    fun recognize(pages: List<OmrImage>, onProgress: (OmrProgress) -> Unit = {}): OmrResult {
         val recognizer = PageRecognizer(segnet, relations, transformer)
         val results = mutableMapOf<Int, PageResult>()
         var inheritedTimes: List<TimeSignature?>? = null
         pages.forEachIndexed { index, page ->
-            onProgress(index.toFloat() / pages.size)
             val result = page.toBgr().use { image ->
                 try {
-                    recognizer.recognize(image, inheritedTimes, "p${index + 1}") { done, total -> onProgress((index + done.toFloat() / total) / pages.size) }
+                    recognizer.recognize(
+                        image,
+                        inheritedTimes,
+                        "p${index + 1}",
+                        onPatches = { done, total -> onProgress(OmrProgress.Segmenting(index, pages.size, done, total)) },
+                        onStaff = { done, total -> onProgress(OmrProgress.ReadingStaff(index, pages.size, done, total)) },
+                    )
                 } catch (e: NoStaffsFoundException) {
                     logger.info("Skipping page {}: {}", index + 1, e.message)
                     null
@@ -56,7 +61,6 @@ class Omr(modelDirectory: File) : AutoCloseable {
             results[index] = result
             inheritedTimes = lastTimeSignatures(result.document.documentElement)
         }
-        onProgress(1f)
         if (results.isEmpty()) throw OmrException("No staffs found on any page")
         val merged = mergePages(results.values.map { it.document })
         val measureOf = measuresOfNotes(merged)

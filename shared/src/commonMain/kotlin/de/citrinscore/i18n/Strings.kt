@@ -116,6 +116,9 @@ interface Strings {
     val omrCreatePart: String
     val omrPreviewLabel: String
     val omrRecognizing: String
+    val omrPreparing: String
+    fun omrAnalyzingPage(page: Int, pages: Int): String
+    fun omrReadingStaff(page: Int, pages: Int, staff: Int, staffs: Int): String
     val omrFailed: String
     val omrPartSummary: String
 

@@ -3,6 +3,7 @@ package de.citrinscore.score.omr
 import de.citrinscore.omr.Omr
 import de.citrinscore.omr.OmrBox
 import de.citrinscore.omr.OmrImage
+import de.citrinscore.omr.OmrProgress
 import de.citrinscore.omr.OmrResult
 import de.citrinscore.score.RecognitionLayout
 import de.citrinscore.score.RecognizedMeasure
@@ -24,7 +25,7 @@ private const val MODEL_DIRECTORY = "omr"
 private val recognition = Mutex()
 private val logger = LoggerFactory.getLogger("de.citrinscore.score.omr.MusicRecognition")
 
-actual suspend fun recognizeMusic(pages: List<RecognitionPage>, onProgress: (Float) -> Unit): RecognizedMusic = recognition.withLock {
+actual suspend fun recognizeMusic(pages: List<RecognitionPage>, onProgress: (RecognitionProgress) -> Unit): RecognizedMusic = recognition.withLock {
     withContext(Dispatchers.Default) {
         val context = coroutineContext
         val images = pages.map { page ->
@@ -35,13 +36,18 @@ actual suspend fun recognizeMusic(pages: List<RecognitionPage>, onProgress: (Flo
             Omr(File(FileKit.filesDir.path, MODEL_DIRECTORY)).use { omr ->
                 omr.recognize(images) { progress ->
                     context.ensureActive()
-                    onProgress(progress)
+                    onProgress(progress.toRecognitionProgress())
                 }
             }
         }
         logger.info("Recognized {} notes on {} pages in {}", result.notes.size, pages.size, duration)
         result.toMusic(pages.map { it.pixelsPerUnit })
     }
+}
+
+private fun OmrProgress.toRecognitionProgress() = when (this) {
+    is OmrProgress.Segmenting -> RecognitionProgress.AnalyzingPage(page, pages, patch, patches)
+    is OmrProgress.ReadingStaff -> RecognitionProgress.ReadingStaff(page, pages, staff, staffs)
 }
 
 private fun OmrResult.toMusic(scales: List<Float>): RecognizedMusic {

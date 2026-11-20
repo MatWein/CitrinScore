@@ -40,13 +40,13 @@ private class PageMapping(private val left: Int, private val top: Int, private v
 
 internal class PageRecognizer(private val segnet: Segnet, private val relations: StaffRelations, private val transformer: Transformer) {
 
-    fun recognize(page: Mat, inheritedTimes: List<TimeSignature?>?, idPrefix: String, onStaff: (Int, Int) -> Unit): PageResult {
+    fun recognize(page: Mat, inheritedTimes: List<TimeSignature?>?, idPrefix: String, onPatches: (Int, Int) -> Unit, onStaff: (Int, Int) -> Unit): PageResult {
         val cropped = autocrop(page)
         val resized = resizeToTargetWidth(cropped.image)
         val mapping = PageMapping(cropped.left, cropped.top, cropped.image.cols().toDouble() / resized.cols(), cropped.image.rows().toDouble() / resized.rows())
         if (cropped.image !== page && resized !== cropped.image) cropped.image.release()
         val preprocessed = applyClahe(resized).also { if (resized !== page) resized.release() }
-        val segmented = filterNoise(segnet.segment(preprocessed))
+        val segmented = filterNoise(segnet.segment(preprocessed, onPatches))
         val predictions = Predictions(
             segmented.preprocessed,
             segmented.notehead,

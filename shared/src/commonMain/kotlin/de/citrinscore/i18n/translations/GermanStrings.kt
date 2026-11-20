@@ -123,6 +123,11 @@ object GermanStrings : Strings {
     override val omrCreatePart = "Noten per OMR erkennen, damit sie abspielbar sind"
     override val omrPreviewLabel = "Erkannte Noten (OMR)"
     override val omrRecognizing = "Noten werden erkannt …"
+    override val omrPreparing = "Erkennung wird vorbereitet …"
+    override fun omrAnalyzingPage(page: Int, pages: Int) = onPage(page, pages, "Notenzeilen werden gesucht …")
+    override fun omrReadingStaff(page: Int, pages: Int, staff: Int, staffs: Int) = onPage(page, pages, "Notenzeile $staff von $staffs wird gelesen …")
+
+    private fun onPage(page: Int, pages: Int, text: String) = if (pages > 1) "Seite $page von $pages: $text" else text
     override val omrFailed = "Auf den Seiten konnten keine Noten erkannt werden."
     override val omrPartSummary = "abspielbar (OMR)"
 

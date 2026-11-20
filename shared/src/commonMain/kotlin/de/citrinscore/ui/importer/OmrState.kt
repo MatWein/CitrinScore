@@ -3,6 +3,7 @@ package de.citrinscore.ui.importer
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.omr.RecognitionPage
+import de.citrinscore.score.omr.RecognitionProgress
 import de.citrinscore.score.omr.musicXmlPreview
 import de.citrinscore.score.omr.recognizeMusic
 import de.citrinscore.score.scan.EraserStroke
@@ -24,7 +25,7 @@ data class OmrInput(val key: String, val pages: List<OmrPageInput>)
 sealed interface OmrState {
     val input: Any
 
-    data class Running(override val input: Any, val progress: Float) : OmrState
+    data class Running(override val input: Any, val progress: RecognitionProgress) : OmrState
 
     data class Done(override val input: Any, val music: RecognizedMusic, val preview: List<PreviewPage>) : OmrState
 
@@ -34,7 +35,7 @@ sealed interface OmrState {
 sealed interface OmrDisplay {
     data object Idle : OmrDisplay
 
-    data class Recognizing(val progress: Float?) : OmrDisplay
+    data class Recognizing(val progress: RecognitionProgress?) : OmrDisplay
 
     data object Failed : OmrDisplay
 
@@ -64,7 +65,7 @@ internal fun CoroutineScope.launchMusicRecognition(
         if (input == null) return@collectLatest
         if (current()?.takeIf { it !is OmrState.Running }?.input == input) return@collectLatest
         delay(OMR_DELAY_MILLIS)
-        publish(input, OmrState.Running(input, 0f))
+        publish(input, OmrState.Running(input, RecognitionProgress.Preparing))
         val result = attempt {
             val music = recognizeMusic(pages(input)) { progress -> publish(input, OmrState.Running(input, progress)) }
             OmrState.Done(input, music, musicXmlPreview(music.musicXml))

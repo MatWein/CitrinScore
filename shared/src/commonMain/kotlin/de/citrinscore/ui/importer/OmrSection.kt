@@ -14,8 +14,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.i18n.Strings
+import de.citrinscore.score.omr.RecognitionProgress
 import de.citrinscore.ui.pages.PagePreview
 import de.citrinscore.ui.theme.Spacing
+
+private fun Strings.omrProgress(progress: RecognitionProgress?) = when (progress) {
+    null -> omrRecognizing
+    RecognitionProgress.Preparing -> omrPreparing
+    is RecognitionProgress.AnalyzingPage -> omrAnalyzingPage(progress.page + 1, progress.pages)
+    is RecognitionProgress.ReadingStaff -> omrReadingStaff(progress.page + 1, progress.pages, progress.staff + 1, progress.staffs)
+}
 
 @Composable
 fun OmrSection(enabled: Boolean, display: OmrDisplay, onEnabledChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
@@ -34,10 +43,10 @@ fun OmrSection(enabled: Boolean, display: OmrDisplay, onEnabledChange: (Boolean)
             is OmrDisplay.Recognized -> PagePreview(display.preview, isLoading = false, failed = false, label = strings.omrPreviewLabel)
             OmrDisplay.Failed -> Text(strings.omrFailed, color = MaterialTheme.colorScheme.error)
             is OmrDisplay.Recognizing -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
-                Text(strings.omrRecognizing, style = MaterialTheme.typography.bodyMedium)
-                val progress = display.progress
-                if (progress != null) {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Text(strings.omrProgress(display.progress), style = MaterialTheme.typography.bodyMedium)
+                val fraction = display.progress?.fraction
+                if (fraction != null) {
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                 } else {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }

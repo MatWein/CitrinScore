@@ -51,24 +51,30 @@ internal class Predictions(
 internal class Segnet(private val environment: OrtEnvironment, modelPath: String) : AutoCloseable {
     private val session: OrtSession = environment.createSession(modelPath, OrtSession.SessionOptions())
 
-    fun segment(preprocessed: Mat): Predictions {
+    fun segment(preprocessed: Mat, onPatches: (Int, Int) -> Unit): Predictions {
         val height = preprocessed.rows()
         val width = preprocessed.cols()
         val gray = preprocessed.bytes()
+        val rows = pythonRange(0, max(height, WINDOW), STEP)
+        val columns = pythonRange(0, max(width, WINDOW), STEP)
+        val total = rows.size * columns.size
         val patches = mutableListOf<IntArray>()
         val batch = mutableListOf<FloatArray>()
-        for (yLoop in pythonRange(0, max(height, WINDOW), STEP)) {
+        fun flush() {
+            patches += run(batch)
+            batch.clear()
+            onPatches(patches.size, total)
+        }
+        onPatches(0, total)
+        for (yLoop in rows) {
             val y = min(yLoop, height - WINDOW)
-            for (xLoop in pythonRange(0, max(width, WINDOW), STEP)) {
+            for (xLoop in columns) {
                 val x = min(xLoop, width - WINDOW)
                 batch += extractPatch(gray, width, height, x, y)
-                if (batch.size == BATCH_SIZE) {
-                    patches += run(batch)
-                    batch.clear()
-                }
+                if (batch.size == BATCH_SIZE) flush()
             }
         }
-        if (batch.isNotEmpty()) patches += run(batch)
+        if (batch.isNotEmpty()) flush()
         val merged = mergePatches(patches, width, height)
         fun mask(label: Int) = byteMat(height, width, ByteArray(merged.size) { if (merged[it] == label) 1 else 0 })
         return Predictions(preprocessed, mask(NOTEHEAD), mask(SYMBOLS), mask(STAFF), mask(CLEFS_KEYS), mask(STEMS_RESTS))
