@@ -56,9 +56,9 @@ if (System.getProperty("os.name").startsWith("Windows")) {
     val vswhere = "${System.getenv("ProgramFiles(x86)")}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
     val msvcRuntimeLibrary = providers.exec {
         commandLine(vswhere, "-latest", "-products", "*", "-find", "VC\\Redist\\MSVC\\*\\x64\\Microsoft.VC*.CRT\\msvcp140_1.dll")
-    }.standardOutput.asText.map { output -> file(output.lines().last(String::isNotBlank)) }
+    }.standardOutput.asText.map { output -> File(output.lines().last(String::isNotBlank)) }
 
-    tasks.named<AbstractJLinkTask>("createRuntimeImage") {
+    tasks.withType<AbstractJLinkTask>().configureEach {
         val runtimeBin = destinationDir.dir("bin")
         inputs.file(msvcRuntimeLibrary)
         doLast {
