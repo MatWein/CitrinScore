@@ -5,22 +5,28 @@ your own device as plain files: no account, no cloud, no lock-in.
 
 <table>
   <tr>
+    <td align="center"><img src="docs/screenshots/welcome.png" width="200" alt="Welcome"><br>Welcome</td>
     <td align="center"><img src="docs/screenshots/library.png" width="200" alt="Library"><br>Library</td>
-    <td align="center"><img src="docs/screenshots/musicxml.png" width="200" alt="MusicXML score with audio player"><br>MusicXML with audio player</td>
-    <td align="center"><img src="docs/screenshots/playback.png" width="200" alt="Playback"><br>Playback</td>
-    <td align="center"><img src="docs/screenshots/parts.png" width="200" alt="Parts"><br>Parts</td>
+    <td align="center"><img src="docs/screenshots/import.png" width="200" alt="Importing a photo with OMR"><br>Importing a photo with OMR</td>
+    <td align="center"><img src="docs/screenshots/original.png" width="200" alt="Original photo"><br>Original photo</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/annotations.png" width="200" alt="Notes on a PDF score"><br>Notes on a PDF score</td>
-    <td align="center"><img src="docs/screenshots/import.png" width="200" alt="Import wizard"><br>Import wizard</td>
-    <td align="center"><img src="docs/screenshots/settings.png" width="200" alt="Settings"><br>Settings</td>
+    <td align="center"><img src="docs/screenshots/annotations.png" width="200" alt="Black and white with notes"><br>Black and white with notes</td>
+    <td align="center"><img src="docs/screenshots/recognized.png" width="200" alt="Recognized music"><br>Recognized music</td>
+    <td align="center"><img src="docs/screenshots/musicxml.png" width="200" alt="MusicXML with attachments"><br>MusicXML with attachments</td>
+    <td align="center"><img src="docs/screenshots/playback.png" width="200" alt="Playback"><br>Playback</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/parts.png" width="200" alt="Parts"><br>Parts</td>
+    <td align="center"><img src="docs/screenshots/edit.png" width="200" alt="Editing parts"><br>Editing parts</td>
     <td align="center"><img src="docs/screenshots/dark.png" width="200" alt="Dark theme"><br>Dark theme</td>
+    <td align="center"><img src="docs/screenshots/settings.png" width="200" alt="Settings"><br>Settings</td>
   </tr>
 </table>
 
 ## Features
 
-- **Import** images, SVGs, PDFs and MusicXML, or take photos with the camera, all in one step. Margins are cropped automatically, photos are straightened and turned into clean black and white pages, and the originals are kept.
+- **Import** images, SVGs, PDFs and MusicXML, or take photos with the camera, all in one step. Margins are cropped automatically and every page is also stored as a straightened black and white version. In the viewer you switch between the original, the black and white pages and the recognized music.
 - **Music recognition** – make images, scans and PDFs playable: the notes are recognized on your device with the models
   of [homr](https://github.com/liebharc/homr) and highlighted in the original pages during playback and play-along.
 - **Parts** – keep several parts per score, for example one per instrument.
