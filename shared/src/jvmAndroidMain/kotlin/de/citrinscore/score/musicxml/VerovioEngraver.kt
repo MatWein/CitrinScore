@@ -26,7 +26,7 @@ import javax.xml.transform.stream.StreamResult
 import kotlin.math.roundToInt
 import kotlin.time.measureTimedValue
 
-private const val PAGE_MARGIN = 50
+private const val PAGE_MARGIN = 30
 private const val CLASS_STYLES = ".placeholder {display:none} .ending, .fing, .reh, .tempo {font-weight:bold} .dir, .dynam, .mNum {font-style:italic} .label {font-weight:normal}"
 private const val TIMEMAP_OPTIONS = """{"includeMeasures":false,"includeRests":false}"""
 private const val UTF8_BOM = "﻿"
@@ -159,6 +159,7 @@ private fun options(layout: EngravingLayout) = buildJsonObject {
     put("pageMarginBottom", PAGE_MARGIN)
     put("adjustPageHeight", true)
     put("breaks", "auto")
+    put("header", "none")
     put("footer", "none")
     put("svgCss", CLASS_STYLES)
     put("svgViewBox", true)
