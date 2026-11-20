@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
 
 plugins {
     kotlin("jvm")
@@ -47,6 +48,22 @@ compose.desktop {
                 shortcut = true
                 upgradeUuid = "bc46cebd-3747-4492-bb3d-63996ce758ae"
             }
+        }
+    }
+}
+
+if (System.getProperty("os.name").startsWith("Windows")) {
+    val vswhere = "${System.getenv("ProgramFiles(x86)")}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+    val msvcRuntimeLibrary = providers.exec {
+        commandLine(vswhere, "-latest", "-products", "*", "-find", "VC\\Redist\\MSVC\\*\\x64\\Microsoft.VC*.CRT\\msvcp140_1.dll")
+    }.standardOutput.asText.map { output -> file(output.lines().last(String::isNotBlank)) }
+
+    tasks.named<AbstractJLinkTask>("createRuntimeImage") {
+        val runtimeBin = destinationDir.dir("bin")
+        inputs.file(msvcRuntimeLibrary)
+        doLast {
+            val library = msvcRuntimeLibrary.get()
+            library.copyTo(runtimeBin.get().file(library.name).asFile, overwrite = true)
         }
     }
 }

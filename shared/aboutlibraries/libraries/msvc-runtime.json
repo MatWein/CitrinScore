@@ -1,0 +1,14 @@
+{
+  "uniqueId": "com.microsoft:msvc-runtime",
+  "name": "Microsoft Visual C++ Runtime",
+  "description": "C++ standard library runtime (msvcp140_1.dll), required by ONNX Runtime on Windows.",
+  "website": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
+  "developers": [
+    {
+      "name": "Microsoft"
+    }
+  ],
+  "licenses": [
+    "msvc-runtime"
+  ]
+}
