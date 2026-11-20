@@ -101,7 +101,6 @@ interface Strings {
     val importFilesTitle: String
     val importFilesSubtitle: String
     val addFiles: String
-    val normalizePage: String
     val musicXmlLabel: String
     val takePhoto: String
     val scanThreshold: String
@@ -134,6 +133,9 @@ interface Strings {
     fun pageNumber(number: Int): String
     val editLoadFailed: String
     val parts: String
+    val displayOriginal: String
+    val displayNormalized: String
+    val displayMusicXml: String
     fun partNumber(number: Int): String
     val partNameLabel: String
     val partNameExists: String

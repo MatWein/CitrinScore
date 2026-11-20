@@ -3,6 +3,7 @@ package de.citrinscore.library
 import de.citrinscore.score.Attachment
 import de.citrinscore.score.AttachmentKind
 import de.citrinscore.score.CitScore
+import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.Recognition
 import de.citrinscore.score.RecognitionLayout
@@ -52,6 +53,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 private val logger = LoggerFactory.getLogger(LibraryRepository::class.java)
+private val PAGE_DISPLAYS = listOf(PartDisplay.Original, PartDisplay.Normalized)
 
 class LibraryRepository(
     private val json: Json = AppJson,
@@ -127,17 +129,22 @@ class LibraryRepository(
         updateManifest(part.score) { it.copy(currentPart = part.directory) }
     }
 
-    suspend fun annotations(part: PartRef): ScoreAnnotations =
-        read(part.root / CitScore.ANNOTATIONS_FILE) { readString() }?.let { decode(ScoreAnnotations.serializer(), it) } ?: ScoreAnnotations()
+    suspend fun annotations(display: DisplayRef): ScoreAnnotations =
+        read(display.annotations) { readString() }?.let { decode(ScoreAnnotations.serializer(), it) } ?: ScoreAnnotations()
 
-    suspend fun saveAnnotations(part: PartRef, annotations: ScoreAnnotations) {
-        logger.debug("Saving annotations of {}", part)
-        (part.root / CitScore.ANNOTATIONS_FILE).writeString(json.encodeToString(annotations))
+    suspend fun saveAnnotations(display: DisplayRef, annotations: ScoreAnnotations) {
+        logger.debug("Saving annotations of {}", display)
+        display.annotations.writeString(json.encodeToString(annotations))
     }
 
-    suspend fun saveView(part: PartRef, view: ScoreViewState) {
-        logger.debug("Saving view {} of {}", view, part)
-        updatePart(part) { it.copy(view = view) }
+    suspend fun saveView(part: PartRef, display: PartDisplay, view: ScoreViewState) {
+        logger.debug("Saving {} view {} of {}", display, view, part)
+        updatePart(part) { it.withView(display, view) }
+    }
+
+    suspend fun saveDisplay(part: PartRef, display: PartDisplay) {
+        logger.debug("Saving display {} of {}", display, part)
+        updatePart(part) { it.copy(display = display) }
     }
 
     suspend fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
@@ -230,16 +237,17 @@ class LibraryRepository(
                 is PageOrigin.Stored -> origin.path
                 is PageOrigin.File -> copied.getOrPut(origin.file.path) { storeFile(root, CitScore.SOURCES_DIRECTORY, origin.file.extension) { it write origin.file } }
             }
-            val normalization = page.normalization?.let { normalized ->
-                Normalization(storeFile(root, CitScore.PAGES_DIRECTORY, CitScore.SCAN_EXTENSION) { it.write(normalized.image) }, normalized.threshold, normalized.erased)
-            }
-            ScorePage(source, page.page, page.crop, normalization)
+            val normalized = page.normalization
+            val image = storeFile(root, CitScore.PAGES_DIRECTORY, CitScore.SCAN_EXTENSION) { it.write(normalized.image) }
+            ScorePage(source, page.page, page.crop, Normalization(image, normalized.threshold, normalized.erased))
         }
-        val referenced = written.flatMap { listOfNotNull(it.source, it.normalization?.image) }.toSet()
-        previous?.pages.orEmpty().flatMap { listOfNotNull(it.source, it.normalization?.image) }.filterNot { it in referenced }.distinct()
+        val referenced = written.flatMap { it.files }.toSet()
+        previous?.pages.orEmpty().flatMap { it.files }.filterNot { it in referenced }.distinct()
             .forEach { CitScore.resolve(root, it).delete(mustExist = false) }
         return ScoreContent.Pages(written)
     }
+
+    private val ScorePage.files get() = listOf(source, normalization.image)
 
     private suspend fun storeFile(root: PlatformFile, directory: String, extension: String, write: suspend (PlatformFile) -> Unit): String {
         val path = "$directory/${Uuid.random()}.${extension.lowercase()}"
@@ -251,9 +259,11 @@ class LibraryRepository(
     private suspend fun editContent(score: PlatformFile, part: ScorePart, source: PartSource): ScorePart {
         val ref = PartRef(score, part.directory)
         val content = writeContent(ref.root, source, part.content)
-        if (source is PartSource.Pages && (ref.root / CitScore.ANNOTATIONS_FILE).exists()) {
+        if (source is PartSource.Pages) {
             val newIndexByOldIndex = source.pages.withIndex().mapNotNull { (index, page) -> page.previousIndex?.let { it to index } }.toMap()
-            saveAnnotations(ref, annotations(ref).remapPages(newIndexByOldIndex))
+            PAGE_DISPLAYS.map { DisplayRef(ref, it) }.filter { it.annotations.exists() }.forEach { display ->
+                saveAnnotations(display, annotations(display).remapPages(newIndexByOldIndex))
+            }
         }
         return part.copy(content = content, systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(ref.root, it) }, view = null)
     }
@@ -277,6 +287,7 @@ class LibraryRepository(
             part.recognition?.let { recognition ->
                 CitScore.resolve(root, recognition.musicXml).delete(mustExist = false)
                 CitScore.resolve(root, recognition.layout).delete(mustExist = false)
+                (root / CitScore.annotationsFile(PartDisplay.MusicXml)).delete(mustExist = false)
             }
             part.copy(recognition = null)
         }
@@ -288,10 +299,10 @@ class LibraryRepository(
     }
 
     private suspend fun systemBreaks(root: PlatformFile, content: ScoreContent): List<List<Float>> =
-        ScoreRenderers.open(root, content).use { renderer -> renderer.pageSizes.indices.map { renderer.systemBreaks(it) } }
+        ScoreRenderers.open(root, content, PartDisplay.Normalized).use { renderer -> renderer.pageSizes.indices.map { renderer.systemBreaks(it) } }
 
     private suspend fun writeThumbnail(score: PlatformFile, part: ScorePart) {
-        ScoreRenderers.open(PartRef(score, part.directory).root, part.content).use { renderer ->
+        ScoreRenderers.open(PartRef(score, part.directory).root, part.content, PartDisplay.Original).use { renderer ->
             (score / CitScore.THUMBNAIL_FILE) write ScoreThumbnail.render(renderer)
         }
     }

@@ -12,12 +12,23 @@ class ScoreManifestTest {
     fun `pages survive a round trip`() {
         val content: ScoreContent = ScoreContent.Pages(
             listOf(
-                ScorePage("sources/a.pdf", 2, PageCrop(0f, 0f, 1f, 1f)),
+                ScorePage("sources/a.pdf", 2, PageCrop(0f, 0f, 1f, 1f), Normalization("pages/a.png", 0.15f)),
                 ScorePage("sources/b.jpg", 0, PageCrop(0f, 0f, 2f, 2f), Normalization("pages/c.png", 0.2f, listOf(EraserStroke(listOf(Offset(1f, 2f)), 3f)))),
             ),
         )
 
         assertEquals(content, AppJson.decodeFromString<ScoreContent>(AppJson.encodeToString(content)))
+    }
+
+    @Test
+    fun `pages offer the original and the black and white display and the recognized music when present`() {
+        val part = ScorePart("parts/a", "", ScoreContent.Pages(emptyList()))
+        val recognized = part.copy(recognition = Recognition(), display = PartDisplay.MusicXml)
+
+        assertEquals(listOf(PartDisplay.Original, PartDisplay.Normalized) to PartDisplay.Original, part.displays to part.shownDisplay)
+        assertEquals(PartDisplay.MusicXml, recognized.shownDisplay)
+        assertEquals(PartDisplay.Original, recognized.copy(recognition = null).shownDisplay)
+        assertEquals(listOf(PartDisplay.MusicXml), ScorePart("parts/b", "", ScoreContent.MusicXml("score.mxl")).displays)
     }
 
     @Test

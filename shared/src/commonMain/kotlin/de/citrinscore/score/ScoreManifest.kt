@@ -47,10 +47,34 @@ data class ScorePart(
     val name: String,
     val content: ScoreContent,
     val view: ScoreViewState? = null,
+    val engravedView: ScoreViewState? = null,
+    val display: PartDisplay? = null,
     val playback: PlaybackPreferences? = null,
     val systemBreaks: List<List<Float>>? = null,
     val recognition: Recognition? = null,
-)
+) {
+    val displays
+        get() = when (content) {
+            is ScoreContent.Pages -> listOfNotNull(PartDisplay.Original, PartDisplay.Normalized, PartDisplay.MusicXml.takeIf { recognition != null })
+            is ScoreContent.MusicXml -> listOf(PartDisplay.MusicXml)
+        }
+
+    val shownDisplay get() = display?.takeIf { it in displays } ?: displays.first()
+
+    fun view(display: PartDisplay) = if (display.isEngraved) engravedView else view
+
+    fun withView(display: PartDisplay, view: ScoreViewState?) = if (display.isEngraved) copy(engravedView = view) else copy(view = view)
+}
+
+@Serializable
+enum class PartDisplay {
+    Original,
+    Normalized,
+    MusicXml,
+    ;
+
+    val isEngraved get() = this == MusicXml
+}
 
 @Serializable
 data class ScoreMetadata(
@@ -95,11 +119,7 @@ sealed interface ScoreContent {
 }
 
 @Serializable
-data class ScorePage(val source: String, val page: Int = 0, val crop: PageCrop, val normalization: Normalization? = null) {
-    val shown get() = normalization?.image ?: source
-
-    val shownPage get() = if (normalization == null) page else 0
-}
+data class ScorePage(val source: String, val page: Int = 0, val crop: PageCrop, val normalization: Normalization)
 
 @Serializable
 data class Normalization(val image: String, val threshold: Float, val erased: List<EraserStroke> = emptyList())

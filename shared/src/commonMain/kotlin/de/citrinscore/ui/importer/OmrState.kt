@@ -1,30 +1,23 @@
 package de.citrinscore.ui.importer
 
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import de.citrinscore.score.PageCrop
 import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.omr.RecognitionPage
 import de.citrinscore.score.omr.musicXmlPreview
 import de.citrinscore.score.omr.recognizeMusic
-import de.citrinscore.score.render.PageSource
-import de.citrinscore.score.render.ScoreRenderer
-import de.citrinscore.score.render.scanSize
 import de.citrinscore.score.scan.EraserStroke
 import de.citrinscore.ui.pages.PreviewPage
 import de.citrinscore.util.attempt
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private const val OMR_DELAY_MILLIS = 500L
 
-data class OmrPageInput(val key: String, val normalize: Boolean, val crop: PageCrop?, val erased: List<EraserStroke>)
+data class OmrPageInput(val key: String, val crop: PageCrop?, val erased: List<EraserStroke>)
 
 data class OmrInput(val key: String, val pages: List<OmrPageInput>)
 
@@ -78,17 +71,4 @@ internal fun CoroutineScope.launchMusicRecognition(
         }
         publish(input, result ?: OmrState.Failed(input))
     }
-}
-
-private const val OMR_RESOLUTION = 2000f
-
-internal suspend fun PageSource.recognitionPage(page: Int, region: Rect): RecognitionPage {
-    val scale = OMR_RESOLUTION / region.width
-    return RecognitionPage(withContext(Dispatchers.Default) { render(page, region, scanSize(region.size, scale)) }, scale)
-}
-
-internal suspend fun ScoreRenderer.recognitionPage(page: Int): RecognitionPage {
-    val size = pageSizes[page]
-    val scale = OMR_RESOLUTION / size.width
-    return RecognitionPage(render(page, Rect(Offset.Zero, size), scanSize(size, scale)), scale)
 }

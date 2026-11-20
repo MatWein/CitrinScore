@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 
 private const val OPEN_SOURCE_LIMIT = 3
 
-class SourcePage(val file: PlatformFile, val index: Int, val crop: PageCrop)
+class SourcePage(val file: PlatformFile, val index: Int, val crop: PageCrop, val unitWidth: Float? = null)
 
 class SourceScoreRenderer(
     private val pages: List<SourcePage>,
@@ -29,8 +29,9 @@ class SourceScoreRenderer(
         val source = sources.remove(target.file.path) ?: open(target.file)
         sources[target.file.path] = source
         if (sources.size > OPEN_SOURCE_LIMIT) sources.remove(sources.keys.first())?.close()
+        val scale = target.unitWidth?.let { source.pageSizes[target.index].width / it } ?: 1f
         withContext(Dispatchers.Default) {
-            source.render(target.index, region.translate(target.crop.left, target.crop.top), size)
+            source.render(target.index, region.translate(target.crop.left, target.crop.top).scaled(scale), size)
         }
     }
 
@@ -39,3 +40,5 @@ class SourceScoreRenderer(
         sources.clear()
     }
 }
+
+fun Rect.scaled(scale: Float) = Rect(left * scale, top * scale, right * scale, bottom * scale)

@@ -1,7 +1,9 @@
 package de.citrinscore.ui.viewer.annotations
 
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.library.DisplayRef
 import de.citrinscore.library.PartRef
+import de.citrinscore.score.PartDisplay
 import androidx.compose.ui.geometry.Rect
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.MeasureAnchor
@@ -39,7 +41,7 @@ class AnnotationViewModelTest {
 
     private val score = Files.createTempDirectory("citrinscore-annotations").toFile()
     private val repository = LibraryRepository()
-    private val part = PartRef(PlatformFile(score), "")
+    private val part = DisplayRef(PartRef(PlatformFile(score), ""), PartDisplay.Original)
     private val stroke = InkStroke(page = 0, points = listOf(1f, 1f, 5f, 5f), width = 1f)
 
     @BeforeTest
@@ -89,8 +91,8 @@ class AnnotationViewModelTest {
 
     @Test
     fun `switching the part shows its annotations and starts a new history`() = runTest {
-        val other = PartRef(PlatformFile(score), "parts/other")
-        File(score, other.directory).mkdirs()
+        val other = DisplayRef(PartRef(PlatformFile(score), "parts/other"), PartDisplay.Original)
+        File(score, other.part.directory).mkdirs()
         repository.saveAnnotations(other, ScoreAnnotations(strokes = listOf(stroke)))
         val selected = MutableStateFlow(part)
         val viewModel = AnnotationViewModel(selected, repository, MutableStateFlow(null))
@@ -102,6 +104,23 @@ class AnnotationViewModelTest {
             withTimeout(SAVE_TIMEOUT) { while (viewModel.state.value.annotations.strokes != listOf(stroke)) delay(POLL_INTERVAL) }
         }
         assertFalse(viewModel.state.value.canUndo)
+    }
+
+    @Test
+    fun `every display of a part keeps its own annotations`() = runTest {
+        val normalized = part.copy(display = PartDisplay.Normalized)
+        val selected = MutableStateFlow(part)
+        val viewModel = AnnotationViewModel(selected, repository, MutableStateFlow(null))
+        viewModel.addStrokes(listOf(stroke))
+        assertSaved(ScoreAnnotations(listOf(stroke)))
+
+        selected.value = normalized
+
+        withContext(Dispatchers.Default) {
+            withTimeout(SAVE_TIMEOUT) { while (viewModel.state.value.annotations.strokes.isNotEmpty()) delay(POLL_INTERVAL) }
+        }
+        assertEquals(ScoreAnnotations(), repository.annotations(normalized))
+        assertEquals(ScoreAnnotations(listOf(stroke)), repository.annotations(part))
     }
 
     @Test

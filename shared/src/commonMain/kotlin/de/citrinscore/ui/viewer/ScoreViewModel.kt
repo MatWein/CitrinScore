@@ -6,16 +6,18 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import de.citrinscore.library.DisplayRef
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.library.PartRef
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScorePart
+import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.PlaybackPreferences
+import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.Recognition
 import de.citrinscore.score.ScoreViewState
-import de.citrinscore.score.isReflowable
 import de.citrinscore.score.musicxml.EngravedPage
 import de.citrinscore.score.musicxml.EngravingLayout
 import de.citrinscore.score.musicxml.MeasureAnchors
@@ -68,6 +70,9 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val _part = MutableStateFlow<PartRef?>(null)
     val part: StateFlow<PartRef?> = _part.asStateFlow()
 
+    private val _display = MutableStateFlow<DisplayRef?>(null)
+    val display: StateFlow<DisplayRef?> = _display.asStateFlow()
+
     private val _anchors = MutableStateFlow<MeasureAnchors?>(null)
     val anchors: StateFlow<MeasureAnchors?> = _anchors.asStateFlow()
 
@@ -75,12 +80,14 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     val notes: StateFlow<NotePositions?> = _notes.asStateFlow()
 
     private val viewportSize = MutableStateFlow<Size?>(null)
-    private val renderers = mutableMapOf<String, ScoreRenderer>()
+    private val renderers = mutableMapOf<Pair<String, PartDisplay>, ScoreRenderer>()
     private val engravers = mutableMapOf<String, MusicXmlEngraver>()
+    private val recognitions = mutableMapOf<String, RecognizedMusic>()
     private val performances = mutableMapOf<String, ScorePerformance>()
     private var manifest: ScoreManifest? = null
     private var detection: Job? = null
     private val showing = Mutex()
+    private val opening = Mutex()
 
     init {
         viewModelScope.launch {
@@ -93,7 +100,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             viewportSize.filterNotNull().collectLatest {
                 delay(VIEWPORT_SETTLE_MILLIS)
                 val directory = _part.value?.directory ?: return@collectLatest
-                if (manifest?.part(directory)?.content?.isReflowable == true) show(directory)
+                if (manifest?.part(directory)?.shownDisplay?.isEngraved == true) show(directory)
             }
         }
     }
@@ -110,33 +117,46 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         }
     }
 
+    fun selectDisplay(part: PartRef, display: PartDisplay, view: ScoreViewState?) {
+        val current = manifest ?: return
+        val shown = current.part(part.directory).shownDisplay
+        if (shown == display) return
+        logger.info("Showing {} as {}", part, display)
+        saveView(part, shown, view)
+        manifest = manifest?.updatePart(part.directory) { it.copy(display = display) }
+        viewModelScope.launch {
+            show(part.directory)
+            withContext(NonCancellable) { attempt { repository.saveDisplay(part, display) } }
+        }
+    }
+
     fun reflow(part: PartRef, zoom: Float, view: ScoreViewState?) {
         val current = manifest ?: return
         val scale = (current.part(part.directory).reflowScale * zoom).coerceIn(ScoreViewport.MIN_ZOOM, ScoreViewport.MAX_ZOOM)
         logger.info("Reflowing {} at scale {}", part, scale)
         val reflowed = ScoreViewState(scale, view?.x ?: 0f, view?.y ?: 0f)
-        manifest = current.updatePart(part.directory) { it.copy(view = reflowed) }
-        persistView(part, reflowed)
+        manifest = current.updatePart(part.directory) { it.copy(engravedView = reflowed) }
+        persistView(part, PartDisplay.MusicXml, reflowed)
         viewModelScope.launch { show(part.directory) }
     }
 
     suspend fun performance(part: PartRef): ScorePerformance? = attempt {
-        performances[part.directory] ?: engravers[part.directory]?.perform()?.also { performances[part.directory] = it }
+        performances[part.directory] ?: engraver(part, manifest?.part(part.directory) ?: return@attempt null)?.perform()?.also { performances[part.directory] = it }
     }
 
     suspend fun writtenPitches(part: PartRef, notes: Collection<String>): Map<String, Int> =
-        attempt { engravers[part.directory]?.writtenPitches(notes) }.orEmpty()
+        attempt { manifest?.part(part.directory)?.let { engraver(part, it) }?.writtenPitches(notes) }.orEmpty()
 
-    suspend fun render(part: PartRef, page: Int, region: Rect, size: IntSize): ImageBitmap? =
-        attempt { renderers[part.directory]?.render(page, region, size) }
+    suspend fun render(part: PartRef, display: PartDisplay, page: Int, region: Rect, size: IntSize): ImageBitmap? =
+        attempt { renderers[part.directory to display]?.render(page, region, size) }
 
-    fun saveView(part: PartRef, view: ScoreViewState?) {
+    fun saveView(part: PartRef, display: PartDisplay, view: ScoreViewState?) {
         val current = manifest ?: return
         val scorePart = current.part(part.directory)
-        val stored = (if (scorePart.content.isReflowable) view?.copy(zoom = scorePart.reflowScale) else view) ?: return
-        if (scorePart.view == stored) return
-        manifest = current.updatePart(part.directory) { it.copy(view = stored) }
-        persistView(part, stored)
+        val stored = (if (display.isEngraved) view?.copy(zoom = scorePart.reflowScale) else view) ?: return
+        if (scorePart.view(display) == stored) return
+        manifest = current.updatePart(part.directory) { it.withView(display, stored) }
+        persistView(part, display, stored)
     }
 
     fun playback(part: PartRef): PlaybackPreferences? = manifest?.part(part.directory)?.playback
@@ -150,9 +170,9 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         }
     }
 
-    private fun persistView(part: PartRef, view: ScoreViewState) {
+    private fun persistView(part: PartRef, display: PartDisplay, view: ScoreViewState) {
         viewModelScope.launch {
-            withContext(NonCancellable) { attempt { repository.saveView(part, view) } }
+            withContext(NonCancellable) { attempt { repository.saveView(part, display, view) } }
         }
     }
 
@@ -161,6 +181,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private suspend fun present(directory: String) {
         val current = manifest ?: return
         val part = current.part(directory)
+        val display = part.shownDisplay
         val ref = PartRef(score, directory)
         detection?.cancelAndJoin()
         if (_part.value != ref) {
@@ -168,50 +189,54 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             _notes.value = null
         }
         _part.value = ref
-        val content = part.content
-        logger.info("Showing {} as {}", ref, content::class.simpleName)
+        _display.value = DisplayRef(ref, display)
+        logger.info("Showing {} as {}", ref, display)
+        val recognized = part.recognition?.let { attempt { recognition(ref, it) } }
         var engraved: List<EngravedPage>? = null
-        val renderer = if (content is ScoreContent.MusicXml) {
+        val renderer = if (display.isEngraved) {
             val size = viewportSize.value ?: return run { _state.value = ScoreViewerState.Loading }
-            attempt { engrave(ref, content, layout(size, part.reflowScale)) }?.let { (renderer, pages) ->
+            attempt { engrave(ref, part, layout(size, part.reflowScale)) }?.let { (renderer, pages) ->
                 engraved = pages
                 renderer
             }
         } else {
-            attempt { renderers.getOrPut(directory) { ScoreRenderers.open(ref.root, content) } }
+            attempt { renderers.getOrPut(directory to display) { ScoreRenderers.open(ref.root, part.content, display) } }
         } ?: return run { _state.value = ScoreViewerState.Failed }
         if (_part.value != ref) return
         _anchors.value = engraved?.let { pages -> MeasureAnchors(pages.map { it.staves }) }
-        _notes.value = engraved?.let(::NotePositions) ?: part.recognition?.let { recognized(ref, it, renderer.pageSizes.size) }
-        val breaks = part.systemBreaks?.takeIf { !content.isReflowable && it.size == renderer.pageSizes.size }
+        _notes.value = engraved?.let(::NotePositions) ?: recognized?.layout?.notePositions(renderer.pageSizes.size)
+        val breaks = part.systemBreaks?.takeIf { !display.isEngraved && it.size == renderer.pageSizes.size }
         _systemBreaks.value = breaks.orEmpty()
         _state.value = ScoreViewerState.Ready(
             metadata = current.metadata,
             parts = current.parts,
             part = ref,
+            display = display,
+            displays = part.displays,
             pageSizes = renderer.pageSizes,
-            view = if (content.isReflowable) part.view?.copy(zoom = DEFAULT_REFLOW_SCALE) else part.view,
-            reflowScale = part.reflowScale.takeIf { content.isReflowable },
+            view = if (display.isEngraved) part.engravedView?.copy(zoom = DEFAULT_REFLOW_SCALE) else part.view,
+            reflowScale = part.reflowScale.takeIf { display.isEngraved },
             isPlayable = engraved != null || _notes.value != null,
         )
-        if (breaks == null) detection = viewModelScope.launch { detectSystemBreaks(ref, renderer, persist = !content.isReflowable) }
+        if (breaks == null) detection = viewModelScope.launch { detectSystemBreaks(ref, renderer, persist = !display.isEngraved) }
     }
 
-    private suspend fun engrave(part: PartRef, content: ScoreContent.MusicXml, layout: EngravingLayout): Pair<ScoreRenderer, List<EngravedPage>> {
-        val engraver = engravers.getOrPut(part.directory) { openMusicXmlEngraver(CitScore.resolve(part.root, content.path)) }
-        val pages = engraver.engrave(layout)
+    private suspend fun engrave(part: PartRef, scorePart: ScorePart, layout: EngravingLayout): Pair<ScoreRenderer, List<EngravedPage>> {
+        val pages = checkNotNull(engraver(part, scorePart)).engrave(layout)
         val renderer = PageSourceRenderer(pages.pageSource())
-        renderers.put(part.directory, renderer)?.close()
+        renderers.put(part.directory to PartDisplay.MusicXml, renderer)?.close()
         return renderer to pages
     }
 
-    private suspend fun recognized(part: PartRef, recognition: Recognition, pages: Int): NotePositions? = attempt {
-        val music = repository.recognition(part, recognition) ?: return@attempt null
-        engravers.remove(part.directory)?.close()
-        engravers[part.directory] = openMusicXmlEngraver(music.musicXml.encodeToByteArray(), compressed = false)
-        performances.remove(part.directory)
-        music.layout.notePositions(pages)
+    private suspend fun engraver(part: PartRef, scorePart: ScorePart): MusicXmlEngraver? = opening.withLock {
+        engravers[part.directory] ?: when (val content = scorePart.content) {
+            is ScoreContent.MusicXml -> openMusicXmlEngraver(CitScore.resolve(part.root, content.path))
+            is ScoreContent.Pages -> scorePart.recognition?.let { recognition(part, it) }?.let { openMusicXmlEngraver(it.musicXml.encodeToByteArray(), compressed = false) }
+        }?.also { engravers[part.directory] = it }
     }
+
+    private suspend fun recognition(part: PartRef, recognition: Recognition): RecognizedMusic? =
+        recognitions[part.directory] ?: repository.recognition(part, recognition)?.also { recognitions[part.directory] = it }
 
     private fun layout(viewport: Size, scale: Float): EngravingLayout {
         val width = maxOf(viewport.width * UNITS_PER_DP, MIN_LAYOUT_WIDTH) / scale
@@ -221,7 +246,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         )
     }
 
-    private val ScorePart.reflowScale get() = view?.zoom ?: DEFAULT_REFLOW_SCALE
+    private val ScorePart.reflowScale get() = engravedView?.zoom ?: DEFAULT_REFLOW_SCALE
 
     private suspend fun detectSystemBreaks(part: PartRef, renderer: ScoreRenderer, persist: Boolean) {
         for (page in renderer.pageSizes.indices) {

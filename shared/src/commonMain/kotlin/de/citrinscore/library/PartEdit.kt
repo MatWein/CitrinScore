@@ -23,7 +23,7 @@ class NewPage(
     val origin: PageOrigin,
     val page: Int,
     val crop: PageCrop,
-    val normalization: NewNormalization? = null,
+    val normalization: NewNormalization,
     val previousIndex: Int? = null,
 )
 

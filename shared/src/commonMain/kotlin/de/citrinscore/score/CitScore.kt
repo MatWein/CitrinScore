@@ -8,7 +8,6 @@ object CitScore {
     const val MANIFEST_FILE = "manifest.json"
     const val DEVICE_STATE_FILE = "device.json"
     const val THUMBNAIL_FILE = "thumbnail.jpg"
-    const val ANNOTATIONS_FILE = "annotations.json"
     const val RECOGNITION_MUSICXML_FILE = "recognition.musicxml"
     const val RECOGNITION_LAYOUT_FILE = "recognition.json"
     const val PAGES_DIRECTORY = "pages"
@@ -36,4 +35,6 @@ object CitScore {
     fun resolvePath(directory: String, relativePath: String) = listOf(directory, relativePath).filter { it.isNotEmpty() }.joinToString("/")
 
     fun partDirectory(id: String) = "$PARTS_DIRECTORY/$id"
+
+    fun annotationsFile(display: PartDisplay) = "annotations-${display.name.lowercase()}.json"
 }

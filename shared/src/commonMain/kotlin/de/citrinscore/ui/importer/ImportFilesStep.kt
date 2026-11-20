@@ -4,14 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,8 +20,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_crop
@@ -45,7 +41,6 @@ import io.github.vinceglb.filekit.name
 import org.jetbrains.compose.resources.painterResource
 
 private const val DEFAULT_ERASER_WIDTH = 0.02f
-private const val LABEL_ALPHA = 0.7f
 private val EraserWidthRange = 0.005f..0.08f
 
 @Composable
@@ -74,7 +69,7 @@ private fun SourceList(draft: PartDraft, editor: PartDraftEditor, modifier: Modi
         type = importPickerExtensions?.let { FileKitType.File(it) } ?: FileKitType.File(),
         mode = FileKitMode.Multiple(),
     ) { picked -> picked?.let { editor.addFiles(it) } }
-    val camera = rememberCameraLauncher { photo -> editor.addFiles(listOf(photo), fromCamera = true) }
+    val camera = rememberCameraLauncher { photo -> editor.addFiles(listOf(photo)) }
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
         draft.musicXml?.let { musicXml ->
             NumberedRow(position = 1, name = musicXml.file.name, reorderable = false, onMoveUp = null, onMoveDown = null, onRemove = editor::removeMusicXml)
@@ -106,45 +101,28 @@ private fun PagesPanel(draft: PartDraft, editor: PartDraftEditor, modifier: Modi
         failed = draft.previewFailed,
         modifier = modifier,
         controls = {
-            if (draft.hasNormalizedPages) {
-                LabeledSlider(strings.scanThreshold, draft.threshold, ScanThresholdRange, editor::updateThreshold)
-                ToolSelector(tool) { tool = it }
-                if (tool == PageTool.Eraser) {
-                    LabeledSlider(strings.eraserSize, eraserWidth, EraserWidthRange, { eraserWidth = it }) {
-                        IconAction(Res.drawable.ic_undo, strings.undo, onClick = editor::undoErase, enabled = draft.erasedPages.isNotEmpty())
-                    }
+            LabeledSlider(strings.scanThreshold, draft.threshold, ScanThresholdRange, editor::updateThreshold)
+            ToolSelector(tool) { tool = it }
+            if (tool == PageTool.Eraser) {
+                LabeledSlider(strings.eraserSize, eraserWidth, EraserWidthRange, { eraserWidth = it }) {
+                    IconAction(Res.drawable.ic_undo, strings.undo, onClick = editor::undoErase, enabled = draft.erasedPages.isNotEmpty())
                 }
             }
         },
     ) {
         draft.pages.forEach { page ->
             key(page.key) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.ExtraSmall)) {
-                    NormalizeSwitch(page.normalize) { editor.setNormalize(page.key, it) }
-                    page.view?.let { view ->
-                        PageEditor(
-                            page = view,
-                            tool = if (page.normalize) tool else PageTool.Crop,
-                            eraserWidth = eraserWidth,
-                            onCrop = { editor.cropPage(page.key, it) },
-                            onErase = { editor.erasePage(page.key, it) },
-                        )
-                    }
+                page.view?.let { view ->
+                    PageEditor(
+                        page = view,
+                        tool = tool,
+                        eraserWidth = eraserWidth,
+                        onCrop = { editor.cropPage(page.key, it) },
+                        onErase = { editor.erasePage(page.key, it) },
+                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NormalizeSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(LocalStrings.current.normalizePage, style = MaterialTheme.typography.bodyMedium, color = Color.Black.copy(alpha = LABEL_ALPHA))
-        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

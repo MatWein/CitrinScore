@@ -31,6 +31,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.citrinscore.score.PageCrop
+import de.citrinscore.score.render.scaled
 import de.citrinscore.score.scan.EraserStroke
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -153,5 +154,3 @@ private data class CropHandle(val left: Boolean, val top: Boolean, val right: Bo
             abs(value - edge) <= radius && abs(value - edge) <= abs(value - opposite)
     }
 }
-
-private fun Rect.scaled(scale: Float) = Rect(left * scale, top * scale, right * scale, bottom * scale)

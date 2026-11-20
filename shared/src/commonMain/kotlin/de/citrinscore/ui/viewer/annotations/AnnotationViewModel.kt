@@ -3,7 +3,7 @@ package de.citrinscore.ui.viewer.annotations
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
-import de.citrinscore.library.PartRef
+import de.citrinscore.library.DisplayRef
 import de.citrinscore.score.InkStroke
 import de.citrinscore.score.MeasureStroke
 import de.citrinscore.score.MeasureText
@@ -22,7 +22,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class AnnotationViewModel(
-    private val part: StateFlow<PartRef?>,
+    private val display: StateFlow<DisplayRef?>,
     private val repository: LibraryRepository,
     private val anchors: StateFlow<MeasureAnchors?>,
 ) : ViewModel() {
@@ -38,7 +38,7 @@ class AnnotationViewModel(
 
     init {
         viewModelScope.launch {
-            part.filterNotNull().collectLatest { ref ->
+            display.filterNotNull().collectLatest { ref ->
                 history.clear()
                 show(ScoreAnnotations())
                 _state.update { it.copy(draft = null, canUndo = false) }
@@ -121,7 +121,7 @@ class AnnotationViewModel(
     }
 
     private fun save(annotations: ScoreAnnotations) {
-        val ref = part.value ?: return
+        val ref = display.value ?: return
         viewModelScope.launch {
             saving.withLock {
                 attempt { repository.saveAnnotations(ref, annotations) } ?: _state.update { it.copy(saveFailed = true) }

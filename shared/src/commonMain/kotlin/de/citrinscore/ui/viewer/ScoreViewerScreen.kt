@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -26,6 +28,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,19 +65,25 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.citrinscore.i18n.LocalStrings
+import de.citrinscore.i18n.Strings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_downward
 import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_check
+import de.citrinscore.resources.ic_contrast
+import de.citrinscore.resources.ic_image
+import de.citrinscore.resources.ic_library_music
 import de.citrinscore.resources.ic_queue_music
 import de.citrinscore.resources.ic_edit_note
 import de.citrinscore.resources.ic_music_note
+import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.musicxml.NotePositions
 import de.citrinscore.ui.viewer.playback.PlaybackCursor
 import de.citrinscore.ui.viewer.playback.PlaybackBar
@@ -108,6 +120,9 @@ private const val CURSOR_ALPHA = 0.25f
 private const val SUBTITLE_SEPARATOR = " · "
 private val ZoomSliderWidth = 320.dp
 private val ZoomLabelWidth = 56.dp
+private val ToggleSegmentSize = DpSize(40.dp, 28.dp)
+private val ToggleIconSize = 18.dp
+private const val TOGGLE_ALPHA = 0.85f
 
 @Composable
 fun ScoreViewerScreen(
@@ -185,34 +200,40 @@ private fun ViewerContent(
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
                 val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
-                val render: PageRenderer = remember(state.part) { { page, region, size -> viewModel.render(state.part, page, region, size) } }
+                val render: PageRenderer = remember(state.part, state.display) {
+                    { page, region, size -> viewModel.render(state.part, state.display, page, region, size) }
+                }
                 val anchors by viewModel.anchors.collectAsStateWithLifecycle()
                 val editing = annotations.isEditing && (!state.isReflowable || anchors != null)
                 val notes by viewModel.notes.collectAsStateWithLifecycle()
                 val cursor by playbackViewModel.cursor.collectAsStateWithLifecycle()
-                ScoreDocument(
-                    pageSizes = state.pageSizes,
-                    systemBreaks = systemBreaks,
-                    viewport = viewport,
-                    render = render,
-                    paperColors = paperColors(),
-                    annotations = annotations.annotations,
-                    annotationInput = AnnotationInput(
-                        tool = annotations.tool,
-                        onStrokes = annotationViewModel::addStrokes,
-                        onErase = annotationViewModel::erase,
-                        onTextTap = annotationViewModel::startText,
-                        sizing = anchors?.staffSizing(),
-                    ).takeIf { editing },
-                    highlight = playbackHighlight(cursor, notes),
-                    onTap = notes?.takeIf { playback.isOpen && !editing }?.let { positions ->
-                        { page, position -> positions.nearest(page, position)?.let(playbackViewModel::select) }
-                    },
-                )
-                PersistView(viewport, state.part, viewModel)
+                key(state.part, state.display) {
+                    ScoreDocument(
+                        pageSizes = state.pageSizes,
+                        systemBreaks = systemBreaks,
+                        viewport = viewport,
+                        render = render,
+                        paperColors = paperColors(),
+                        annotations = annotations.annotations,
+                        annotationInput = AnnotationInput(
+                            tool = annotations.tool,
+                            onStrokes = annotationViewModel::addStrokes,
+                            onErase = annotationViewModel::erase,
+                            onTextTap = annotationViewModel::startText,
+                            sizing = anchors?.staffSizing(),
+                        ).takeIf { editing },
+                        highlight = playbackHighlight(cursor, notes),
+                        onTap = notes?.takeIf { playback.isOpen && !editing }?.let { positions ->
+                            { page, position -> positions.nearest(page, position)?.let(playbackViewModel::select) }
+                        },
+                    )
+                }
+                PersistView(viewport, state.part, state.display, viewModel)
                 if (state.isReflowable) ReflowOnZoom(viewport, state.part, viewModel)
                 if (editing) {
                     AnnotationToolbar(annotations, annotationViewModel, Modifier.align(Alignment.TopCenter).padding(Spacing.Large))
+                } else if (state.displays.size > 1) {
+                    DisplayToggle(state, viewport, viewModel, Modifier.align(Alignment.TopEnd).padding(Spacing.Small))
                 }
             }
         }
@@ -276,15 +297,15 @@ private fun paperColors(): PaperColors? {
 }
 
 @Composable
-private fun PersistView(viewport: ScoreViewport, part: PartRef, viewModel: ScoreViewModel) {
+private fun PersistView(viewport: ScoreViewport, part: PartRef, display: PartDisplay, viewModel: ScoreViewModel) {
     LaunchedEffect(viewport) {
         snapshotFlow { viewport.zoom to viewport.offset }.collectLatest {
             delay(SAVE_DELAY_MILLIS)
-            viewModel.saveView(part, viewport.view)
+            viewModel.saveView(part, display, viewport.view)
         }
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveView(part, viewport.view) }
-    DisposableEffect(viewport) { onDispose { viewModel.saveView(part, viewport.view) } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveView(part, display, viewport.view) }
+    DisposableEffect(viewport) { onDispose { viewModel.saveView(part, display, viewport.view) } }
 }
 
 @Composable
@@ -389,6 +410,40 @@ private fun PartAction(toolbar: ToolbarState) {
             }
         }
     }
+}
+
+@Composable
+private fun DisplayToggle(state: ScoreViewerState.Ready, viewport: ScoreViewport, viewModel: ScoreViewModel, modifier: Modifier) {
+    val strings = LocalStrings.current
+    val colors = SegmentedButtonDefaults.colors(inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = TOGGLE_ALPHA))
+    SingleChoiceSegmentedButtonRow(modifier) {
+        state.displays.forEachIndexed { index, display ->
+            SegmentedButton(
+                selected = display == state.display,
+                onClick = { viewModel.selectDisplay(state.part, display, viewport.view) },
+                shape = SegmentedButtonDefaults.itemShape(index, state.displays.size),
+                modifier = Modifier.size(ToggleSegmentSize),
+                colors = colors,
+                contentPadding = PaddingValues(),
+                icon = {},
+            ) {
+                Icon(painterResource(display.icon), contentDescription = strings.displayName(display), modifier = Modifier.size(ToggleIconSize))
+            }
+        }
+    }
+}
+
+private val PartDisplay.icon
+    get() = when (this) {
+        PartDisplay.Original -> Res.drawable.ic_image
+        PartDisplay.Normalized -> Res.drawable.ic_contrast
+        PartDisplay.MusicXml -> Res.drawable.ic_library_music
+    }
+
+private fun Strings.displayName(display: PartDisplay) = when (display) {
+    PartDisplay.Original -> displayOriginal
+    PartDisplay.Normalized -> displayNormalized
+    PartDisplay.MusicXml -> displayMusicXml
 }
 
 @Composable

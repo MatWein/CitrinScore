@@ -16,13 +16,11 @@ data class DraftPage(
     val file: PlatformFile,
     val page: Int,
     val pageCount: Int,
-    val normalize: Boolean,
     val key: String = Uuid.random().toString(),
     val storedPath: String? = null,
     val previousIndex: Int? = null,
     val crop: PageCrop? = null,
     val erased: List<EraserStroke> = emptyList(),
-    val sourceSize: Size? = null,
     val image: ImageBitmap? = null,
     val size: Size? = null,
     val failed: Boolean = false,
@@ -53,11 +51,9 @@ data class PartDraft(
 
     val isPreviewReady get() = pages.isNotEmpty() && !isLoadingPreview && !previewFailed
 
-    val hasNormalizedPages get() = pages.any { it.normalize }
-
     val supportsOmr get() = musicXml == null && pages.isNotEmpty()
 
-    val omrInput get() = OmrInput(key, pages.map { OmrPageInput(it.key, it.normalize, it.crop, it.erased) })
+    val omrInput get() = OmrInput(key, pages.map { OmrPageInput(it.key, it.crop, it.erased) })
 
     val keepsStoredRecognition get() = omrEnabled && storedRecognition?.input == omrInput
 

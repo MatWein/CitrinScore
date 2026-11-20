@@ -19,7 +19,6 @@ import de.citrinscore.score.render.openPageSource
 import de.citrinscore.score.render.scanSize
 import de.citrinscore.score.scan.DEFAULT_SCAN_THRESHOLD
 import de.citrinscore.score.scan.EraserStroke
-import de.citrinscore.score.scan.SCAN_PAGE_WIDTH
 import de.citrinscore.score.scan.ScanPage
 import de.citrinscore.score.scan.scanPage
 import de.citrinscore.ui.pages.PreviewPage
@@ -78,14 +77,13 @@ class PartDraftEditor(private val scope: CoroutineScope) {
                         file = CitScore.resolve(root, page.source),
                         page = page.page,
                         pageCount = content.pages.count { it.source == page.source },
-                        normalize = page.normalization != null,
                         storedPath = page.source,
                         previousIndex = index,
                         crop = page.crop,
-                        erased = page.normalization?.erased.orEmpty(),
+                        erased = page.normalization.erased,
                     )
                 },
-                threshold = content.pages.firstNotNullOfOrNull { it.normalization?.threshold } ?: DEFAULT_SCAN_THRESHOLD,
+                threshold = content.pages.firstOrNull()?.normalization?.threshold ?: DEFAULT_SCAN_THRESHOLD,
                 omrEnabled = part.recognition != null,
             )
         }
@@ -106,7 +104,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
 
     fun enableOmr(enabled: Boolean) = _draft.update { draft -> draft.copy(omrEnabled = enabled, omr = draft.omr as? OmrState.Done) }
 
-    fun addFiles(files: List<PlatformFile>, fromCamera: Boolean = false) {
+    fun addFiles(files: List<PlatformFile>) {
         val key = _draft.value.key
         val musicXml = files.firstOrNull { SourceKind.of(it) == SourceKind.MusicXml }
         if (musicXml != null) {
@@ -120,9 +118,9 @@ class PartDraftEditor(private val scope: CoroutineScope) {
                 logger.info("Adding pages of {}", file.path)
                 val count = attempt { openPageSource(file).use { it.pageSizes.size } }
                 val added = if (count == null) {
-                    listOf(DraftPage(file, 0, 1, fromCamera, failed = true))
+                    listOf(DraftPage(file, 0, 1, failed = true))
                 } else {
-                    List(count) { page -> DraftPage(file, page, count, fromCamera) }
+                    List(count) { page -> DraftPage(file, page, count) }
                 }
                 _draft.update { draft -> if (draft.key == key) draft.copy(pages = draft.pages + added, musicXml = null) else draft }
                 added.filterNot { it.failed }.forEach { loadPage(key, it.key) }
@@ -139,18 +137,6 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     }
 
     fun removeMusicXml() = _draft.update { it.copy(musicXml = null) }
-
-    fun setNormalize(key: String, normalize: Boolean) {
-        val draft = _draft.value
-        val page = draft.pages.firstOrNull { it.key == key }?.takeIf { it.normalize != normalize } ?: return
-        val factor = page.sourceSize?.let { SCAN_PAGE_WIDTH / it.width } ?: 1f
-        val crop = page.crop?.let { if (normalize) it.scaled(factor) else it.scaled(1 / factor) }
-        _draft.update { current ->
-            current.withPage(key) { it.copy(normalize = normalize, crop = crop, erased = emptyList(), image = null, size = null) }
-                .copy(erasedPages = current.erasedPages.filterNot { it == key })
-        }
-        loadPage(draft.key, key)
-    }
 
     fun cropPage(key: String, crop: PageCrop) = _draft.update { draft -> draft.withPage(key) { it.copy(crop = crop) } }
 
@@ -169,7 +155,7 @@ class PartDraftEditor(private val scope: CoroutineScope) {
         thresholdJob?.cancel()
         thresholdJob = scope.launch {
             delay(THRESHOLD_DELAY_MILLIS)
-            _draft.value.pages.filter { it.normalize }.forEach { page ->
+            _draft.value.pages.forEach { page ->
                 val scan = scanPages[page.key] ?: return@forEach
                 val image = attempt { previewImage(scan.binarized(threshold), scan) } ?: return@forEach
                 _draft.update { draft -> if (draft.key == key) draft.withPage(page.key) { it.copy(image = image) } else draft }
@@ -187,51 +173,32 @@ class PartDraftEditor(private val scope: CoroutineScope) {
 
     private suspend fun newPage(draft: PartDraft, page: DraftPage): NewPage {
         val origin = page.storedPath?.let(PageOrigin::Stored) ?: PageOrigin.File(page.file)
-        val normalization = if (page.normalize) {
-            val image = scanPages.getValue(page.key).binarized(draft.threshold, page.erased)
-            NewNormalization(withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) }, draft.threshold, page.erased)
-        } else {
-            null
-        }
+        val image = scanPages.getValue(page.key).binarized(draft.threshold, page.erased)
+        val normalization = NewNormalization(withContext(Dispatchers.Default) { image.encodeToByteArray(ImageFormat.PNG) }, draft.threshold, page.erased)
         return NewPage(origin, page.page, checkNotNull(page.crop), normalization, page.previousIndex)
     }
 
     private suspend fun recognitionPages(draft: PartDraft): List<RecognitionPage> = draft.pages.map { page ->
         val crop = checkNotNull(page.crop)
-        if (page.normalize) {
-            val image = scanPages.getValue(page.key).grayscale(page.erased)
-            RecognitionPage(withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, crop.rect, scanSize(crop.size, 1f)) } }, 1f)
-        } else {
-            openPageSource(page.file).use { it.recognitionPage(page.page, crop.rect) }
-        }
+        val image = scanPages.getValue(page.key).grayscale(page.erased)
+        RecognitionPage(withContext(Dispatchers.Default) { BitmapPageSource(image).use { it.render(0, crop.rect, scanSize(crop.size, 1f)) } }, 1f)
     }
 
     private fun loadPage(draftKey: String, pageKey: String) {
         val page = _draft.value.pages.firstOrNull { it.key == pageKey } ?: return
         scope.launch {
             val loaded = attempt {
-                openPageSource(page.file).use { source ->
-                    val sourceSize = source.pageSizes[page.page]
-                    if (page.normalize) {
-                        val scan = scanPages[page.key] ?: source.scanPage(page.page).also { scanPages[page.key] = it }
-                        val binarized = scan.binarized(_draft.value.threshold)
-                        val crop = page.crop ?: BitmapPageSource(binarized).use { it.contentCrop(0) }
-                        page.copy(sourceSize = sourceSize, image = previewImage(binarized, scan), size = scan.size, crop = crop)
-                    } else {
-                        val crop = page.crop ?: source.contentCrop(page.page)
-                        val image = withContext(Dispatchers.Default) {
-                            source.render(page.page, Rect(Offset.Zero, sourceSize), previewSize(sourceSize.width, sourceSize.height))
-                        }
-                        page.copy(sourceSize = sourceSize, image = image, size = sourceSize, crop = crop)
-                    }
-                }
+                val scan = scanPages[page.key] ?: openPageSource(page.file).use { it.scanPage(page.page) }.also { scanPages[page.key] = it }
+                val binarized = scan.binarized(_draft.value.threshold)
+                val crop = page.crop ?: BitmapPageSource(binarized).use { it.contentCrop(0) }
+                page.copy(image = previewImage(binarized, scan), size = scan.size, crop = crop)
             }
             _draft.update { draft ->
                 val current = draft.pages.firstOrNull { it.key == pageKey }
                 when {
-                    draft.key != draftKey || current == null || current.normalize != page.normalize -> draft
+                    draft.key != draftKey || current == null -> draft
                     loaded == null -> draft.withPage(pageKey) { it.copy(failed = true) }
-                    else -> draft.withPage(pageKey) { it.copy(sourceSize = loaded.sourceSize, image = loaded.image, size = loaded.size, crop = it.crop ?: loaded.crop) }
+                    else -> draft.withPage(pageKey) { it.copy(image = loaded.image, size = loaded.size, crop = it.crop ?: loaded.crop) }
                 }
             }
         }
@@ -240,6 +207,4 @@ class PartDraftEditor(private val scope: CoroutineScope) {
     private suspend fun previewImage(image: ImageBitmap, scan: ScanPage) = withContext(Dispatchers.Default) {
         BitmapPageSource(image).use { it.render(0, Rect(Offset.Zero, scan.size), previewSize(scan.size.width, scan.size.height)) }
     }
-
-    private fun PageCrop.scaled(factor: Float) = PageCrop(left * factor, top * factor, right * factor, bottom * factor)
 }
