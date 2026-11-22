@@ -22,6 +22,19 @@ Requirements:
   [homr releases](https://github.com/liebharc/homr/releases/tag/onnx_checkpoints) and bundles them into the app.
 - `dpkg-deb` and `rpmbuild` to package the desktop app on Linux, since jpackage builds both a `.deb` and an `.rpm`
   (on Arch Linux: `pacman -S dpkg rpm-tools`).
+- A JDK that contains `jpackage` and the `jmods` to package the desktop app. Fedora's OpenJDK ships the jmods
+  separately, and without them `jlink` refuses to build the runtime because Fedora modifies `java.security`.
+
+On Fedora, install everything with:
+
+```shell
+sudo dnf install java-25-openjdk-devel java-25-openjdk-jmods cmake gcc-c++ dpkg rpm-build git
+```
+
+The desktop app is packaged with the JDK the Gradle daemon runs on. If Android Studio started the daemon with its
+bundled JetBrains Runtime, which has no `jpackage`, packaging fails with `'jpackage' is missing`. Stop the daemon with
+`./gradlew --stop` and build again from the terminal. jpackage only builds packages for the current OS, so the Windows
+`.msi` has to be built on Windows or with the [Build](.github/workflows/build.yml) workflow.
 
 All versions are defined in [`gradle.properties`](gradle.properties).
 
