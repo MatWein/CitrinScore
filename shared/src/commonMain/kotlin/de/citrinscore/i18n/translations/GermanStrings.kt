@@ -159,8 +159,10 @@ object GermanStrings : Strings {
 
     override val zoom = "Zoom"
     override fun zoomPercent(percent: Int) = "$percent %"
-    override val previousPage = "Vorherige Seite"
-    override val nextPage = "Nächste Seite"
+    override val scrollDown = "Nach unten scrollen"
+    override val scrollModeBoth = "In alle Richtungen scrollen"
+    override val scrollModeVertical = "Nur hoch und runter scrollen"
+    override val scrollModeHorizontal = "Nur nach links und rechts scrollen"
     override val startRecording = "Aufnahme starten"
     override val stopRecording = "Aufnahme stoppen"
     override val recordingActive = "Aufnahme läuft"

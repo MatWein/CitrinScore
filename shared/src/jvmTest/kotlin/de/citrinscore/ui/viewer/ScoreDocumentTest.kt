@@ -29,7 +29,6 @@ class ScoreDocumentTest {
         setContent {
             ScoreDocument(
                 pageSizes = pageSizes,
-                systemBreaks = emptyList(),
                 viewport = viewport,
                 render = { _, _, size -> ImageBitmap(size.width, size.height) },
                 paperColors = null,

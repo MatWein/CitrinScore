@@ -15,11 +15,4 @@ class PageLayoutTest {
         assertEquals(listOf(Rect(5f, 5f, 1005f, 205f), Rect(5f, 215f, 505f, 415f)), layout.pages)
         assertEquals(420f, layout.height)
     }
-
-    @Test
-    fun `document breaks combine the page breaks with the gaps between pages`() {
-        val layout = PageLayout(listOf(Size(2000f, 400f), Size(1000f, 400f)), width = 1010f, margin = 5f, gap = 10f)
-
-        assertEquals(listOf(0f, 55f, 210f, 265f), layout.documentBreaks(listOf(listOf(100f), listOf(100f))))
-    }
 }

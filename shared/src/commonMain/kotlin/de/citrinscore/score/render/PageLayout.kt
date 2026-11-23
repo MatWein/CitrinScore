@@ -17,10 +17,4 @@ class PageLayout(pageSizes: List<Size>, val width: Float, margin: Float, gap: Fl
         }
         height = (pages.lastOrNull()?.bottom ?: 0f) + margin
     }
-
-    fun documentBreaks(pageBreaks: List<List<Float>>): List<Float> = listOf(0f) + pages.flatMapIndexed { index, page ->
-        val within = pageBreaks.getOrNull(index).orEmpty().map { page.top + it * scale }
-        val between = pages.getOrNull(index + 1)?.let { next -> (page.bottom + next.top) / 2 }
-        within + listOfNotNull(between)
-    }
 }

@@ -1,5 +1,7 @@
 package de.citrinscore.ui.viewer
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -27,6 +30,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -41,23 +46,29 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.layout.onSizeChanged
@@ -75,15 +86,18 @@ import de.citrinscore.i18n.Strings
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_arrow_downward
-import de.citrinscore.resources.ic_arrow_upward
 import de.citrinscore.resources.ic_check
 import de.citrinscore.resources.ic_contrast
 import de.citrinscore.resources.ic_image
 import de.citrinscore.resources.ic_library_music
 import de.citrinscore.resources.ic_piano
 import de.citrinscore.resources.ic_edit
+import de.citrinscore.resources.ic_height
+import de.citrinscore.resources.ic_open_with
+import de.citrinscore.resources.ic_width
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.score.PartDisplay
+import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.musicxml.NotePositions
 import de.citrinscore.ui.viewer.playback.PlaybackCursor
 import de.citrinscore.ui.viewer.playback.PlaybackBar
@@ -92,6 +106,7 @@ import de.citrinscore.resources.ic_zoom_in
 import de.citrinscore.library.PartRef
 import de.citrinscore.ui.parts.partName
 import de.citrinscore.ui.components.IconAction
+import de.citrinscore.ui.components.LabelTooltip
 import de.citrinscore.ui.theme.LocalDarkTheme
 import de.citrinscore.ui.theme.Spacing
 import de.citrinscore.ui.viewer.annotations.AnnotationDialogs
@@ -105,8 +120,11 @@ import de.citrinscore.ui.viewer.audio.OnAppBackground
 import de.citrinscore.ui.viewer.audio.ScoreAudioViewModel
 import de.citrinscore.ui.viewer.files.AttachmentsMenu
 import de.citrinscore.ui.viewer.files.ScoreFilesViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.exp
 import kotlin.math.ln
@@ -122,6 +140,11 @@ private val ZoomLabelWidth = 56.dp
 private val ToggleSegmentSize = DpSize(40.dp, 28.dp)
 private val ToggleIconSize = 18.dp
 private const val TOGGLE_ALPHA = 0.85f
+private val StepButtonSize = 56.dp
+private val StepIconSize = 32.dp
+private const val IDLE_MILLIS = 10_000L
+private const val IDLE_OVERLAY_ALPHA = 0.25f
+private const val OVERLAY_FADE_MILLIS = 600
 
 @Composable
 fun ScoreViewerScreen(
@@ -133,31 +156,44 @@ fun ScoreViewerScreen(
     onClose: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val scrollMode by viewModel.scrollMode.collectAsStateWithLifecycle()
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
     val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose)
     val playback by playbackViewModel.state.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
+    SideEffect { viewport?.scrollMode = scrollMode }
+    val scope = rememberCoroutineScope()
+    var activity by remember { mutableIntStateOf(0) }
+    var idle by remember { mutableStateOf(false) }
+    LaunchedEffect(activity) {
+        idle = false
+        delay(IDLE_MILLIS)
+        idle = true
+    }
+    val overlayAlpha by animateFloatAsState(if (idle) IDLE_OVERLAY_ALPHA else 1f, tween(OVERLAY_FADE_MILLIS))
+    val overlays = Overlays(overlayAlpha, scrollMode, viewModel::selectScrollMode)
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(paperColors()?.paper ?: Color.White)
             .keepScreenOn()
-            .keyboardNavigation(viewport, focusRequester, if (playback.isOpen) playbackViewModel::step else null),
+            .onUserActivity { activity++ }
+            .keyboardNavigation(viewport, ready?.reflowScale ?: 1f, scope, focusRequester, if (playback.isOpen) playbackViewModel::step else null),
     ) {
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize()) {
                 SideToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Vertical)
-                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
+                ViewerContent(state, viewport, toolbar, overlays, viewModel, Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(insets))
             }
         } else {
             Column(Modifier.fillMaxSize()) {
                 TopToolbar(toolbar)
                 val insets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                ViewerContent(state, viewport, toolbar, viewModel, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(insets))
+                ViewerContent(state, viewport, toolbar, overlays, viewModel, Modifier.weight(1f).fillMaxWidth().windowInsetsPadding(insets))
             }
         }
     }
@@ -174,11 +210,14 @@ private class ToolbarState(
     val onClose: () -> Unit,
 )
 
+private class Overlays(val alpha: Float, val scrollMode: ScrollMode, val onScrollModeChange: (ScrollMode) -> Unit)
+
 @Composable
 private fun ViewerContent(
     state: ScoreViewerState,
     viewport: ScoreViewport?,
     toolbar: ToolbarState,
+    overlays: Overlays,
     viewModel: ScoreViewModel,
     modifier: Modifier,
 ) {
@@ -198,7 +237,6 @@ private fun ViewerContent(
             ScoreViewerState.Loading -> CircularProgressIndicator()
             ScoreViewerState.Failed -> Text(strings.scoreLoadFailed, color = MaterialTheme.colorScheme.error)
             is ScoreViewerState.Ready -> if (viewport != null) {
-                val systemBreaks by viewModel.systemBreaks.collectAsStateWithLifecycle()
                 val render: PageRenderer = remember(state.part, state.display) {
                     { page, region, size -> viewModel.render(state.part, state.display, page, region, size) }
                 }
@@ -209,7 +247,6 @@ private fun ViewerContent(
                 key(state.part, state.display) {
                     ScoreDocument(
                         pageSizes = state.pageSizes,
-                        systemBreaks = systemBreaks,
                         viewport = viewport,
                         render = render,
                         paperColors = paperColors(),
@@ -230,11 +267,18 @@ private fun ViewerContent(
                 }
                 PersistView(viewport, state.part, state.display, viewModel)
                 if (state.isReflowable) ReflowOnZoom(viewport, state.part, viewModel)
+                val overlay = Modifier.graphicsLayer { alpha = overlays.alpha }
                 if (editing) {
                     AnnotationToolbar(annotations, annotationViewModel, Modifier.align(Alignment.TopCenter).padding(Spacing.Large))
-                } else if (state.displays.size > 1) {
-                    DisplayToggle(state, viewport, viewModel, Modifier.align(Alignment.TopEnd).padding(Spacing.Small))
+                } else {
+                    ScrollModeToggle(overlays.scrollMode, overlays.onScrollModeChange, overlay.align(Alignment.TopStart).padding(Spacing.Small))
+                    if (state.displays.size > 1) DisplayToggle(state, viewport, viewModel, overlay.align(Alignment.TopEnd).padding(Spacing.Small))
                 }
+                val barShown = audio.recordingStart != null || audio.player != null || playback.isOpen
+                StepButton(
+                    viewport,
+                    overlay.align(Alignment.BottomStart).padding(start = Spacing.Large, bottom = Spacing.Large + if (barShown) ViewerBarHeight else 0.dp),
+                )
             }
         }
         val barModifier = Modifier.align(Alignment.BottomCenter)
@@ -254,10 +298,31 @@ private fun ViewerContent(
     }
 }
 
-private fun Modifier.keyboardNavigation(viewport: ScoreViewport?, focusRequester: FocusRequester, step: ((Int) -> Unit)?) = this
+private fun Modifier.onUserActivity(onActivity: () -> Unit) = this
+    .onPreviewKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown) onActivity()
+        false
+    }
+    .pointerInput(onActivity) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val scrolled = event.type == PointerEventType.Scroll
+                if (scrolled || event.type == PointerEventType.Press || event.changes.any { it.pressed }) onActivity()
+            }
+        }
+    }
+
+private fun Modifier.keyboardNavigation(
+    viewport: ScoreViewport?,
+    baseScale: Float,
+    scope: CoroutineScope,
+    focusRequester: FocusRequester,
+    step: ((Int) -> Unit)?,
+) = this
     .focusRequester(focusRequester)
     .focusable()
-    .onPreviewKeyEvent { event -> event.stepPlayback(step) || viewport?.handleKey(event) == true }
+    .onPreviewKeyEvent { event -> event.stepPlayback(step) || viewport?.handleKey(event, baseScale, scope) == true }
     .pointerInput(focusRequester) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -277,11 +342,12 @@ private fun KeyEvent.stepPlayback(step: ((Int) -> Unit)?): Boolean {
     return true
 }
 
-private fun ScoreViewport.handleKey(event: KeyEvent): Boolean {
+private fun ScoreViewport.handleKey(event: KeyEvent, baseScale: Float, scope: CoroutineScope): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
     when (event.key) {
-        Key.PageDown, Key.DirectionDown, Key.Spacebar -> nextPage()
-        Key.PageUp, Key.DirectionUp -> previousPage()
+        Key.Zero, Key.NumPad0 -> if (event.isCtrlPressed) zoomTo(1f / baseScale) else return false
+        Key.PageDown, Key.DirectionDown, Key.Spacebar -> scope.launch { step(1) }
+        Key.PageUp, Key.DirectionUp -> scope.launch { step(-1) }
         Key.Plus, Key.Equals, Key.NumPadAdd -> zoomBy(ScoreViewport.ZOOM_STEP)
         Key.Minus, Key.NumPadSubtract -> zoomBy(1 / ScoreViewport.ZOOM_STEP)
         else -> return false
@@ -343,7 +409,6 @@ private fun TopToolbar(toolbar: ToolbarState) {
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
-            PageActions(toolbar)
             ZoomAction(toolbar)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -365,7 +430,6 @@ private fun SideToolbar(toolbar: ToolbarState) {
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
-            PageActions(toolbar)
             ZoomAction(toolbar)
         }
     }
@@ -413,19 +477,85 @@ private fun PartAction(toolbar: ToolbarState) {
 @Composable
 private fun DisplayToggle(state: ScoreViewerState.Ready, viewport: ScoreViewport, viewModel: ScoreViewModel, modifier: Modifier) {
     val strings = LocalStrings.current
+    OverlayToggle(
+        options = state.displays,
+        selected = state.display,
+        icon = { it.icon },
+        label = strings::displayName,
+        onSelect = { viewModel.selectDisplay(state.part, it, viewport.view) },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ScrollModeToggle(mode: ScrollMode, onChange: (ScrollMode) -> Unit, modifier: Modifier) {
+    val strings = LocalStrings.current
+    OverlayToggle(
+        options = ScrollMode.entries,
+        selected = mode,
+        icon = { it.icon },
+        label = strings::scrollModeName,
+        onSelect = onChange,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun <T> OverlayToggle(
+    options: List<T>,
+    selected: T,
+    icon: (T) -> DrawableResource,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier,
+) {
     val colors = SegmentedButtonDefaults.colors(inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = TOGGLE_ALPHA))
     SingleChoiceSegmentedButtonRow(modifier) {
-        state.displays.forEachIndexed { index, display ->
+        options.forEachIndexed { index, option ->
             SegmentedButton(
-                selected = display == state.display,
-                onClick = { viewModel.selectDisplay(state.part, display, viewport.view) },
-                shape = SegmentedButtonDefaults.itemShape(index, state.displays.size),
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
                 modifier = Modifier.size(ToggleSegmentSize),
                 colors = colors,
                 contentPadding = PaddingValues(),
                 icon = {},
             ) {
-                Icon(painterResource(display.icon), contentDescription = strings.displayName(display), modifier = Modifier.size(ToggleIconSize))
+                Icon(painterResource(icon(option)), contentDescription = label(option), modifier = Modifier.size(ToggleIconSize))
+            }
+        }
+    }
+}
+
+private val ScrollMode.icon
+    get() = when (this) {
+        ScrollMode.Both -> Res.drawable.ic_open_with
+        ScrollMode.Vertical -> Res.drawable.ic_height
+        ScrollMode.Horizontal -> Res.drawable.ic_width
+    }
+
+private fun Strings.scrollModeName(mode: ScrollMode) = when (mode) {
+    ScrollMode.Both -> scrollModeBoth
+    ScrollMode.Vertical -> scrollModeVertical
+    ScrollMode.Horizontal -> scrollModeHorizontal
+}
+
+@Composable
+private fun StepButton(viewport: ScoreViewport, modifier: Modifier) {
+    val scope = rememberCoroutineScope()
+    val label = LocalStrings.current.scrollDown
+    Box(modifier) {
+        LabelTooltip(label) {
+            FilledTonalIconButton(
+                onClick = { scope.launch { viewport.step(1) } },
+                enabled = viewport.canScrollDown,
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = TOGGLE_ALPHA),
+                ),
+                modifier = Modifier.size(StepButtonSize),
+            ) {
+                Icon(painterResource(Res.drawable.ic_arrow_downward), contentDescription = label, modifier = Modifier.size(StepIconSize))
             }
         }
     }
@@ -485,24 +615,6 @@ private fun AnnotationAction(toolbar: ToolbarState) {
         LocalStrings.current.annotate,
         onClick = toolbar.annotations::toggleEditing,
         enabled = toolbar.viewport != null,
-    )
-}
-
-@Composable
-private fun PageActions(toolbar: ToolbarState) {
-    val strings = LocalStrings.current
-    val viewport = toolbar.viewport
-    IconAction(
-        Res.drawable.ic_arrow_upward,
-        strings.previousPage,
-        onClick = { viewport?.previousPage() },
-        enabled = viewport?.canGoToPreviousPage == true,
-    )
-    IconAction(
-        Res.drawable.ic_arrow_downward,
-        strings.nextPage,
-        onClick = { viewport?.nextPage() },
-        enabled = viewport?.canGoToNextPage == true,
     )
 }
 

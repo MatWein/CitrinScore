@@ -98,7 +98,6 @@ class PaperColors(val paper: Color, val ink: Color) {
 @Composable
 fun ScoreDocument(
     pageSizes: List<Size>,
-    systemBreaks: List<List<Float>>,
     viewport: ScoreViewport,
     render: PageRenderer,
     paperColors: PaperColors?,
@@ -115,11 +114,7 @@ fun ScoreDocument(
         val layout = remember(pageSizes, viewportSize.width, density) {
             with(density) { PageLayout(pageSizes, viewportSize.width, Margin.toPx(), PageGap.toPx()) }
         }
-        val breaks = remember(layout, systemBreaks) { layout.documentBreaks(systemBreaks) }
-        SideEffect {
-            viewport.setBounds(viewportSize, Size(layout.width, layout.height), with(density) { bottomInset.toPx() })
-            viewport.breaks = breaks
-        }
+        SideEffect { viewport.setBounds(viewportSize, Size(layout.width, layout.height), with(density) { bottomInset.toPx() }) }
         LaunchedEffect(layout, highlight?.reveal, highlight?.lookahead) {
             highlight?.reveal?.let { target ->
                 viewport.reveal(layout.documentRect(target.page, target.bounds), highlight.lookahead?.let { layout.documentRect(it.page, it.bounds) })

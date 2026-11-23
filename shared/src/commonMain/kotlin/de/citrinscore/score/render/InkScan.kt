@@ -8,7 +8,6 @@ import kotlin.math.roundToInt
 
 internal const val SCAN_WIDTH = 1000f
 private const val INK_LUMINANCE = 160
-private const val MARK_LUMINANCE = 224
 private const val MIN_INK_PIXELS = 3
 private const val MAX_CHANNEL = 255
 private const val RED_WEIGHT = 299
@@ -40,10 +39,6 @@ internal class InkScan(image: ImageBitmap) {
         }
         inkRows = rows.indices.filter { rows[it] >= MIN_INK_PIXELS }
         inkColumns = columns.indices.filter { columns[it] >= MIN_INK_PIXELS }
-    }
-
-    fun isBridged(top: Int, bottom: Int) = (0 until width).any { x ->
-        (top until bottom).all { y -> luminance[y * width + x] < MARK_LUMINANCE }
     }
 }
 

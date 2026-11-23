@@ -150,8 +150,10 @@ interface Strings {
 
     val zoom: String
     fun zoomPercent(percent: Int): String
-    val previousPage: String
-    val nextPage: String
+    val scrollDown: String
+    val scrollModeBoth: String
+    val scrollModeVertical: String
+    val scrollModeHorizontal: String
     val startRecording: String
     val stopRecording: String
     val recordingActive: String

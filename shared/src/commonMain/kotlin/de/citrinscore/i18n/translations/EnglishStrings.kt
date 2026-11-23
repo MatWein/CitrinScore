@@ -159,8 +159,10 @@ object EnglishStrings : Strings {
 
     override val zoom = "Zoom"
     override fun zoomPercent(percent: Int) = "$percent%"
-    override val previousPage = "Previous page"
-    override val nextPage = "Next page"
+    override val scrollDown = "Scroll down"
+    override val scrollModeBoth = "Scroll in all directions"
+    override val scrollModeVertical = "Scroll up and down only"
+    override val scrollModeHorizontal = "Scroll left and right only"
     override val startRecording = "Start recording"
     override val stopRecording = "Stop recording"
     override val recordingActive = "Recording"

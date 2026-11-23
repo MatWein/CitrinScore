@@ -18,6 +18,7 @@ import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.Recognition
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.musicxml.EngravedPage
 import de.citrinscore.score.musicxml.EngravingLayout
 import de.citrinscore.score.musicxml.MeasureAnchors
@@ -31,19 +32,15 @@ import de.citrinscore.score.render.ScoreRenderer
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.score.render.pageSource
 import de.citrinscore.score.render.openMusicXmlEngraver
-import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -64,8 +61,8 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val _state = MutableStateFlow<ScoreViewerState>(ScoreViewerState.Loading)
     val state: StateFlow<ScoreViewerState> = _state.asStateFlow()
 
-    private val _systemBreaks = MutableStateFlow(emptyList<List<Float>>())
-    val systemBreaks: StateFlow<List<List<Float>>> = _systemBreaks.asStateFlow()
+    private val _scrollMode = MutableStateFlow(ScrollMode.Vertical)
+    val scrollMode: StateFlow<ScrollMode> = _scrollMode.asStateFlow()
 
     private val _part = MutableStateFlow<PartRef?>(null)
     val part: StateFlow<PartRef?> = _part.asStateFlow()
@@ -85,7 +82,6 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val recognitions = mutableMapOf<String, RecognizedMusic>()
     private val performances = mutableMapOf<String, ScorePerformance>()
     private var manifest: ScoreManifest? = null
-    private var detection: Job? = null
     private val showing = Mutex()
     private val opening = Mutex()
 
@@ -93,6 +89,7 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         viewModelScope.launch {
             val opened = attempt { repository.open(score) } ?: return@launch run { _state.value = ScoreViewerState.Failed }
             manifest = opened
+            opened.scrollMode?.let { _scrollMode.value = it }
             val current = opened.currentPart?.takeIf { directory -> opened.parts.any { it.directory == directory } }
             show(current ?: opened.parts.first().directory)
         }
@@ -114,6 +111,15 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         viewModelScope.launch {
             show(directory)
             attempt { repository.selectPart(PartRef(score, directory)) }
+        }
+    }
+
+    fun selectScrollMode(mode: ScrollMode) {
+        if (_scrollMode.value == mode) return
+        _scrollMode.value = mode
+        manifest = manifest?.copy(scrollMode = mode)
+        viewModelScope.launch {
+            withContext(NonCancellable) { attempt { repository.saveScrollMode(score, mode) } }
         }
     }
 
@@ -183,7 +189,6 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         val part = current.part(directory)
         val display = part.shownDisplay
         val ref = PartRef(score, directory)
-        detection?.cancelAndJoin()
         if (_part.value != ref) {
             _anchors.value = null
             _notes.value = null
@@ -205,8 +210,6 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         if (_part.value != ref) return
         _anchors.value = engraved?.let { pages -> MeasureAnchors(pages.map { it.staves }) }
         _notes.value = engraved?.let(::NotePositions) ?: recognized?.layout?.notePositions(renderer.pageSizes.size)
-        val breaks = part.systemBreaks?.takeIf { !display.isEngraved && it.size == renderer.pageSizes.size }
-        _systemBreaks.value = breaks.orEmpty()
         _state.value = ScoreViewerState.Ready(
             metadata = current.metadata,
             parts = current.parts,
@@ -218,7 +221,6 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             reflowScale = part.reflowScale.takeIf { display.isEngraved },
             isPlayable = engraved != null || _notes.value != null,
         )
-        if (breaks == null) detection = viewModelScope.launch { detectSystemBreaks(ref, renderer, persist = !display.isEngraved) }
     }
 
     private suspend fun engrave(part: PartRef, scorePart: ScorePart, layout: EngravingLayout): Pair<ScoreRenderer, List<EngravedPage>> {
@@ -247,18 +249,6 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     }
 
     private val ScorePart.reflowScale get() = engravedView?.zoom ?: DEFAULT_REFLOW_SCALE
-
-    private suspend fun detectSystemBreaks(part: PartRef, renderer: ScoreRenderer, persist: Boolean) {
-        for (page in renderer.pageSizes.indices) {
-            val breaks = attempt { renderer.systemBreaks(page) } ?: return
-            _systemBreaks.update { it + listOf(breaks) }
-        }
-        logger.debug("Detected staff systems on {} pages of {}", renderer.pageSizes.size, part)
-        if (!persist) return
-        val detected = _systemBreaks.value
-        manifest = manifest?.updatePart(part.directory) { it.copy(systemBreaks = detected) }
-        attempt { repository.saveSystemBreaks(part, detected) }
-    }
 
     override fun onCleared() {
         renderers.values.forEach { it.close() }

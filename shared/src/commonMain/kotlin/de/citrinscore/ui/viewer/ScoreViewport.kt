@@ -1,5 +1,9 @@
 package de.citrinscore.ui.viewer
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.MutatorMutex
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -9,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.ScrollMode
 
 @Stable
 class ScoreViewport(private val initial: ScoreViewState?) {
@@ -21,14 +26,16 @@ class ScoreViewport(private val initial: ScoreViewState?) {
     private var documentSize by mutableStateOf(Size.Zero)
     private var bottomInset by mutableFloatStateOf(0f)
 
-    var breaks: List<Float> = listOf(0f)
+    var scrollMode by mutableStateOf(ScrollMode.Vertical)
+
+    private val stepping = MutatorMutex()
+    private var remainingStep = 0f
 
     private val maxOffsetY get() = (documentSize.height * zoom + bottomInset - viewportSize.height).coerceAtLeast(0f)
 
     private val visibleHeight get() = (viewportSize.height - bottomInset).coerceAtLeast(0f)
 
-    val canGoToPreviousPage get() = offset.y > 0f
-    val canGoToNextPage get() = offset.y < maxOffsetY
+    val canScrollDown get() = offset.y < maxOffsetY - EDGE_TOLERANCE
 
     val view: ScoreViewState?
         get() = if (documentSize.isEmpty()) initial else ScoreViewState(
@@ -47,23 +54,34 @@ class ScoreViewport(private val initial: ScoreViewState?) {
     }
 
     fun scrollBy(delta: Offset): Offset {
+        val allowed = when (scrollMode) {
+            ScrollMode.Both -> delta
+            ScrollMode.Vertical -> Offset(0f, delta.y)
+            ScrollMode.Horizontal -> Offset(delta.x, 0f)
+        }
         val previous = offset
-        offset = clamp(offset + delta)
+        offset = clamp(offset + allowed)
         return offset - previous
     }
 
-    fun previousPage() {
-        val top = offset.y
-        val limit = top - visibleHeight
-        val target = scaledBreaks.firstOrNull { it >= limit && it < top - BREAK_TOLERANCE } ?: limit
-        scrollBy(Offset(0f, target - top))
-    }
-
-    fun nextPage() {
-        val top = offset.y
-        val bottom = top + visibleHeight
-        val target = scaledBreaks.lastOrNull { it > top + BREAK_TOLERANCE && it <= bottom } ?: bottom
-        scrollBy(Offset(0f, target - top))
+    /** Glides by half the visible height per step; steps requested while one is running add up. */
+    suspend fun step(direction: Int) {
+        val requested = remainingStep + direction * visibleHeight * STEP_FRACTION
+        val distance = requested.coerceIn(-offset.y, maxOffsetY - offset.y)
+        if (distance == 0f) return
+        stepping.mutate {
+            remainingStep = distance
+            var travelled = 0f
+            try {
+                animate(0f, distance, animationSpec = tween(STEP_MILLIS, easing = FastOutSlowInEasing)) { value, _ ->
+                    offset = clamp(offset + Offset(0f, value - travelled))
+                    travelled = value
+                    remainingStep = distance - value
+                }
+            } finally {
+                remainingStep = 0f
+            }
+        }
     }
 
     fun reveal(document: Rect, ahead: Rect? = null) {
@@ -86,8 +104,6 @@ class ScoreViewport(private val initial: ScoreViewState?) {
 
     private val viewportCenter get() = Offset(viewportSize.width / 2, viewportSize.height / 2)
 
-    private val scaledBreaks get() = breaks.map { it * zoom }
-
     private fun clamp(offset: Offset): Offset {
         val width = documentSize.width * zoom
         val x = if (width <= viewportSize.width) (width - viewportSize.width) / 2 else offset.x.coerceIn(0f, width - viewportSize.width)
@@ -99,7 +115,9 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         const val MIN_ZOOM = 0.5f
         const val MAX_ZOOM = 5f
         const val ZOOM_STEP = 1.25f
-        private const val BREAK_TOLERANCE = 1f
+        private const val STEP_FRACTION = 0.5f
+        private const val EDGE_TOLERANCE = 0.5f
+        private const val STEP_MILLIS = 700
         private const val REVEAL_MARGIN = 0.05f
     }
 }

@@ -15,6 +15,7 @@ data class ScoreManifest(
     val createdAt: Instant,
     val lastOpenedAt: Instant? = null,
     val currentPart: String? = null,
+    val scrollMode: ScrollMode? = null,
     val audio: List<Attachment> = emptyList(),
     val files: List<Attachment> = emptyList(),
     val formatVersion: Int = CURRENT_FORMAT_VERSION,
@@ -50,7 +51,6 @@ data class ScorePart(
     val engravedView: ScoreViewState? = null,
     val display: PartDisplay? = null,
     val playback: PlaybackPreferences? = null,
-    val systemBreaks: List<List<Float>>? = null,
     val recognition: Recognition? = null,
 ) {
     val displays

@@ -27,6 +27,7 @@ import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.shared
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScorePart
@@ -127,49 +128,9 @@ class LibraryRepositoryTest {
         assertTrue(pages.all { it.source.startsWith("${CitScore.SOURCES_DIRECTORY}/") && it.page == 0 && it.normalization.image.startsWith("${CitScore.PAGES_DIRECTORY}/") })
         assertEquals(listOf("jpg", "png"), pages.map { it.source.substringAfterLast('.') })
         assertEquals(listOf(PageCrop(0f, 0f, 1200f, 1700f), PageCrop(0f, 0f, 800f, 1100f)), pages.map { it.crop })
-        assertEquals(listOf(emptyList(), emptyList<Float>()), part.systemBreaks)
         val partDirectory = File(score, part.directory)
         assertContentEquals(second.readBytes(), File(partDirectory, pages[0].source).readBytes())
         assertContentEquals(first.readBytes(), File(partDirectory, pages[1].source).readBytes())
-    }
-
-    @Test
-    fun `imports store the system breaks relative to the cropped page`() = runTest {
-        val page = File(root, "systems.png")
-        ImageIO.write(
-            BufferedImage(1000, 1000, BufferedImage.TYPE_INT_RGB).apply {
-                createGraphics().apply {
-                    color = Color.WHITE
-                    fillRect(0, 0, 1000, 1000)
-                    color = Color.BLACK
-                    fillRect(100, 100, 800, 200)
-                    fillRect(100, 600, 800, 200)
-                    dispose()
-                }
-            },
-            "png",
-            page,
-        )
-
-        importImages(ScoreMetadata(title = "Etude"), page)
-
-        val manifest = repository.open(PlatformFile(File(root, "Etude.citscore")))
-        assertEquals(360f, assertNotNull(manifest.parts.single().systemBreaks).single().single(), absoluteTolerance = 0.5f)
-    }
-
-    @Test
-    fun `saving the system breaks keeps the rest of the manifest`() = runTest {
-        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
-        val score = PlatformFile(File(root, "Etude.citscore"))
-        val opened = repository.open(score)
-        val part = opened.parts.single()
-
-        repository.saveSystemBreaks(PartRef(score, part.directory), listOf(listOf(4f)))
-
-        assertEquals(
-            opened.updatePart(part.directory) { it.copy(systemBreaks = listOf(listOf(4f))) },
-            repository.open(score).copy(lastOpenedAt = opened.lastOpenedAt),
-        )
     }
 
     @Test
@@ -306,7 +267,6 @@ class LibraryRepositoryTest {
         assertEquals(before.pages[1].source to before.pages[1].page, pages[1].source to pages[1].page)
         assertContentEquals(third.readBytes(), File(directory, pages[0].source).readBytes())
         assertFalse(File(directory, before.pages[0].source).exists())
-        assertEquals(2, edited.systemBreaks?.size)
     }
 
     @Test
@@ -419,12 +379,13 @@ class LibraryRepositoryTest {
         repository.saveView(part, PartDisplay.Original, ScoreViewState(2f, 0.5f, 0.25f))
         repository.saveView(part, PartDisplay.MusicXml, ScoreViewState(1.5f, 0f, 0.75f))
         repository.selectPart(part)
+        repository.saveScrollMode(file, ScrollMode.Both)
 
         val shared = File(score, CitScore.MANIFEST_FILE).readText()
         val device = AppJson.decodeFromString<ScoreDeviceState>(File(score, CitScore.DEVICE_STATE_FILE).readText())
-        assertFalse("lastOpenedAt" in shared || "view" in shared || "currentPart" in shared, shared)
+        assertFalse("lastOpenedAt" in shared || "view" in shared || "currentPart" in shared || "scrollMode" in shared, shared)
         assertEquals(
-            ScoreDeviceState(now, part.directory, mapOf(part.directory to ScoreViewState(2f, 0.5f, 0.25f)), mapOf(part.directory to ScoreViewState(1.5f, 0f, 0.75f))),
+            ScoreDeviceState(now, part.directory, ScrollMode.Both, mapOf(part.directory to ScoreViewState(2f, 0.5f, 0.25f)), mapOf(part.directory to ScoreViewState(1.5f, 0f, 0.75f))),
             device,
         )
     }
@@ -573,7 +534,6 @@ class LibraryRepositoryTest {
         val score = File(root, "Walzer.citscore")
         val part = repository.load(PlatformFile(score)).parts.single()
         assertEquals(ScoreContent.MusicXml("score.mxl"), part.content)
-        assertNull(part.systemBreaks)
         assertContentEquals(musicXml.readBytes(), File(score, "${part.directory}/score.mxl").readBytes())
         assertNotNull(repository.thumbnail(PlatformFile(score)))
     }

@@ -13,6 +13,7 @@ import de.citrinscore.score.Normalization
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScorePage
 import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.deviceState
 import de.citrinscore.score.shared
 import de.citrinscore.score.withDeviceState
@@ -23,7 +24,6 @@ import de.citrinscore.score.ScoreThumbnail
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.isReflowable
 import de.citrinscore.score.render.ScoreRenderers
-import de.citrinscore.score.render.systemBreaks
 import de.citrinscore.serialization.AppJson
 import de.citrinscore.util.zip
 import io.github.vinceglb.filekit.PlatformFile
@@ -129,6 +129,11 @@ class LibraryRepository(
         updateManifest(part.score) { it.copy(currentPart = part.directory) }
     }
 
+    suspend fun saveScrollMode(score: PlatformFile, mode: ScrollMode) {
+        logger.debug("Saving scroll mode {} of {}", mode, score.path)
+        updateManifest(score) { it.copy(scrollMode = mode) }
+    }
+
     suspend fun annotations(display: DisplayRef): ScoreAnnotations =
         read(display.annotations) { readString() }?.let { decode(ScoreAnnotations.serializer(), it) } ?: ScoreAnnotations()
 
@@ -150,11 +155,6 @@ class LibraryRepository(
     suspend fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
         logger.debug("Saving playback preferences {} of {}", playback, part)
         updatePart(part) { it.copy(playback = playback) }
-    }
-
-    suspend fun saveSystemBreaks(part: PartRef, systemBreaks: List<List<Float>>) {
-        logger.debug("Saving staff systems of {} pages of {}", systemBreaks.size, part)
-        updatePart(part) { it.copy(systemBreaks = systemBreaks) }
     }
 
     suspend fun attachments(score: PlatformFile, kind: AttachmentKind): List<Attachment> = manifest(score)?.attachments(kind).orEmpty()
@@ -211,7 +211,6 @@ class LibraryRepository(
                 directory,
                 part.name,
                 content,
-                systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(root, it) },
                 recognition = part.recognition?.let { writeRecognition(root, it) },
             )
         } catch (e: Exception) {
@@ -265,7 +264,7 @@ class LibraryRepository(
                 saveAnnotations(display, annotations(display).remapPages(newIndexByOldIndex))
             }
         }
-        return part.copy(content = content, systemBreaks = content.takeUnless { it.isReflowable }?.let { systemBreaks(ref.root, it) }, view = null)
+        return part.copy(content = content, view = null)
     }
 
     suspend fun recognition(part: PartRef, recognition: Recognition): RecognizedMusic? {
@@ -297,9 +296,6 @@ class LibraryRepository(
     private suspend fun deletePart(score: PlatformFile, part: ScorePart) {
         PartRef(score, part.directory).root.delete(mustExist = false, recursively = true)
     }
-
-    private suspend fun systemBreaks(root: PlatformFile, content: ScoreContent): List<List<Float>> =
-        ScoreRenderers.open(root, content, PartDisplay.Normalized).use { renderer -> renderer.pageSizes.indices.map { renderer.systemBreaks(it) } }
 
     private suspend fun writeThumbnail(score: PlatformFile, part: ScorePart) {
         ScoreRenderers.open(PartRef(score, part.directory).root, part.content, PartDisplay.Original).use { renderer ->
