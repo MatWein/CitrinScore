@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
+import de.citrinscore.library.TransferMode
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
@@ -44,14 +45,14 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
 
     fun open(folder: PlatformFile) {
         logger.info("Opening folder {}", folder.path)
-        _state.update { it.copy(path = it.path + folder, content = null) }
+        _state.update { it.copy(path = it.path + folder, content = null, selection = emptySet()) }
         refresh()
     }
 
     fun up() {
         if (_state.value.isRoot) return
         logger.info("Leaving folder {}", currentFolder.path)
-        _state.update { it.copy(path = it.path.dropLast(1), content = null) }
+        _state.update { it.copy(path = it.path.dropLast(1), content = null, selection = emptySet()) }
         refresh()
     }
 
@@ -67,9 +68,30 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         selectedScore = score
     }
 
-    fun delete(item: PlatformFile) {
+    fun setSelection(selection: Set<String>) = _state.update { it.copy(selection = selection) }
+
+    fun clearSelection() = setSelection(emptySet())
+
+    /** Drops selected items that are no longer shown, for example because a search hides them. */
+    fun retainSelection(visible: Set<String>) = _state.update { it.copy(selection = it.selection intersect visible) }
+
+    fun delete(items: List<PlatformFile>) {
+        logger.info("Deleting {} items", items.size)
+        clearSelection()
         viewModelScope.launch {
-            attempt { repository.delete(item) } ?: report(LibraryError.Delete)
+            val failed = items.count { item -> attempt { repository.delete(item) } == null }
+            if (failed > 0) report(LibraryError.Delete)
+            thumbnails.evictAll()
+            refresh()
+        }
+    }
+
+    fun transfer(items: List<PlatformFile>, target: PlatformFile, mode: TransferMode) {
+        val source = currentFolder
+        clearSelection()
+        viewModelScope.launch {
+            val failed = attempt { repository.transfer(items, source, target, mode) } ?: items
+            if (failed.isNotEmpty()) report(if (mode == TransferMode.Move) LibraryError.Move else LibraryError.Copy)
             thumbnails.evictAll()
             refresh()
         }
@@ -87,7 +109,7 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         viewModelScope.launch {
             val existing = _state.value.path.takeWhile { attempt { it.exists() } == true }.ifEmpty { _state.value.path.take(1) }
             thumbnails.evictAll()
-            _state.update { it.copy(path = existing) }
+            _state.update { it.copy(path = existing, selection = emptySet()) }
             refresh()
         }
     }

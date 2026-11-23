@@ -89,6 +89,16 @@ object GermanStrings : Strings {
     override fun deleteFolderText(name: String) =
         "Der Ordner „$name“ und sein gesamter Inhalt werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden."
     override val deleteFailed = "Der Eintrag konnte nicht gelöscht werden."
+    override fun deleteItemsText(count: Int) =
+        "$count Einträge werden mit ihrem gesamten Inhalt endgültig gelöscht. Das kann nicht rückgängig gemacht werden."
+    override fun selectedCount(count: Int) = "$count ausgewählt"
+    override val selectAll = "Alle auswählen"
+    override val clearSelection = "Auswahl aufheben"
+    override val moveHere = "Hierher verschieben"
+    override val copyHere = "Hierher kopieren"
+    override fun parentFolder(name: String) = "Überordner „$name“"
+    override val moveFailed = "Nicht alle Einträge konnten verschoben werden."
+    override val copyFailed = "Nicht alle Einträge konnten kopiert werden."
     override val export = "Exportieren"
     override val exportFailed = "Die Noten konnten nicht exportiert werden."
     override val createFolderFailed = "Der Ordner konnte nicht angelegt werden."

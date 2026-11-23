@@ -25,8 +25,10 @@ import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.isReflowable
 import de.citrinscore.score.render.ScoreRenderers
 import de.citrinscore.serialization.AppJson
+import de.citrinscore.util.attempt
 import de.citrinscore.util.zip
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.copyRecursively
 import io.github.vinceglb.filekit.createDirectories
 import io.github.vinceglb.filekit.delete
 import io.github.vinceglb.filekit.div
@@ -79,6 +81,46 @@ class LibraryRepository(
         logger.info("Deleting {}", item.path)
         item.delete(mustExist = false, recursively = true)
         if (item.exists()) throw IOException("${item.name} could not be deleted")
+    }
+
+    /**
+     * Moves or copies [items] from the folder [source] into the folder [target]. Items whose name is already taken in
+     * the target get a numbered name, and renamed scores get the matching title. Returns the items that failed.
+     */
+    suspend fun transfer(items: List<PlatformFile>, source: PlatformFile, target: PlatformFile, mode: TransferMode): List<PlatformFile> =
+        withContext(Dispatchers.IO) {
+            logger.info("{} {} from {} to {}", mode, items.map { it.name }, source.path, target.path)
+            val taken = target.list().mapTo(ArrayList()) { it.name }
+            items.filterNot { item ->
+                if (target.isInside(item)) return@filterNot false
+                if (mode == TransferMode.Move && target.path == source.path) return@filterNot true
+                val name = availableName(item.name, taken)
+                taken += name
+                attempt { transferItem(item, source, target, name, mode) } != null
+            }
+        }
+
+    private suspend fun transferItem(item: PlatformFile, source: PlatformFile, target: PlatformFile, name: String, mode: TransferMode) {
+        val destination = when (mode) {
+            TransferMode.Copy -> copyItem(item, target / name)
+            TransferMode.Move -> attempt { item.moveDirectory(source, target, name) } ?: copyItem(item, target / name).also {
+                logger.info("Moving {} directly failed, copied it instead", item.path)
+                delete(item)
+            }
+        }
+        if (name != item.name && CitScore.isScoreDirectoryName(name) && destination.isScore()) {
+            attempt { updateManifest(destination) { it.copy(metadata = it.metadata.copy(title = CitScore.title(name))) } }
+        }
+    }
+
+    private fun PlatformFile.isInside(folder: PlatformFile) = path == folder.path || listOf('/', '\\').any { path.startsWith(folder.path + it) }
+
+    private suspend fun copyItem(item: PlatformFile, destination: PlatformFile): PlatformFile = try {
+        item.copyRecursively(destination)
+        destination
+    } catch (e: Exception) {
+        attempt { destination.delete(mustExist = false, recursively = true) }
+        throw e
     }
 
     suspend fun open(score: PlatformFile): ScoreManifest {

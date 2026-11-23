@@ -82,6 +82,15 @@ interface Strings {
     fun deleteScoreText(name: String): String
     fun deleteFolderText(name: String): String
     val deleteFailed: String
+    fun deleteItemsText(count: Int): String
+    fun selectedCount(count: Int): String
+    val selectAll: String
+    val clearSelection: String
+    val moveHere: String
+    val copyHere: String
+    fun parentFolder(name: String): String
+    val moveFailed: String
+    val copyFailed: String
     val export: String
     val exportFailed: String
     val createFolderFailed: String

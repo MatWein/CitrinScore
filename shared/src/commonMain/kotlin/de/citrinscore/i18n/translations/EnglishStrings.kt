@@ -89,6 +89,16 @@ object EnglishStrings : Strings {
     override fun deleteFolderText(name: String) =
         "The folder “$name” and everything in it will be deleted permanently. This cannot be undone."
     override val deleteFailed = "The item could not be deleted."
+    override fun deleteItemsText(count: Int) =
+        "$count items and everything in them will be deleted permanently. This cannot be undone."
+    override fun selectedCount(count: Int) = "$count selected"
+    override val selectAll = "Select all"
+    override val clearSelection = "Clear selection"
+    override val moveHere = "Move here"
+    override val copyHere = "Copy here"
+    override fun parentFolder(name: String) = "Parent folder “$name”"
+    override val moveFailed = "Not all items could be moved."
+    override val copyFailed = "Not all items could be copied."
     override val export = "Export"
     override val exportFailed = "The score could not be exported."
     override val createFolderFailed = "The folder could not be created."

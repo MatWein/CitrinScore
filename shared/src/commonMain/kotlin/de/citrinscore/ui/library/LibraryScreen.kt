@@ -2,6 +2,8 @@ package de.citrinscore.ui.library
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
@@ -41,13 +44,19 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -66,6 +75,7 @@ import de.citrinscore.library.LibrarySort
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_check
+import de.citrinscore.resources.ic_check_circle
 import de.citrinscore.resources.ic_close
 import de.citrinscore.resources.ic_create_new_folder
 import de.citrinscore.resources.ic_delete
@@ -77,6 +87,7 @@ import de.citrinscore.resources.ic_more_vert
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.resources.ic_refresh
 import de.citrinscore.resources.ic_search
+import de.citrinscore.resources.ic_select_all
 import de.citrinscore.resources.ic_settings
 import de.citrinscore.resources.ic_sort
 import de.citrinscore.resources.ic_sync
@@ -103,6 +114,10 @@ private val TilePadding = PaddingValues(Spacing.Medium)
 private val TileMenuSize = Spacing.Section
 private val WideToolbarWidth = 600.dp
 private const val ZIP_EXTENSION = "zip"
+private const val DRAGGED_ALPHA = 0.4f
+private val AutoScrollEdge = 64.dp
+private val AutoScrollSpeed = 16.dp
+private val SelectionMarkBorder = 2.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,7 +135,10 @@ fun LibraryScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val strings = LocalStrings.current
     var showNewFolderDialog by rememberSaveable { mutableStateOf(false) }
-    var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
+    var pendingDelete by remember { mutableStateOf<List<LibraryItem>?>(null) }
+    var pendingDrop by remember { mutableStateOf<Drop?>(null) }
+    var anchor by remember { mutableStateOf<String?>(null) }
+    val drag = remember { LibraryDragState() }
     var exporting by remember { mutableStateOf<PlatformFile?>(null) }
     val exporter = rememberFileSaverLauncher(FileKitDialogSettings.createDefault()) { target ->
         val score = exporting
@@ -130,12 +148,43 @@ fun LibraryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var query by rememberSaveable(state.currentFolder.path) { mutableStateOf<String?>(null) }
     var searchOpened by remember { mutableStateOf(false) }
+    val visible = remember(state.content, sort, query) { state.content?.arranged(sort, query.orEmpty()).orEmpty() }
+    LaunchedEffect(visible) { viewModel.retainSelection(visible.mapTo(HashSet()) { it.file.path }) }
+    val windowInfo = LocalWindowInfo.current
 
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
-        isBackEnabled = query != null || !state.isRoot,
-        onBackCompleted = { if (query != null) query = null else viewModel.up() },
+        isBackEnabled = state.isSelecting || query != null || !state.isRoot,
+        onBackCompleted = {
+            when {
+                viewModel.state.value.isSelecting -> viewModel.clearSelection()
+                query != null -> query = null
+                else -> viewModel.up()
+            }
+        },
     )
+
+    fun toggle(item: LibraryItem) {
+        val path = item.file.path
+        val selection = viewModel.state.value.selection
+        viewModel.setSelection(if (path in selection) selection - path else selection + path)
+        anchor = path
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun onTileClick(item: LibraryItem) {
+        val keys = windowInfo.keyboardModifiers
+        val selection = viewModel.state.value.selection
+        val from = visible.indexOfFirst { it.file.path == anchor }
+        val to = visible.indexOfFirst { it.file.path == item.file.path }
+        when {
+            keys.isShiftPressed && from >= 0 && to >= 0 ->
+                viewModel.setSelection(selection + visible.subList(minOf(from, to), maxOf(from, to) + 1).map { it.file.path })
+            keys.isShiftPressed || keys.isCtrlPressed || keys.isMetaPressed || selection.isNotEmpty() -> toggle(item)
+            item is LibraryItem.Folder -> viewModel.open(item.file)
+            item is LibraryItem.Score -> onOpenScore(item.file)
+        }
+    }
 
     LaunchedEffect(state.error) {
         state.error?.let { error ->
@@ -145,6 +194,8 @@ fun LibraryScreen(
                     LibraryError.CreateFolder -> strings.createFolderFailed
                     LibraryError.Delete -> strings.deleteFailed
                     LibraryError.Export -> strings.exportFailed
+                    LibraryError.Move -> strings.moveFailed
+                    LibraryError.Copy -> strings.copyFailed
                     LibraryError.SaveSettings -> strings.settingsSaveFailed
                 },
             )
@@ -154,7 +205,14 @@ fun LibraryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (state.isSelecting) {
+                SelectionBar(
+                    count = state.selection.size,
+                    onClear = viewModel::clearSelection,
+                    onSelectAll = { viewModel.setSelection(visible.mapTo(HashSet()) { it.file.path }) },
+                    onDelete = { pendingDelete = visible.filter(state::isSelected) },
+                )
+            } else TopAppBar(
                 title = {
                     val search = query
                     if (search == null) {
@@ -198,11 +256,13 @@ fun LibraryScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onImport,
-                icon = { Icon(painterResource(Res.drawable.ic_upload_file), contentDescription = null) },
-                text = { Text(strings.importScores) },
-            )
+            if (!state.isSelecting) {
+                ExtendedFloatingActionButton(
+                    onClick = onImport,
+                    icon = { Icon(painterResource(Res.drawable.ic_upload_file), contentDescription = null) },
+                    text = { Text(strings.importScores) },
+                )
+            }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -214,17 +274,48 @@ fun LibraryScreen(
                     )
                 } else {
                     LibraryGrid(
-                        items = content.arranged(sort, query.orEmpty()),
-                        onOpenFolder = viewModel::open,
-                        onOpenScore = onOpenScore,
+                        items = visible,
+                        selection = state.selection,
+                        drag = drag,
+                        onClick = ::onTileClick,
                         onEdit = onEditScore,
                         onExport = { score ->
                             exporting = score
                             exporter.launch(suggestedName = score.name, defaultExtension = ZIP_EXTENSION)
                         },
-                        onDelete = { pendingDelete = it },
+                        onDelete = { pendingDelete = listOf(it) },
                         loadThumbnail = viewModel::thumbnail,
+                        modifier = drag.containerModifier.libraryDragGestures(
+                            state = drag,
+                            visible = visible,
+                            parent = state.parentFolder,
+                            onLongPress = { item ->
+                                viewModel.setSelection(viewModel.state.value.selection + item.file.path)
+                                anchor = item.file.path
+                            },
+                            selectedItems = { visible.filter { it.file.path in viewModel.state.value.selection } },
+                            onDrop = { pendingDrop = it },
+                        ),
                     )
+                    val parent = state.parentFolder
+                    if (drag.isDragging && parent != null) {
+                        ParentDropZone(
+                            state = drag,
+                            name = if (state.path.size == 2) strings.libraryTitle else parent.name,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                    DragPreview(drag)
+                    pendingDrop?.let { drop ->
+                        DropMenu(
+                            drop = drop,
+                            onTransfer = { mode ->
+                                pendingDrop = null
+                                viewModel.transfer(drop.items.map { it.file }, drop.target, mode)
+                            },
+                            onDismiss = { pendingDrop = null },
+                        )
+                    }
                 }
             }
         }
@@ -242,14 +333,16 @@ fun LibraryScreen(
         )
     }
 
-    pendingDelete?.let { item ->
+    pendingDelete?.let { items ->
+        val single = items.singleOrNull()
         ConfirmDeleteDialog(
-            text = when (item) {
-                is LibraryItem.Folder -> strings.deleteFolderText(item.displayName)
-                is LibraryItem.Score -> strings.deleteScoreText(item.displayName)
+            text = when (single) {
+                is LibraryItem.Folder -> strings.deleteFolderText(single.displayName)
+                is LibraryItem.Score -> strings.deleteScoreText(single.displayName)
+                null -> strings.deleteItemsText(items.size)
             },
             onConfirm = {
-                viewModel.delete(item.file)
+                viewModel.delete(items.map { it.file })
                 pendingDelete = null
             },
             onDismiss = { pendingDelete = null },
@@ -260,15 +353,36 @@ fun LibraryScreen(
 @Composable
 private fun LibraryGrid(
     items: List<LibraryItem>,
-    onOpenFolder: (PlatformFile) -> Unit,
-    onOpenScore: (PlatformFile) -> Unit,
+    selection: Set<String>,
+    drag: LibraryDragState,
+    onClick: (LibraryItem) -> Unit,
     onEdit: (PlatformFile) -> Unit,
     onExport: (PlatformFile) -> Unit,
     onDelete: (LibraryItem) -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
+    modifier: Modifier,
 ) {
     val gridState = rememberLazyGridState()
-    Box(Modifier.fillMaxSize()) {
+    val density = LocalDensity.current
+    LaunchedEffect(drag.isDragging) {
+        if (!drag.isDragging) return@LaunchedEffect
+        val edge = with(density) { AutoScrollEdge.toPx() }
+        val speed = with(density) { AutoScrollSpeed.toPx() }
+        while (true) {
+            withFrameNanos {}
+            val y = drag.position.y
+            val bottom = drag.scrollAreaHeight
+            val delta = when {
+                y < edge -> -speed * (1 - y / edge).coerceIn(0f, 1f)
+                y in (bottom - edge)..bottom -> speed * (1 - (bottom - y) / edge).coerceIn(0f, 1f)
+                else -> 0f
+            }
+            if (delta != 0f) gridState.scrollBy(delta)
+            drag.refreshTarget()
+        }
+    }
+    val selecting = selection.isNotEmpty()
+    Box(modifier.fillMaxSize()) {
         if (items.isEmpty()) {
             Text(
                 LocalStrings.current.noSearchResults,
@@ -286,13 +400,14 @@ private fun LibraryGrid(
             modifier = Modifier.fillMaxSize(),
         ) {
             items(items, key = { it.file.path }) { item ->
-                val onClick = when (item) {
-                    is LibraryItem.Folder -> onOpenFolder
-                    is LibraryItem.Score -> onOpenScore
-                }
                 LibraryTile(
                     item = item,
-                    onClick = { onClick(item.file) },
+                    selected = item.file.path in selection,
+                    selecting = selecting,
+                    highlighted = drag.isTarget(item),
+                    dimmed = drag.isDragged(item),
+                    modifier = Modifier.dragBounds(drag, item.file.path),
+                    onClick = { onClick(item) },
                     onEdit = { onEdit(item.file) }.takeIf { item is LibraryItem.Score },
                     onExport = { onExport(item.file) }.takeIf { item is LibraryItem.Score },
                     onDelete = { onDelete(item) },
@@ -307,13 +422,23 @@ private fun LibraryGrid(
 @Composable
 private fun LibraryTile(
     item: LibraryItem,
+    selected: Boolean,
+    selecting: Boolean,
+    highlighted: Boolean,
+    dimmed: Boolean,
+    modifier: Modifier,
     onClick: () -> Unit,
     onEdit: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onDelete: () -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
 ) {
-    Tile(Modifier.aspectRatio(CitScore.PAGE_ASPECT_RATIO), onClick = onClick, contentPadding = TilePadding) {
+    Tile(
+        modifier.aspectRatio(CitScore.PAGE_ASPECT_RATIO).alpha(if (dimmed) DRAGGED_ALPHA else 1f),
+        selected = selected || highlighted,
+        onClick = onClick,
+        contentPadding = TilePadding,
+    ) {
         Row {
             Text(
                 item.displayName,
@@ -323,7 +448,7 @@ private fun LibraryTile(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(top = Spacing.ExtraSmall),
             )
-            TileMenu(onEdit, onExport, onDelete)
+            if (selecting) SelectionMark(selected) else TileMenu(onEdit, onExport, onDelete)
         }
         Box(
             modifier = Modifier
@@ -476,4 +601,30 @@ private fun SyncAction(localChanges: Int, onClick: () -> Unit) {
         onClick = onClick,
         badge = { if (localChanges > 0) Badge { Text(localChanges.toString()) } },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectionBar(count: Int, onClear: () -> Unit, onSelectAll: () -> Unit, onDelete: () -> Unit) {
+    val strings = LocalStrings.current
+    TopAppBar(
+        title = { Text(strings.selectedCount(count)) },
+        navigationIcon = { IconAction(Res.drawable.ic_close, strings.clearSelection, onClick = onClear) },
+        actions = {
+            IconAction(Res.drawable.ic_select_all, strings.selectAll, onClick = onSelectAll)
+            IconAction(Res.drawable.ic_delete, strings.delete, onClick = onDelete)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    )
+}
+
+@Composable
+private fun SelectionMark(selected: Boolean) {
+    Box(Modifier.size(TileMenuSize), contentAlignment = Alignment.Center) {
+        if (selected) {
+            Icon(painterResource(Res.drawable.ic_check_circle), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        } else {
+            Box(Modifier.size(Spacing.ExtraLarge - Spacing.ExtraSmall).border(SelectionMarkBorder, MaterialTheme.colorScheme.outline, CircleShape))
+        }
+    }
 }
