@@ -79,11 +79,15 @@ internal class FluidSynthEngine private constructor(
 
     companion object {
         suspend fun open(performance: ScorePerformance, instrument: Instrument?): FluidSynthEngine {
+            val midi = instrument?.let { performance.midi.withProgram(it.program) } ?: performance.midi
+            return open(midi, instrument?.program)
+        }
+
+        suspend fun open(midi: ByteArray, previewProgram: Int? = null): FluidSynthEngine {
             val font = soundFontFile()
             return withContext(Dispatchers.IO) {
-                val midi = instrument?.let { performance.midi.withProgram(it.program) } ?: performance.midi
-                logger.debug("Opening FluidSynth with {} MIDI bytes, instrument {} and sound font {}", midi.size, instrument, font)
-                val previewProgram = instrument?.program ?: midi.initialProgram()
+                logger.debug("Opening FluidSynth with {} MIDI bytes and sound font {}", midi.size, font)
+                val previewProgram = previewProgram ?: midi.initialProgram()
                 val library = FluidSynthLibrary.instance
                 val settings = library.newFluidSettings()
                 library.fluidSettingsSetnum(settings, "synth.sample-rate", ENGINE_SAMPLE_RATE.toDouble())

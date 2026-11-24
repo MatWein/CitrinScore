@@ -1,6 +1,10 @@
 package de.citrinscore.score.audio
 
+import de.citrinscore.score.CitScore
+import de.citrinscore.score.playback.openMidiAudioPlayer
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.extension
+import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.sound.sampled.AudioFormat
@@ -16,7 +20,12 @@ import kotlin.time.DurationUnit
 private const val PCM_BITS_PER_SAMPLE = 16
 private const val BITS_PER_BYTE = 8
 
-actual suspend fun openAudioPlayer(file: PlatformFile): AudioPlayer = withContext(Dispatchers.IO) {
+actual suspend fun openAudioPlayer(file: PlatformFile): AudioPlayer {
+    if (file.extension.lowercase() in CitScore.MIDI_EXTENSIONS) return openMidiAudioPlayer(file.readBytes())
+    return openClipAudioPlayer(file)
+}
+
+private suspend fun openClipAudioPlayer(file: PlatformFile): AudioPlayer = withContext(Dispatchers.IO) {
     val clip = AudioSystem.getClip()
     AudioSystem.getAudioInputStream(file.file).use { stream -> stream.decoded().use(clip::open) }
     ClipAudioPlayer(clip)

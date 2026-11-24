@@ -18,7 +18,8 @@ object CitScore {
     const val MUSICXML_EXTENSION = "musicxml"
     const val SCAN_EXTENSION = "png"
     const val RECORDING_EXTENSION = "wav"
-    val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3")
+    val MIDI_EXTENSIONS = listOf("mid", "midi")
+    val AUDIO_EXTENSIONS = listOf(RECORDING_EXTENSION, "mp3") + MIDI_EXTENSIONS
     const val THUMBNAIL_WIDTH = 600
     const val PAGE_ASPECT_RATIO = 210f / 297f
 
