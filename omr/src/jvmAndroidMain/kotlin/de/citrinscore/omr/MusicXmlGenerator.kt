@@ -12,7 +12,8 @@ private const val POSITION_ATTRIBUTE = "homr-position"
 private const val VOICES_PER_STAFF = 4
 
 private val LIFT_TO_ALTER = mapOf("N" to 0, "#" to 1, "##" to 2, "b" to -1, "bb" to -2)
-private val LIFT_TO_ACCIDENTAL = mapOf("N" to "natural", "#" to "sharp", "##" to "double-sharp", "b" to "flat", "bb" to "flat-flat")
+private val ALTER_TO_ACCIDENTAL = mapOf(0 to "natural", 1 to "sharp", 2 to "double-sharp", -1 to "flat", -2 to "flat-flat")
+private const val SHARP_ORDER = "FCGDAEB"
 private val DURATION_NAMES = mapOf(0 to "breve", 1 to "whole", 2 to "half", 4 to "quarter", 8 to "eighth", 16 to "16th", 32 to "32nd", 64 to "64th", 128 to "128th")
 private val BEAM_TYPES = mapOf("beamStart" to "begin", "beamContinue" to "continue", "beamStop" to "end")
 private val BEAMS_PER_TYPE = mapOf("eighth" to 1, "16th" to 2, "32nd" to 3, "64th" to 4, "128th" to 5)
@@ -210,6 +211,7 @@ private fun buildPart(root: Element, voice: List<EncodedSymbol>, index: Int, has
     val part = root.add("part", null, "id" to partId(index))
     MeasureBuilder(part, voice, hasTwoStaves, inheritedTime, ids).build().forEach { part.appendChild(it) }
     convertTies(part)
+    addAccidentals(part)
     addStems(part)
     convertBeams(part)
     part.descendants("note").forEach { it.removeAttribute(POSITION_ATTRIBUTE) }
@@ -440,8 +442,6 @@ private class MeasureBuilder(
             }
         }
         repeat(duration.dots) { note.add("dot") }
-        // <alter> only sets the sounding pitch, renderers draw an accidental only for <accidental>
-        LIFT_TO_ACCIDENTAL[symbol.lift]?.let { if (symbol.pitch != EMPTY && symbol.pitch != NO_NOTE) note.add("accidental", it) }
         if (duration.isTuplet) {
             note.add("time-modification").apply {
                 add("actual-notes", duration.actualNotes.toString())
@@ -908,6 +908,41 @@ private fun addTie(note: Element, type: String, notation: Element) {
 private fun hasTie(note: Element, type: String) = note.children("tie").any { it.getAttribute("type") == type }
 
 private fun notationsOf(note: Element) = note.find("notations") ?: note.add("notations")
+
+private fun keyAlters(fifths: Int): Map<Char, Int> =
+    if (fifths >= 0) SHARP_ORDER.take(fifths).associateWith { 1 } else SHARP_ORDER.reversed().take(-fifths).associateWith { -1 }
+
+// <alter> only sets the sounding pitch, renderers draw an accidental only for <accidental>. The recognized lift is the
+// sounding alteration including the key signature, so an accidental is drawn only where the alteration differs from
+// the key signature or from an earlier accidental on the same line or space in the measure.
+private fun addAccidentals(part: Element) {
+    val keys = mutableMapOf<String, Map<Char, Int>>()
+    for (measure in part.children("measure")) {
+        val altered = mutableMapOf<Pair<String, String>, Int>()
+        for (child in measure.elements) {
+            if (child.tagName == "attributes") {
+                for (key in child.children("key")) {
+                    val alters = keyAlters(key.findText("fifths", "0").toIntOrNull()?.coerceIn(-7, 7) ?: 0)
+                    val number = key.getAttribute("number")
+                    if (number.isEmpty()) keys.clear()
+                    keys[number] = alters
+                }
+            }
+            if (child.tagName != "note" || hasTie(child, "stop")) continue
+            val pitch = child.find("pitch") ?: continue
+            val staff = child.findText("staff", "1")
+            val step = pitch.findText("step")
+            val alter = pitch.findText("alter", "0").toIntOrNull() ?: 0
+            val position = staff to step + pitch.findText("octave")
+            val current = altered[position] ?: (keys[staff] ?: keys[""]).orEmpty()[step.firstOrNull()] ?: 0
+            if (alter == current) continue
+            val accidental = ALTER_TO_ACCIDENTAL[alter] ?: continue
+            val anchor = child.children("dot").lastOrNull() ?: child.find("type") ?: continue
+            child.insertAt(child.indexOf(anchor) + 1, child.element("accidental", accidental))
+            altered[position] = alter
+        }
+    }
+}
 
 private fun convertTies(part: Element) {
     val previous = mutableMapOf<Pair<String, String>, List<Element>>()
