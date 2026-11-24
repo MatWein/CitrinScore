@@ -127,6 +127,18 @@ class MusicXmlEngraverTest {
     }
 
     @Test
+    fun `multi measure rests are drawn as bars however short they are`() = runTest {
+        val score = score(measures = 1, notes = """<note><rest measure="yes"/><duration>4</duration></note>""", attributes = "<measure-style><multiple-rest>3</multiple-rest></measure-style>")
+            .replace("</part>", (2..3).joinToString("") { """<measure number="$it"><note><rest measure="yes"/><duration>4</duration></note></measure>""" } + "</part>")
+
+        openMusicXmlEngraver(score.encodeToByteArray(), compressed = false).use { engraver ->
+            val svg = engraver.engrave(EngravingLayout.Print).joinToString { it.svg }
+            assertTrue("class=\"multiRest\"" in svg)
+            assertFalse(listOf("E4E1", "E4E2", "E4E3").any { it in svg })
+        }
+    }
+
+    @Test
     fun `invalid scores are rejected`() = runTest {
         assertFailsWith<IllegalStateException> { openMusicXmlEngraver("no music".encodeToByteArray(), compressed = false) }
         openMusicXmlEngraver("<score-partwise>".encodeToByteArray(), compressed = false).use { engraver ->

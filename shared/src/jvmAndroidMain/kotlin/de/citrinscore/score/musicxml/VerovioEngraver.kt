@@ -179,6 +179,8 @@ private fun options(layout: EngravingLayout) = buildJsonObject {
     put("footer", "none")
     put("svgCss", CLASS_STYLES)
     put("svgViewBox", true)
+    // Without it, rests of up to a few measures are drawn with old symbols and longer ones as bars
+    put("multiRestStyle", "block")
 }.toString()
 
 private fun VerovioLibrary.drainLog(toolkit: Pointer) = logVerovio(getLog(toolkit))
