@@ -109,6 +109,24 @@ class MusicXmlEngraverTest {
     }
 
     @Test
+    fun `repeat counts above two are written above the repeat`() = runTest {
+        fun withRepeat(times: String, words: String = "") = score(measures = 2).replaceFirst(
+            "</measure>",
+            words + """<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward"$times/></barline></measure>""",
+        )
+
+        suspend fun texts(score: String) = openMusicXmlEngraver(score.encodeToByteArray(), compressed = false).use { engraver ->
+            Regex(">([^<>]*\\dx)<").findAll(engraver.engrave(EngravingLayout.Print).joinToString { it.svg }).map { it.groupValues[1] }.toList()
+        }
+
+        assertEquals(listOf("3x"), texts(withRepeat(" times=\"3\"")))
+        assertEquals(emptyList(), texts(withRepeat("")))
+        assertEquals(emptyList(), texts(withRepeat(" times=\"2\"")))
+        val labeled = """<direction placement="above"><direction-type><words>3 mal</words></direction-type></direction>"""
+        assertEquals(emptyList(), texts(withRepeat(" times=\"3\"", labeled)))
+    }
+
+    @Test
     fun `invalid scores are rejected`() = runTest {
         assertFailsWith<IllegalStateException> { openMusicXmlEngraver("no music".encodeToByteArray(), compressed = false) }
         openMusicXmlEngraver("<score-partwise>".encodeToByteArray(), compressed = false).use { engraver ->

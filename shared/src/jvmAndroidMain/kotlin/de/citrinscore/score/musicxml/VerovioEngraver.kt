@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
+import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
 import org.xml.sax.SAXException
@@ -38,13 +39,28 @@ private const val SCORE_PART = "score-part"
 private const val PRINT_OBJECT = "print-object"
 private const val NO = "no"
 private val PART_LABELS = listOf("part-name", "part-abbreviation")
+private const val PART = "part"
+private const val MEASURE = "measure"
+private const val BARLINE = "barline"
+private const val REPEAT = "repeat"
+private const val DIRECTION = "direction"
+private const val BACKWARD = "backward"
+private const val TIMES = "times"
+private const val WORDS = "words"
+private const val DIRECTION_TYPE = "direction-type"
+private const val PLACEMENT = "placement"
+private const val ABOVE = "above"
+private const val HALIGN = "halign"
+private const val LOCATION = "location"
+private const val RIGHT = "right"
+private val RepeatCountText = Regex("""\d\s*[x×]|[x×]\s*\d|\d+\s*mal""", RegexOption.IGNORE_CASE)
 private val Utf16Boms = listOf(byteArrayOf(0xFE.toByte(), 0xFF.toByte()), byteArrayOf(0xFF.toByte(), 0xFE.toByte()))
 private val TimemapJson = Json { ignoreUnknownKeys = true }
 private val logger = LoggerFactory.getLogger("de.citrinscore.score.musicxml.Verovio")
 
 actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver {
     logger.debug("Loading MusicXML with {} bytes, compressed: {}", data.size, compressed)
-    val score = withContext(Dispatchers.Default) { (if (compressed) data.uncompressMusicXml() else data).decodeXml().withoutSinglePartName() }
+    val score = withContext(Dispatchers.Default) { (if (compressed) data.uncompressMusicXml() else data).decodeXml().preparedForVerovio() }
     val resources = verovioResourcePath()
     val (toolkit, duration) = measureTimedValue {
         Verovio.call {
@@ -182,7 +198,7 @@ private fun ByteArray.uncompressMusicXml(): ByteArray {
     return entries[path] ?: error("The archive contains no $path")
 }
 
-private fun String.withoutSinglePartName(): String {
+private fun String.preparedForVerovio(): String {
     val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder().apply { setEntityResolver { _, _ -> InputSource(StringReader("")) } }
     val document = try {
         builder.parse(InputSource(StringReader(this)))
@@ -190,15 +206,49 @@ private fun String.withoutSinglePartName(): String {
         logger.debug("Leaving unparsable MusicXML to Verovio", e)
         return this
     }
-    val parts = document.getElementsByTagName(SCORE_PART)
-    if (parts.length != 1) return this
+    val hidesPartName = document.hideSinglePartName()
+    val labelsRepeats = document.labelRepeatCounts()
+    if (!hidesPartName && !labelsRepeats) return this
+    return StringWriter().also { TransformerFactory.newInstance().newTransformer().transform(DOMSource(document), StreamResult(it)) }.toString()
+}
+
+private fun Document.hideSinglePartName(): Boolean {
+    val parts = getElementsByTagName(SCORE_PART)
+    if (parts.length != 1) return false
     val part = parts.item(0) as Element
     PART_LABELS.forEach { label ->
         val names = part.getElementsByTagName(label)
         (0 until names.length).forEach { (names.item(it) as Element).setAttribute(PRINT_OBJECT, NO) }
     }
-    return StringWriter().also { TransformerFactory.newInstance().newTransformer().transform(DOMSource(document), StreamResult(it)) }.toString()
+    return true
 }
+
+// Verovio plays a backward repeat as often as its times attribute says, but does not draw the count. Unless the
+// measure already says so in words, the count is written above the end of the measure of the first part.
+private fun Document.labelRepeatCounts(): Boolean {
+    val part = getElementsByTagName(PART).item(0) as? Element ?: return false
+    var labeled = false
+    part.childElements(MEASURE).forEach { measure ->
+        val repeat = measure.childElements(BARLINE).flatMap { it.childElements(REPEAT) }
+            .firstOrNull { it.getAttribute(DIRECTION) == BACKWARD } ?: return@forEach
+        val times = repeat.getAttribute(TIMES).toIntOrNull()?.takeIf { it > 2 } ?: return@forEach
+        val words = measure.getElementsByTagName(WORDS)
+        if ((0 until words.length).any { RepeatCountText.containsMatchIn(words.item(it).textContent) }) return@forEach
+        val direction = createElement(DIRECTION).apply {
+            setAttribute(PLACEMENT, ABOVE)
+            appendChild(createElement(DIRECTION_TYPE)).appendChild(createElement(WORDS).apply {
+                setAttribute(HALIGN, RIGHT)
+                textContent = "${times}x"
+            })
+        }
+        measure.insertBefore(direction, measure.childElements(BARLINE).lastOrNull { it.getAttribute(LOCATION) == RIGHT })
+        labeled = true
+    }
+    return labeled
+}
+
+private fun Element.childElements(tag: String): List<Element> =
+    (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }.filter { it.tagName == tag }
 
 private fun ByteArray.decodeXml(): String =
     if (Utf16Boms.any { bom -> bom.indices.all { getOrNull(it) == bom[it] } }) toString(Charsets.UTF_16) else decodeToString().removePrefix(UTF8_BOM)
