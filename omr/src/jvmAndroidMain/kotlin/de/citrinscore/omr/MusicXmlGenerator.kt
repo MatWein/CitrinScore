@@ -12,6 +12,7 @@ private const val POSITION_ATTRIBUTE = "homr-position"
 private const val VOICES_PER_STAFF = 4
 
 private val LIFT_TO_ALTER = mapOf("N" to 0, "#" to 1, "##" to 2, "b" to -1, "bb" to -2)
+private val LIFT_TO_ACCIDENTAL = mapOf("N" to "natural", "#" to "sharp", "##" to "double-sharp", "b" to "flat", "bb" to "flat-flat")
 private val DURATION_NAMES = mapOf(0 to "breve", 1 to "whole", 2 to "half", 4 to "quarter", 8 to "eighth", 16 to "16th", 32 to "32nd", 64 to "64th", 128 to "128th")
 private val BEAM_TYPES = mapOf("beamStart" to "begin", "beamContinue" to "continue", "beamStop" to "end")
 private val BEAMS_PER_TYPE = mapOf("eighth" to 1, "16th" to 2, "32nd" to 3, "64th" to 4, "128th" to 5)
@@ -439,6 +440,8 @@ private class MeasureBuilder(
             }
         }
         repeat(duration.dots) { note.add("dot") }
+        // <alter> only sets the sounding pitch, renderers draw an accidental only for <accidental>
+        LIFT_TO_ACCIDENTAL[symbol.lift]?.let { if (symbol.pitch != EMPTY && symbol.pitch != NO_NOTE) note.add("accidental", it) }
         if (duration.isTuplet) {
             note.add("time-modification").apply {
                 add("actual-notes", duration.actualNotes.toString())

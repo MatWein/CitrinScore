@@ -267,8 +267,24 @@ internal fun prepareStaffImage(staff: Staff, page: Mat, regions: StaffRegions): 
     val scaledHeight = (page.rows() * scaling).toInt()
     val scaled = Mat().also { Imgproc.resize(page, it, Size(scaledWidth.toDouble(), scaledHeight.toDouble())) }
     val scaledRegion = region.map { Math.rint(it * scaling) }
-    val (cropped, topLeft) = scaled.use {
-        cropAndReturnTop(it, scaledRegion[0] - CROP_MARGIN_X, scaledRegion[1] - CROP_MARGIN_Y, scaledRegion[2] + CROP_MARGIN_X, scaledRegion[3] + CROP_MARGIN_Y)
+    // A staff close to the page edge has a region that reaches beyond the page. Clamping the crop would leave an image that
+    // is smaller than the region, which then gets stretched and dewarped wrongly, so the page is extended with white instead.
+    val padLeft = max(0, -roundHalfEven(scaledRegion[0] - CROP_MARGIN_X))
+    val padTop = max(0, -roundHalfEven(scaledRegion[1] - CROP_MARGIN_Y))
+    val padRight = max(0, roundHalfEven(scaledRegion[2] + CROP_MARGIN_X) - scaledWidth + 1)
+    val padBottom = max(0, roundHalfEven(scaledRegion[3] + CROP_MARGIN_Y) - scaledHeight + 1)
+    val padded = if (padLeft + padTop + padRight + padBottom == 0) scaled else scaled.use {
+        Mat().also { padded -> Core.copyMakeBorder(it, padded, padTop, padBottom, padLeft, padRight, Core.BORDER_CONSTANT, Scalar.all(255.0)) }
+    }
+    val (cropped, topLeft) = padded.use {
+        val (image, paddedTopLeft) = cropAndReturnTop(
+            it,
+            scaledRegion[0] - CROP_MARGIN_X + padLeft,
+            scaledRegion[1] - CROP_MARGIN_Y + padTop,
+            scaledRegion[2] + CROP_MARGIN_X + padLeft,
+            scaledRegion[3] + CROP_MARGIN_Y + padTop,
+        )
+        image to (paddedTopLeft.first - padLeft to paddedTopLeft.second - padTop)
     }
     val left = topLeft.first / scaling
     val top = topLeft.second / scaling
