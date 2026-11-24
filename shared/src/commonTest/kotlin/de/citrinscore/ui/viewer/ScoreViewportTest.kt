@@ -6,7 +6,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.ScrollMode
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,7 +40,7 @@ class ScoreViewportTest {
     }
 
     @Test
-    fun `the bottom inset adds room below the document and is treated as hidden`() {
+    fun `the bottom inset adds room below the document and is treated as hidden`() = runTest(FrameClock()) {
         val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize, bottomInset = 100f) }
 
         viewport.scrollBy(Offset(0f, 5000f))
@@ -113,14 +115,55 @@ class ScoreViewportTest {
     }
 
     @Test
-    fun `revealing turns the page once the following system leaves the viewport`() {
+    fun `revealing glides half a screen once the played system is the second to last one`() = runTest(FrameClock()) {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+        fun system(index: Int) = Rect(0f, index * 150f, 1000f, index * 150f + 100f)
+
+        viewport.reveal(system(2), ahead = system(3))
+        assertEquals(0f, viewport.offset.y)
+
+        viewport.reveal(system(3), ahead = system(4))
+        assertEquals(400f, viewport.offset.y, absoluteTolerance = 0.01f)
+
+        viewport.reveal(system(4), ahead = system(5))
+        assertEquals(400f, viewport.offset.y, absoluteTolerance = 0.01f)
+    }
+
+    @Test
+    fun `revealing glides at most up to the top of the played system`() = runTest(FrameClock()) {
         val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
 
         viewport.reveal(Rect(0f, 300f, 1000f, 500f), ahead = Rect(0f, 550f, 1000f, 750f))
-        assertEquals(0f, viewport.offset.y)
 
-        viewport.reveal(Rect(0f, 550f, 1000f, 750f), ahead = Rect(0f, 800f, 1000f, 1000f))
-        assertEquals(510f, viewport.offset.y)
+        assertEquals(300f - 800f * 0.05f, viewport.offset.y, absoluteTolerance = 0.01f)
+    }
+
+    @Test
+    fun `revealing glides like stepping instead of jumping`() = runTest(FrameClock()) {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+        val positions = mutableListOf<Float>()
+
+        val glide = launch { viewport.reveal(Rect(0f, 1000f, 1000f, 1200f)) }
+        while (glide.isActive) {
+            positions += viewport.offset.y
+            yield()
+        }
+
+        assertEquals(1000f - 800f * 0.05f, viewport.offset.y, absoluteTolerance = 0.01f)
+        assertTrue(positions.count { it > 0f && it < viewport.offset.y } > 10)
+    }
+
+    @Test
+    fun `revealing the same region again keeps the running glide`() = runTest(FrameClock()) {
+        val viewport = ScoreViewport(null).apply { setBounds(viewportSize, documentSize) }
+
+        val glide = launch { viewport.reveal(Rect(0f, 1000f, 1000f, 1200f)) }
+        repeat(5) { yield() }
+        viewport.reveal(Rect(0f, 1050f, 1000f, 1150f))
+
+        assertTrue(glide.isActive)
+        glide.join()
+        assertEquals(1000f - 800f * 0.05f, viewport.offset.y, absoluteTolerance = 0.01f)
     }
 }
 
@@ -128,6 +171,7 @@ private class FrameClock : MonotonicFrameClock {
     private var nanos = 0L
 
     override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R {
+        yield()
         nanos += FRAME_NANOS
         return onFrame(nanos)
     }

@@ -30,6 +30,7 @@ class ScoreViewport(private val initial: ScoreViewState?) {
 
     private val stepping = MutatorMutex()
     private var remainingStep = 0f
+    private var glideTarget: Offset? = null
 
     private val maxOffsetY get() = (documentSize.height * zoom + bottomInset - viewportSize.height).coerceAtLeast(0f)
 
@@ -84,13 +85,45 @@ class ScoreViewport(private val initial: ScoreViewState?) {
         }
     }
 
-    fun reveal(document: Rect, ahead: Rect? = null) {
-        val bounds = Rect(document.left * zoom, document.top * zoom, document.right * zoom, document.bottom * zoom)
-        val visible = Rect(offset, Size(viewportSize.width, visibleHeight))
-        val bottom = maxOf(bounds.bottom, (ahead?.bottom ?: 0f) * zoom)
-        val x = if (bounds.left < visible.left || bounds.right > visible.right) bounds.center.x - viewportSize.width / 2 else offset.x
-        val y = if (bounds.top < visible.top || bottom > visible.bottom) bounds.top - visibleHeight * REVEAL_MARGIN else offset.y
-        offset = clamp(Offset(x, y))
+    /**
+     * Follows the played system with the same glide as [step]. Once the system is the second to last one that fits,
+     * because the system after [ahead] would not fit anymore, it glides down by at most half the visible height, but
+     * never further than the system's top, so the played notes stay around the middle. A system that is not visible
+     * at all is brought to the top. While a glide is running, the decision is made for where it ends, so a glide that
+     * already heads for the system keeps running undisturbed.
+     */
+    suspend fun reveal(document: Rect, ahead: Rect? = null) {
+        val settled = glideTarget ?: offset
+        val bounds = document.scaled(zoom)
+        val next = ahead?.scaled(zoom)
+        val visible = Rect(settled, Size(viewportSize.width, visibleHeight))
+        val top = bounds.top - visibleHeight * REVEAL_MARGIN
+        val x = if (bounds.left < visible.left || bounds.right > visible.right) bounds.center.x - viewportSize.width / 2 else settled.x
+        val y = when {
+            bounds.top < visible.top || bounds.bottom > visible.bottom -> top
+            next != null && next.bottom + (next.bottom - bounds.bottom) > visible.bottom ->
+                settled.y + minOf(visibleHeight * STEP_FRACTION, top - settled.y).coerceAtLeast(0f)
+            else -> settled.y
+        }
+        val target = clamp(Offset(x, y))
+        if (target != settled) glideTo(target)
+    }
+
+    private fun Rect.scaled(factor: Float) = Rect(left * factor, top * factor, right * factor, bottom * factor)
+
+    private suspend fun glideTo(target: Offset) = stepping.mutate {
+        glideTarget = target
+        val distance = target - offset
+        var travelled = Offset.Zero
+        try {
+            animate(0f, 1f, animationSpec = tween(STEP_MILLIS, easing = FastOutSlowInEasing)) { fraction, _ ->
+                val position = distance * fraction
+                offset = clamp(offset + position - travelled)
+                travelled = position
+            }
+        } finally {
+            if (glideTarget == target) glideTarget = null
+        }
     }
 
     fun zoomBy(factor: Float, focus: Offset = viewportCenter) = zoomTo(zoom * factor, focus)

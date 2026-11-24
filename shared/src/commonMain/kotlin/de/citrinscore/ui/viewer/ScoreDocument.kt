@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -63,6 +64,7 @@ import de.citrinscore.ui.viewer.annotations.pageSizing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val Margin = 4.dp
@@ -115,9 +117,12 @@ fun ScoreDocument(
             with(density) { PageLayout(pageSizes, viewportSize.width, Margin.toPx(), PageGap.toPx()) }
         }
         SideEffect { viewport.setBounds(viewportSize, Size(layout.width, layout.height), with(density) { bottomInset.toPx() }) }
+        // The glide runs in its own scope, so that the next note does not cancel it halfway
+        val glideScope = rememberCoroutineScope()
         LaunchedEffect(layout, highlight?.reveal, highlight?.lookahead) {
             highlight?.reveal?.let { target ->
-                viewport.reveal(layout.documentRect(target.page, target.bounds), highlight.lookahead?.let { layout.documentRect(it.page, it.bounds) })
+                val ahead = highlight.lookahead?.let { layout.documentRect(it.page, it.bounds) }
+                glideScope.launch { viewport.reveal(layout.documentRect(target.page, target.bounds), ahead) }
             }
         }
         val baseImages = remember(layout) { mutableStateMapOf<Int, ImageBitmap>() }
