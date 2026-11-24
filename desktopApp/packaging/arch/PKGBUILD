@@ -1,6 +1,7 @@
 pkgname=citrinscore-bin
 _app=citrinScore
-pkgver=1.1.1
+# Set from the version in gradle.properties by the arch job in .github/workflows/build.yml
+pkgver=0.0.0
 pkgrel=1
 pkgdesc='Sheet music library with MusicXML playback, play along and Git synchronization'
 arch=('x86_64')
