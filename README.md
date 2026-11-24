@@ -36,7 +36,7 @@ your own device as plain files: no account, no cloud, no lock-in.
 - **Play along** – play on your instrument and the cursor follows you through the microphone.
 - **Audio and files** – record yourself, attach MP3 or WAV files and keep related files with each score.
 - **Synchronization** – keep your library up to date on all your devices with a Git repository.
-- Organise scores in folders (select several and drag them into another folder to move or copy them), search and sort them, light and dark theme, English and German.
+- Organise scores in folders (select several and drag them into another folder to move or copy them), search and sort them, light and dark theme, in English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Danish, Swedish and Finnish.
 
 ## Installation
 
