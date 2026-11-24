@@ -13,7 +13,8 @@ private interface CLibrary : Library {
     fun setlocale(category: Int, locale: String): String?
 }
 
+private val cLibrary: CLibrary by lazy { Native.load(if (Platform.isWindows()) WINDOWS_C_RUNTIME else Platform.C_LIBRARY_NAME, CLibrary::class.java) }
+
 internal actual fun useLocaleIndependentNumbers() {
-    val library = Native.load(if (Platform.isWindows()) WINDOWS_C_RUNTIME else Platform.C_LIBRARY_NAME, CLibrary::class.java)
-    checkNotNull(library.setlocale(if (Platform.isLinux()) LINUX_LC_NUMERIC else BSD_LC_NUMERIC, C_LOCALE)) { "The numeric locale could not be set" }
+    checkNotNull(cLibrary.setlocale(if (Platform.isLinux()) LINUX_LC_NUMERIC else BSD_LC_NUMERIC, C_LOCALE)) { "The numeric locale could not be set" }
 }

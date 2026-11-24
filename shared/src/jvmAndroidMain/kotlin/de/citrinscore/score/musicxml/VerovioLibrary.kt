@@ -61,7 +61,15 @@ internal object Verovio {
         }
     }
 
-    suspend fun <T> call(block: VerovioLibrary.() -> T): T = lock.withLock { withContext(Dispatchers.Default) { library.block() } }
+    // Verovio formats the numbers in its SVG with the C locale of the process, which other native code (like GTK) may
+    // switch to the user's locale at any time, so the locale is set again before each call
+    suspend fun <T> call(block: VerovioLibrary.() -> T): T = lock.withLock {
+        withContext(Dispatchers.Default) {
+            val toolkit = library
+            useLocaleIndependentNumbers()
+            toolkit.block()
+        }
+    }
 
     fun release(toolkit: Pointer) = library.destructor(toolkit)
 }
