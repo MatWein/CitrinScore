@@ -42,6 +42,7 @@ import de.citrinscore.serialization.AppJson
 import de.citrinscore.score.musicxml.MusicXmlEngraverTest
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.test.runTest
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -87,19 +88,26 @@ class LibraryRepositoryTest {
 
         val content = repository.content(PlatformFile(root))
 
-        assertEquals(listOf("alpha", "Zeta", "Reopened", "New", "Old", "Broken"), content.arranged(LibrarySort.RecentlyUsed, "").map { it.displayName })
-        assertEquals(listOf("alpha", "Zeta", "Broken", "New", "Old", "Reopened"), content.arranged(LibrarySort.Title, "").map { it.displayName })
+        assertEquals(listOf("alpha", "Zeta", "Reopened", "New", "Old", "Broken"), content.arranged(LibrarySort.RecentlyUsed).map { it.displayName })
+        assertEquals(listOf("alpha", "Zeta", "Broken", "New", "Old", "Reopened"), content.arranged(LibrarySort.Title).map { it.displayName })
     }
 
     @Test
-    fun `search matches names ignoring case`() = runTest {
+    fun `search reaches into subfolders and their metadata`() = runTest {
         File(root, "Chorwerke").mkdir()
         importAt("Choral", Instant.parse("2026-01-01T00:00:00Z"))
-        importAt("Etude", Instant.parse("2026-02-01T00:00:00Z"))
+        importImages(ScoreMetadata("Etude", composer = "Chopin"), image("etude.png", "png", width = 10, height = 14))
+        val nested = File(root, "Klassik/Vivaldi").apply { mkdirs() }
+        repository.importScore(PlatformFile(nested), ScoreMetadata("Frühling", description = "Aus den vier Jahreszeiten"), listOf(imagePart("spring", image("spring.png", "png", 10, 14))))
 
-        val matches = repository.content(PlatformFile(root)).arranged(LibrarySort.Title, " cHOR ").map { it.displayName }
+        val entries = repository.entries(PlatformFile(root))
+        val matches = entries.search(" cHO ", LibrarySort.Title).map { it.item.displayName }
+        val spring = entries.search("vier fruhling", LibrarySort.Title).single()
 
-        assertEquals(listOf("Chorwerke", "Choral"), matches)
+        assertEquals(listOf("Chorwerke", "Choral", "Etude"), matches)
+        assertEquals(listOf("Klassik", "Vivaldi"), spring.entry.location)
+        assertEquals(nested.path, spring.entry.folder.path)
+        assertEquals(Highlighted("Aus den vier Jahreszeiten", listOf(8..11)), spring.detail)
     }
 
     @Test

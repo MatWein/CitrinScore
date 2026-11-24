@@ -68,9 +68,16 @@ class LibraryRepository(
         val directories = folder.list().filter { !it.name.startsWith(".") && it.isDirectory() }
         val (scoreDirectories, subfolders) = directories.partition { it.isScore() }
         val folders = subfolders.map(LibraryItem::Folder)
-        val scores = scoreDirectories.map { LibraryItem.Score(it, manifest(it)?.lastActivity) }
+        val scores = scoreDirectories.map { directory -> manifest(directory).let { LibraryItem.Score(directory, it?.lastActivity, it?.metadata) } }
         FolderContent(folders + scores)
     }
+
+    /** Everything below [folder], in all subfolders. */
+    suspend fun entries(folder: PlatformFile, path: List<PlatformFile> = emptyList()): List<SearchEntry> =
+        content(folder).items.flatMap { item ->
+            listOf(SearchEntry(item, folder, path)) +
+                if (item is LibraryItem.Folder) entries(item.file, path + item.file) else emptyList()
+        }
 
     suspend fun createFolder(parent: PlatformFile, name: String) {
         logger.info("Creating folder {} in {}", name, parent.path)

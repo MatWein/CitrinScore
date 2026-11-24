@@ -35,6 +35,12 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
     var selectedScore: PlatformFile? = null
         private set
 
+    /** The folder holding [selectedScore], which is not the current one for a score found by a search. */
+    var selectedFolder: PlatformFile? = null
+        private set
+
+    private var searching = false
+
     private val thumbnails = object : LruCache<String, ImageBitmap>(THUMBNAIL_CACHE_KILOBYTES) {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * BYTES_PER_PIXEL / BYTES_PER_KILOBYTE
     }
@@ -43,16 +49,19 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         refresh()
     }
 
-    fun open(folder: PlatformFile) {
-        logger.info("Opening folder {}", folder.path)
-        _state.update { it.copy(path = it.path + folder, content = null, selection = emptySet()) }
+    /** Opens [folder], or the last of several nested folders below the current one. */
+    fun open(vararg folder: PlatformFile) {
+        logger.info("Opening folder {}", folder.last().path)
+        searching = false
+        _state.update { it.copy(path = it.path + folder, content = null, selection = emptySet(), searchEntries = null) }
         refresh()
     }
 
     fun up() {
         if (_state.value.isRoot) return
         logger.info("Leaving folder {}", currentFolder.path)
-        _state.update { it.copy(path = it.path.dropLast(1), content = null, selection = emptySet()) }
+        searching = false
+        _state.update { it.copy(path = it.path.dropLast(1), content = null, selection = emptySet(), searchEntries = null) }
         refresh()
     }
 
@@ -64,8 +73,24 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
         }
     }
 
-    fun select(score: PlatformFile) {
+    fun select(score: PlatformFile, folder: PlatformFile = currentFolder) {
         selectedScore = score
+        selectedFolder = folder
+    }
+
+    /** Loads everything below the current folder while a search is open, so the search reaches into subfolders. */
+    fun setSearching(active: Boolean) {
+        if (active == searching) return
+        searching = active
+        if (active) loadSearchEntries() else _state.update { it.copy(searchEntries = null) }
+    }
+
+    private fun loadSearchEntries() {
+        val folder = currentFolder
+        viewModelScope.launch {
+            val entries = attempt { repository.entries(folder) } ?: return@launch report(LibraryError.Load)
+            _state.update { if (searching && it.currentFolder == folder) it.copy(searchEntries = entries) else it }
+        }
     }
 
     fun setSelection(selection: Set<String>) = _state.update { it.copy(selection = selection) }
@@ -120,6 +145,7 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
             val content = attempt { repository.content(folder) } ?: return@launch report(LibraryError.Load)
             _state.update { if (it.currentFolder == folder) it.copy(content = content) else it }
         }
+        if (searching) loadSearchEntries()
     }
 
     fun report(error: LibraryError) = _state.update { it.copy(error = error) }

@@ -83,12 +83,12 @@ fun LibraryNavigation(
                 },
                 onImport = { navController.navigate(ImportRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
-                onOpenScore = { score ->
-                    libraryViewModel.select(score)
+                onOpenScore = { score, folder ->
+                    libraryViewModel.select(score, folder)
                     navController.navigate(ScoreRoute)
                 },
-                onEditScore = { score ->
-                    libraryViewModel.select(score)
+                onEditScore = { score, folder ->
+                    libraryViewModel.select(score, folder)
                     navController.navigate(EditRoute)
                 },
                 onSync = syncViewModel?.let { sync -> settings.git?.let { remote -> { sync.start(remote, libraryViewModel::reload) } } },
@@ -118,7 +118,7 @@ fun LibraryNavigation(
                 LaunchedEffect(Unit) { navController.popBackStack() }
             } else {
                 EditScoreScreen(
-                    folder = libraryViewModel.currentFolder,
+                    folder = libraryViewModel.selectedFolder ?: libraryViewModel.currentFolder,
                     score = score,
                     repository = repository,
                     onClose = { navController.popBackStack() },

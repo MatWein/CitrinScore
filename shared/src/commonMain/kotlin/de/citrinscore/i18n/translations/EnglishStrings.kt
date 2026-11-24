@@ -76,7 +76,7 @@ object EnglishStrings : Strings {
 
     override val refresh = "Refresh"
     override val search = "Search"
-    override val searchPlaceholder = "Search this folder"
+    override val searchPlaceholder = "Title, composer or description"
     override val closeSearch = "Close search"
     override val noSearchResults = "No matches"
     override val sort = "Sort"

@@ -145,11 +145,13 @@ class Drop(val items: List<LibraryItem>, val target: PlatformFile, val position:
 /**
  * Selects a tile on a long press and drags the selection when the pointer moves afterwards. A mouse starts dragging
  * a tile right away. Releasing the pointer over a folder or the parent folder zone reports a [Drop].
+ * Without [draggable] it only selects.
  */
 @Composable
 internal fun Modifier.libraryDragGestures(
     state: LibraryDragState,
     visible: List<LibraryItem>,
+    draggable: Boolean,
     parent: PlatformFile?,
     onLongPress: (LibraryItem) -> Unit,
     selectedItems: () -> List<LibraryItem>,
@@ -158,6 +160,7 @@ internal fun Modifier.libraryDragGestures(
     val haptics = LocalHapticFeedback.current
     val currentVisible by rememberUpdatedState(visible)
     val currentParent by rememberUpdatedState(parent)
+    val currentDraggable by rememberUpdatedState(draggable)
     val currentLongPress by rememberUpdatedState(onLongPress)
     val currentSelection by rememberUpdatedState(selectedItems)
     val currentDrop by rememberUpdatedState(onDrop)
@@ -169,12 +172,12 @@ internal fun Modifier.libraryDragGestures(
             val item = state.itemAt(down.position, currentVisible) ?: return@awaitEachGesture
             val slop = viewConfiguration.touchSlop
             val press = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitPress(down, slop, isMouse) } ?: Press.LongPressed
-            if (press == Press.Cancelled) return@awaitEachGesture
+            if (press == Press.Cancelled || press == Press.Dragged && !currentDraggable) return@awaitEachGesture
 
             if (press == Press.LongPressed) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             currentLongPress(item)
             var position = currentEvent.changes.firstOrNull { it.id == down.id }?.position ?: down.position
-            val startDrag = { state.start(currentSelection().ifEmpty { listOf(item) }, currentVisible, currentParent, position) }
+            val startDrag = { if (currentDraggable) state.start(currentSelection().ifEmpty { listOf(item) }, currentVisible, currentParent, position) }
             if (press == Press.Dragged) startDrag()
             try {
                 while (true) {

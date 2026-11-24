@@ -76,7 +76,7 @@ object GermanStrings : Strings {
 
     override val refresh = "Aktualisieren"
     override val search = "Suchen"
-    override val searchPlaceholder = "In diesem Ordner suchen"
+    override val searchPlaceholder = "Titel, Komponist oder Beschreibung"
     override val closeSearch = "Suche schließen"
     override val noSearchResults = "Keine Treffer"
     override val sort = "Sortieren"

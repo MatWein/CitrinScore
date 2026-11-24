@@ -70,8 +70,17 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.i18n.Strings
+import de.citrinscore.library.Highlighted
 import de.citrinscore.library.LibraryItem
 import de.citrinscore.library.LibrarySort
+import de.citrinscore.library.SearchEntry
+import de.citrinscore.library.SearchHit
+import de.citrinscore.library.search
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
 import de.citrinscore.resources.Res
 import de.citrinscore.resources.ic_arrow_back
 import de.citrinscore.resources.ic_check
@@ -115,6 +124,8 @@ private val TileMenuSize = Spacing.Section
 private val WideToolbarWidth = 600.dp
 private const val ZIP_EXTENSION = "zip"
 private const val DRAGGED_ALPHA = 0.4f
+private const val SEARCH_DELAY = 150L
+private const val LOCATION_SEPARATOR = " › "
 private val AutoScrollEdge = 64.dp
 private val AutoScrollSpeed = 16.dp
 private val SelectionMarkBorder = 2.dp
@@ -126,8 +137,8 @@ fun LibraryScreen(
     sort: LibrarySort,
     onSortChange: (LibrarySort) -> Unit,
     onImport: () -> Unit,
-    onOpenScore: (PlatformFile) -> Unit,
-    onEditScore: (PlatformFile) -> Unit,
+    onOpenScore: (score: PlatformFile, folder: PlatformFile) -> Unit,
+    onEditScore: (score: PlatformFile, folder: PlatformFile) -> Unit,
     onOpenSettings: () -> Unit,
     onSync: (() -> Unit)? = null,
     localChanges: Int = 0,
@@ -148,7 +159,22 @@ fun LibraryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var query by rememberSaveable(state.currentFolder.path) { mutableStateOf<String?>(null) }
     var searchOpened by remember { mutableStateOf(false) }
-    val visible = remember(state.content, sort, query) { state.content?.arranged(sort, query.orEmpty()).orEmpty() }
+    LaunchedEffect(query != null) { viewModel.setSearching(query != null) }
+    val search by produceState(query.orEmpty().trim(), query) {
+        val text = query.orEmpty().trim()
+        if (text.isNotEmpty()) delay(SEARCH_DELAY)
+        value = text
+    }
+    val hits = remember(state.content, state.searchEntries, sort, search) {
+        val folder = state.currentFolder
+        val content = state.content
+        when {
+            content == null -> emptyList()
+            search.isEmpty() -> content.arranged(sort).map { SearchHit(SearchEntry(it, folder), Highlighted(it.displayName)) }
+            else -> (state.searchEntries ?: content.items.map { SearchEntry(it, folder) }).search(search, sort)
+        }
+    }
+    val visible = remember(hits) { hits.map { it.item } }
     LaunchedEffect(visible) { viewModel.retainSelection(visible.mapTo(HashSet()) { it.file.path }) }
     val windowInfo = LocalWindowInfo.current
 
@@ -172,7 +198,8 @@ fun LibraryScreen(
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    fun onTileClick(item: LibraryItem) {
+    fun onTileClick(hit: SearchHit) {
+        val item = hit.item
         val keys = windowInfo.keyboardModifiers
         val selection = viewModel.state.value.selection
         val from = visible.indexOfFirst { it.file.path == anchor }
@@ -181,8 +208,8 @@ fun LibraryScreen(
             keys.isShiftPressed && from >= 0 && to >= 0 ->
                 viewModel.setSelection(selection + visible.subList(minOf(from, to), maxOf(from, to) + 1).map { it.file.path })
             keys.isShiftPressed || keys.isCtrlPressed || keys.isMetaPressed || selection.isNotEmpty() -> toggle(item)
-            item is LibraryItem.Folder -> viewModel.open(item.file)
-            item is LibraryItem.Score -> onOpenScore(item.file)
+            item is LibraryItem.Folder -> viewModel.open(*(hit.entry.path + item.file).toTypedArray())
+            item is LibraryItem.Score -> onOpenScore(item.file, hit.entry.folder)
         }
     }
 
@@ -274,7 +301,7 @@ fun LibraryScreen(
                     )
                 } else {
                     LibraryGrid(
-                        items = visible,
+                        hits = hits,
                         selection = state.selection,
                         drag = drag,
                         onClick = ::onTileClick,
@@ -288,6 +315,7 @@ fun LibraryScreen(
                         modifier = drag.containerModifier.libraryDragGestures(
                             state = drag,
                             visible = visible,
+                            draggable = search.isEmpty(),
                             parent = state.parentFolder,
                             onLongPress = { item ->
                                 viewModel.setSelection(viewModel.state.value.selection + item.file.path)
@@ -352,11 +380,11 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryGrid(
-    items: List<LibraryItem>,
+    hits: List<SearchHit>,
     selection: Set<String>,
     drag: LibraryDragState,
-    onClick: (LibraryItem) -> Unit,
-    onEdit: (PlatformFile) -> Unit,
+    onClick: (SearchHit) -> Unit,
+    onEdit: (score: PlatformFile, folder: PlatformFile) -> Unit,
     onExport: (PlatformFile) -> Unit,
     onDelete: (LibraryItem) -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
@@ -383,7 +411,7 @@ private fun LibraryGrid(
     }
     val selecting = selection.isNotEmpty()
     Box(modifier.fillMaxSize()) {
-        if (items.isEmpty()) {
+        if (hits.isEmpty()) {
             Text(
                 LocalStrings.current.noSearchResults,
                 style = MaterialTheme.typography.bodyLarge,
@@ -399,16 +427,17 @@ private fun LibraryGrid(
             verticalArrangement = Arrangement.spacedBy(Spacing.Large),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(items, key = { it.file.path }) { item ->
+            items(hits, key = { it.item.file.path }) { hit ->
+                val item = hit.item
                 LibraryTile(
-                    item = item,
+                    hit = hit,
                     selected = item.file.path in selection,
                     selecting = selecting,
                     highlighted = drag.isTarget(item),
                     dimmed = drag.isDragged(item),
                     modifier = Modifier.dragBounds(drag, item.file.path),
-                    onClick = { onClick(item) },
-                    onEdit = { onEdit(item.file) }.takeIf { item is LibraryItem.Score },
+                    onClick = { onClick(hit) },
+                    onEdit = { onEdit(item.file, hit.entry.folder) }.takeIf { item is LibraryItem.Score },
                     onExport = { onExport(item.file) }.takeIf { item is LibraryItem.Score },
                     onDelete = { onDelete(item) },
                     loadThumbnail = loadThumbnail,
@@ -421,7 +450,7 @@ private fun LibraryGrid(
 
 @Composable
 private fun LibraryTile(
-    item: LibraryItem,
+    hit: SearchHit,
     selected: Boolean,
     selecting: Boolean,
     highlighted: Boolean,
@@ -433,6 +462,7 @@ private fun LibraryTile(
     onDelete: () -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
 ) {
+    val item = hit.item
     Tile(
         modifier.aspectRatio(CitScore.PAGE_ASPECT_RATIO).alpha(if (dimmed) DRAGGED_ALPHA else 1f),
         selected = selected || highlighted,
@@ -441,7 +471,7 @@ private fun LibraryTile(
     ) {
         Row {
             Text(
-                item.displayName,
+                hit.title.annotated(),
                 style = MaterialTheme.typography.titleSmall,
                 minLines = 2,
                 maxLines = 2,
@@ -449,6 +479,25 @@ private fun LibraryTile(
                 modifier = Modifier.weight(1f).padding(top = Spacing.ExtraSmall),
             )
             if (selecting) SelectionMark(selected) else TileMenu(onEdit, onExport, onDelete)
+        }
+        hit.detail?.let { detail ->
+            Text(
+                detail.annotated(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (hit.entry.path.isNotEmpty()) {
+            Text(
+                hit.entry.location.joinToString(LOCATION_SEPARATOR),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = Spacing.ExtraSmall),
+            )
         }
         Box(
             modifier = Modifier
@@ -463,6 +512,15 @@ private fun LibraryTile(
                 is LibraryItem.Score -> ScorePreview(item.file, loadThumbnail)
             }
         }
+    }
+}
+
+@Composable
+private fun Highlighted.annotated(): AnnotatedString {
+    val style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    return buildAnnotatedString {
+        append(text)
+        matches.forEach { addStyle(style, it.first, it.last + 1) }
     }
 }
 
