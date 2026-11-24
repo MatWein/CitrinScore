@@ -3,6 +3,7 @@ package de.citrinscore.ui.viewer.files
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -75,7 +76,17 @@ fun AttachmentsMenu(audioViewModel: ScoreAudioViewModel, filesViewModel: ScoreFi
     LaunchedEffect(expanded) { if (expanded) audioViewModel.checkMicrophone() }
 
     Box {
-        IconAction(Res.drawable.ic_attach_file, strings.attachments, onClick = { expanded = true })
+        val count = audio.attachments.size + files.files.size
+        IconAction(
+            Res.drawable.ic_attach_file,
+            strings.attachments,
+            onClick = { expanded = true },
+            badge = {
+                if (count > 0) {
+                    Badge(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) { Text(count.toString()) }
+                }
+            },
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (audio.attachments.isEmpty() && files.files.isEmpty()) {
                 Text(

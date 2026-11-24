@@ -27,6 +27,8 @@ fun TextInputDialog(
     var text by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(initialText, selection = TextRange(initialText.length)))
     }
+    val canConfirm = allowBlank || text.text.isNotBlank()
+    val confirm = { onConfirm(text.text.trim()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -36,11 +38,11 @@ fun TextInputDialog(
                 onValueChange = { text = it },
                 label = label,
                 singleLine = singleLine,
-                modifier = Modifier.initialFocus(),
+                modifier = Modifier.initialFocus().confirmOnEnter(canConfirm, confirm),
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text.text.trim()) }, enabled = allowBlank || text.text.isNotBlank()) { Text(confirmLabel) }
+            TextButton(onClick = confirm, enabled = canConfirm) { Text(confirmLabel) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(LocalStrings.current.cancel) } },
     )

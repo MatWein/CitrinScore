@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import de.citrinscore.i18n.LocalStrings
 import de.citrinscore.library.validateName
 import de.citrinscore.ui.components.CitrinTextField
+import de.citrinscore.ui.components.confirmOnEnter
 import de.citrinscore.ui.components.initialFocus
 import de.citrinscore.ui.components.text
 
@@ -31,7 +32,7 @@ fun NewFolderDialog(takenNames: List<String>, onCreate: (String) -> Unit, onDism
                 label = strings.folderNameLabel,
                 singleLine = true,
                 error = error?.takeIf { name.isNotEmpty() }?.text,
-                modifier = Modifier.initialFocus(),
+                modifier = Modifier.initialFocus().confirmOnEnter(error == null) { onCreate(name) },
             )
         },
         confirmButton = {
