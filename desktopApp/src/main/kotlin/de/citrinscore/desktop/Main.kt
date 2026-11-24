@@ -1,6 +1,10 @@
 package de.citrinscore.desktop
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -21,6 +25,7 @@ import java.io.File
 
 private const val SETTINGS_DIRECTORY = ".citrinscore"
 private const val HOME_PROPERTY = "citrinscore.home"
+private const val TITLE_SEPARATOR = " – "
 private val MinimumWindowSize = Dimension(300, 600)
 private val InitialWindowSize = DpSize(1280.dp, 800.dp)
 
@@ -32,12 +37,13 @@ fun main() {
     logger.info("Starting {} {} on {} {} with Java {}", AppInfo.NAME, AppInfo.VERSION, System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("java.version"))
     FileKit.init(appId = AppInfo.ID, filesDir = filesDir)
     application(exitProcessOnExit = false) {
+        var screenTitle by remember { mutableStateOf<String?>(null) }
         Window(
             onCloseRequest = {
                 logger.info("Closing {}", AppInfo.NAME)
                 exitApplication()
             },
-            title = AppInfo.NAME,
+            title = listOfNotNull(AppInfo.NAME, screenTitle).joinToString(TITLE_SEPARATOR),
             icon = painterResource(Res.drawable.app_icon),
             state = rememberWindowState(
                 placement = WindowPlacement.Maximized,
@@ -48,7 +54,7 @@ fun main() {
             LaunchedEffect(window) {
                 window.minimumSize = MinimumWindowSize
             }
-            App()
+            App(onWindowTitleChange = { screenTitle = it })
         }
     }
 }

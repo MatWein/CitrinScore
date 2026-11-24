@@ -14,6 +14,7 @@ import de.citrinscore.settings.AppSettings
 import de.citrinscore.settings.FileSettingsRepository
 import de.citrinscore.ui.AppState
 import de.citrinscore.ui.AppViewModel
+import de.citrinscore.ui.LocalWindowTitle
 import de.citrinscore.ui.library.LibraryNavigation
 import de.citrinscore.ui.library.LibraryUnavailableScreen
 import de.citrinscore.ui.onboarding.OnboardingScreen
@@ -22,10 +23,15 @@ import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.filesDir
 
 @Composable
-fun App() {
+fun App(onWindowTitleChange: (String?) -> Unit = {}) {
     val viewModel = viewModel { AppViewModel(FileSettingsRepository(FileKit.filesDir)) }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    CompositionLocalProvider(LocalWindowTitle provides onWindowTitleChange) { AppContent(state, viewModel) }
+}
+
+@Composable
+private fun AppContent(state: AppState, viewModel: AppViewModel) {
     AnimatedContent(
         targetState = state,
         contentKey = { it::class },

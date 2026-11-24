@@ -99,6 +99,7 @@ import de.citrinscore.resources.ic_music_note
 import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.musicxml.NotePositions
+import de.citrinscore.ui.WindowTitle
 import de.citrinscore.ui.viewer.playback.PlaybackCursor
 import de.citrinscore.ui.viewer.playback.PlaybackBar
 import de.citrinscore.ui.viewer.playback.PlaybackViewModel
@@ -160,6 +161,7 @@ fun ScoreViewerScreen(
     val ready = state as? ScoreViewerState.Ready
     val viewport = ready?.let { remember(it) { ScoreViewport(it.view) } }
     val toolbar = ToolbarState(ready, viewport, viewModel, audioViewModel, annotationViewModel, filesViewModel, playbackViewModel, onClose)
+    WindowTitle(toolbar.windowTitle())
     val playback by playbackViewModel.state.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(viewport) { if (viewport != null) focusRequester.requestFocus() }
@@ -450,6 +452,10 @@ private fun ToolbarState.subtitle(): String? {
     }
     return listOf(ready.metadata.composer, partName.orEmpty()).filter { it.isNotEmpty() }.joinToString(SUBTITLE_SEPARATOR).ifEmpty { null }
 }
+
+@Composable
+private fun ToolbarState.windowTitle(): String? =
+    listOfNotNull(ready?.metadata?.title?.takeIf { it.isNotEmpty() }, subtitle()).joinToString(SUBTITLE_SEPARATOR).ifEmpty { null }
 
 @Composable
 private fun PartAction(toolbar: ToolbarState) {
