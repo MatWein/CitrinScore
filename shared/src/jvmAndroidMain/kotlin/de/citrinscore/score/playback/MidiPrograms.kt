@@ -15,15 +15,19 @@ private val ChannelStatuses = MidiChannelStatus.NOTE_OFF..MidiChannelStatus.PITC
 internal fun ByteArray.initialProgram(): Int =
     music().tracks.flatMap { it.events }.map { it.message }.firstOrNull { it.isProgramChange && it.isMelodic }?.msb?.toInt() ?: DEFAULT_PROGRAM
 
-internal fun ByteArray.withProgram(program: Int): ByteArray {
+/** Lets the first notated instrument play [program] while every other instrument keeps its notated program. */
+internal fun ByteArray.withLeadProgram(program: Int): ByteArray {
     val music = music()
+    val lead = music.tracks.firstNotNullOfOrNull { track ->
+        track.events.firstOrNull { it.message.isChannelMessage && it.message.isMelodic }?.message?.channel?.toInt()
+    } ?: return this
     music.tracks.forEach { track ->
-        val channels = track.events.map { it.message }.filter { it.isChannelMessage && it.isMelodic }.map { it.channel.toInt() }.distinct()
+        if (track.events.none { it.message.isChannelMessage && it.message.channel.toInt() == lead }) return@forEach
         val replaced = track.events.map { event ->
-            if (event.message.isProgramChange && event.message.isMelodic) Midi1Event(event.deltaTime, programChange(event.message.channel.toInt(), program)) else event
+            if (event.message.isProgramChange && event.message.channel.toInt() == lead) Midi1Event(event.deltaTime, programChange(lead, program)) else event
         }
         track.events.clear()
-        track.events += channels.map { Midi1Event(0, programChange(it, program)) } + replaced
+        track.events += listOf(Midi1Event(0, programChange(lead, program))) + replaced
     }
     return mutableListOf<Byte>().also(music::write).toByteArray()
 }

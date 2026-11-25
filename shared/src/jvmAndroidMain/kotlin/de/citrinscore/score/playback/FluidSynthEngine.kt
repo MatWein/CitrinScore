@@ -79,7 +79,7 @@ internal class FluidSynthEngine private constructor(
 
     companion object {
         suspend fun open(performance: ScorePerformance, instrument: Instrument?): FluidSynthEngine {
-            val midi = instrument?.let { performance.midi.withProgram(it.program) } ?: performance.midi
+            val midi = instrument?.let { performance.midi.withLeadProgram(it.program) } ?: performance.midi
             return open(midi, instrument?.program)
         }
 
