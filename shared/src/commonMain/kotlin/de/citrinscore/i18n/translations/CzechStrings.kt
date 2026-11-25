@@ -101,6 +101,8 @@ object CzechStrings : Strings {
     override val copyFailed = "Všechny položky se nepodařilo zkopírovat."
     override val export = "Exportovat"
     override val exportFailed = "Skladbu se nepodařilo exportovat."
+    override val showFilesExternally = "Zobrazit soubory externě"
+    override val showFilesExternallyFailed = "Složku se nepodařilo otevřít ve správci souborů."
     override val createFolderFailed = "Složku se nepodařilo vytvořit."
     override val folderLoadFailed = "Složku se nepodařilo načíst."
     override val settingsSaveFailed = "Nastavení se nepodařilo uložit."

@@ -93,6 +93,8 @@ interface Strings {
     val copyFailed: String
     val export: String
     val exportFailed: String
+    val showFilesExternally: String
+    val showFilesExternallyFailed: String
     val createFolderFailed: String
     val folderLoadFailed: String
     val settingsSaveFailed: String

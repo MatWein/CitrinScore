@@ -101,6 +101,8 @@ object PolishStrings : Strings {
     override val copyFailed = "Nie udało się skopiować wszystkich elementów."
     override val export = "Eksportuj"
     override val exportFailed = "Nie udało się wyeksportować utworu."
+    override val showFilesExternally = "Pokaż pliki zewnętrznie"
+    override val showFilesExternallyFailed = "Nie udało się otworzyć folderu w menedżerze plików."
     override val createFolderFailed = "Nie udało się utworzyć folderu."
     override val folderLoadFailed = "Nie udało się odczytać folderu."
     override val settingsSaveFailed = "Nie udało się zapisać ustawień."

@@ -101,6 +101,8 @@ object DanishStrings : Strings {
     override val copyFailed = "Ikke alle elementer kunne kopieres."
     override val export = "Eksportér"
     override val exportFailed = "Stykket kunne ikke eksporteres."
+    override val showFilesExternally = "Vis filer eksternt"
+    override val showFilesExternallyFailed = "Mappen kunne ikke åbnes i filhåndteringen."
     override val createFolderFailed = "Mappen kunne ikke oprettes."
     override val folderLoadFailed = "Mappen kunne ikke læses."
     override val settingsSaveFailed = "Indstillingerne kunne ikke gemmes."

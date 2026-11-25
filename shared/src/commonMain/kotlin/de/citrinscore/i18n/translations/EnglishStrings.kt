@@ -101,6 +101,8 @@ object EnglishStrings : Strings {
     override val copyFailed = "Not all items could be copied."
     override val export = "Export"
     override val exportFailed = "The score could not be exported."
+    override val showFilesExternally = "Show files externally"
+    override val showFilesExternallyFailed = "The folder could not be opened in the file manager."
     override val createFolderFailed = "The folder could not be created."
     override val folderLoadFailed = "The folder could not be read."
     override val settingsSaveFailed = "The settings could not be saved."

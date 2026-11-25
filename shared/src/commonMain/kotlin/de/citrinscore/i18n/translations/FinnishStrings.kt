@@ -101,6 +101,8 @@ object FinnishStrings : Strings {
     override val copyFailed = "Kaikkia kohteita ei voitu kopioida."
     override val export = "Vie"
     override val exportFailed = "Kappaletta ei voitu viedä."
+    override val showFilesExternally = "Näytä tiedostot ulkoisesti"
+    override val showFilesExternallyFailed = "Kansiota ei voitu avata tiedostonhallinnassa."
     override val createFolderFailed = "Kansiota ei voitu luoda."
     override val folderLoadFailed = "Kansiota ei voitu lukea."
     override val settingsSaveFailed = "Asetuksia ei voitu tallentaa."

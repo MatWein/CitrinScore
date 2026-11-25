@@ -101,6 +101,8 @@ object SwedishStrings : Strings {
     override val copyFailed = "Alla objekt kunde inte kopieras."
     override val export = "Exportera"
     override val exportFailed = "Stycket kunde inte exporteras."
+    override val showFilesExternally = "Visa filer externt"
+    override val showFilesExternallyFailed = "Mappen kunde inte öppnas i filhanteraren."
     override val createFolderFailed = "Mappen kunde inte skapas."
     override val folderLoadFailed = "Mappen kunde inte läsas."
     override val settingsSaveFailed = "Inställningarna kunde inte sparas."

@@ -101,6 +101,8 @@ object FrenchStrings : Strings {
     override val copyFailed = "Tous les éléments n'ont pas pu être copiés."
     override val export = "Exporter"
     override val exportFailed = "La partition n'a pas pu être exportée."
+    override val showFilesExternally = "Afficher les fichiers en externe"
+    override val showFilesExternallyFailed = "Le dossier n'a pas pu être ouvert dans le gestionnaire de fichiers."
     override val createFolderFailed = "Le dossier n'a pas pu être créé."
     override val folderLoadFailed = "Le dossier n'a pas pu être lu."
     override val settingsSaveFailed = "Les paramètres n'ont pas pu être enregistrés."

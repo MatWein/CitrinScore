@@ -6,7 +6,7 @@ import de.citrinscore.library.SearchEntry
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.path
 
-enum class LibraryError { Load, CreateFolder, Delete, Export, Move, Copy, SaveSettings }
+enum class LibraryError { Load, CreateFolder, Delete, Export, ShowInFileManager, Move, Copy, SaveSettings }
 
 data class LibraryState(
     val path: List<PlatformFile>,

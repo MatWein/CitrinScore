@@ -101,6 +101,8 @@ object DutchStrings : Strings {
     override val copyFailed = "Niet alle items konden worden gekopieerd."
     override val export = "Exporteren"
     override val exportFailed = "Het stuk kon niet worden geëxporteerd."
+    override val showFilesExternally = "Bestanden extern weergeven"
+    override val showFilesExternallyFailed = "De map kon niet worden geopend in het bestandsbeheer."
     override val createFolderFailed = "De map kon niet worden gemaakt."
     override val folderLoadFailed = "De map kon niet worden gelezen."
     override val settingsSaveFailed = "De instellingen konden niet worden opgeslagen."

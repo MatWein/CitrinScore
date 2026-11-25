@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.library.TransferMode
+import de.citrinscore.library.showInFileManager
 import de.citrinscore.util.attempt
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
@@ -136,6 +137,12 @@ class LibraryViewModel(root: PlatformFile, private val repository: LibraryReposi
             thumbnails.evictAll()
             _state.update { it.copy(path = existing, selection = emptySet()) }
             refresh()
+        }
+    }
+
+    fun showInFileManager(folder: PlatformFile) {
+        viewModelScope.launch {
+            attempt { folder.showInFileManager() } ?: report(LibraryError.ShowInFileManager)
         }
     }
 

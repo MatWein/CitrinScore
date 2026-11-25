@@ -75,6 +75,7 @@ import de.citrinscore.library.LibraryItem
 import de.citrinscore.library.LibrarySort
 import de.citrinscore.library.SearchEntry
 import de.citrinscore.library.SearchHit
+import de.citrinscore.library.canShowInFileManager
 import de.citrinscore.library.search
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -221,6 +222,7 @@ fun LibraryScreen(
                     LibraryError.CreateFolder -> strings.createFolderFailed
                     LibraryError.Delete -> strings.deleteFailed
                     LibraryError.Export -> strings.exportFailed
+                    LibraryError.ShowInFileManager -> strings.showFilesExternallyFailed
                     LibraryError.Move -> strings.moveFailed
                     LibraryError.Copy -> strings.copyFailed
                     LibraryError.SaveSettings -> strings.settingsSaveFailed
@@ -311,6 +313,7 @@ fun LibraryScreen(
                             exporter.launch(suggestedName = score.name, defaultExtension = ZIP_EXTENSION)
                         },
                         onDelete = { pendingDelete = listOf(it) },
+                        onShowExternally = viewModel::showInFileManager,
                         loadThumbnail = viewModel::thumbnail,
                         modifier = drag.containerModifier.libraryDragGestures(
                             state = drag,
@@ -387,6 +390,7 @@ private fun LibraryGrid(
     onEdit: (score: PlatformFile, folder: PlatformFile) -> Unit,
     onExport: (PlatformFile) -> Unit,
     onDelete: (LibraryItem) -> Unit,
+    onShowExternally: (PlatformFile) -> Unit,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
     modifier: Modifier,
 ) {
@@ -440,6 +444,7 @@ private fun LibraryGrid(
                     onEdit = { onEdit(item.file, hit.entry.folder) }.takeIf { item is LibraryItem.Score },
                     onExport = { onExport(item.file) }.takeIf { item is LibraryItem.Score },
                     onDelete = { onDelete(item) },
+                    onShowExternally = { onShowExternally(item.file) }.takeIf { item.file.canShowInFileManager },
                     loadThumbnail = loadThumbnail,
                 )
             }
@@ -460,6 +465,7 @@ private fun LibraryTile(
     onEdit: (() -> Unit)?,
     onExport: (() -> Unit)?,
     onDelete: () -> Unit,
+    onShowExternally: (() -> Unit)?,
     loadThumbnail: suspend (PlatformFile) -> ImageBitmap?,
 ) {
     val item = hit.item
@@ -478,7 +484,7 @@ private fun LibraryTile(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(top = Spacing.ExtraSmall),
             )
-            if (selecting) SelectionMark(selected) else TileMenu(onEdit, onExport, onDelete)
+            if (selecting) SelectionMark(selected) else TileMenu(onEdit, onExport, onShowExternally, onDelete)
         }
         hit.detail?.let { detail ->
             Text(
@@ -601,7 +607,7 @@ private fun LibrarySort.label(strings: Strings) = when (this) {
 }
 
 @Composable
-private fun TileMenu(onEdit: (() -> Unit)?, onExport: (() -> Unit)?, onDelete: () -> Unit) {
+private fun TileMenu(onEdit: (() -> Unit)?, onExport: (() -> Unit)?, onShowExternally: (() -> Unit)?, onDelete: () -> Unit) {
     val strings = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
     val item: @Composable (String, DrawableResource, () -> Unit) -> Unit = { label, icon, action ->
@@ -619,6 +625,7 @@ private fun TileMenu(onEdit: (() -> Unit)?, onExport: (() -> Unit)?, onDelete: (
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             onEdit?.let { item(strings.edit, Res.drawable.ic_edit, it) }
             onExport?.let { item(strings.export, Res.drawable.ic_download, it) }
+            onShowExternally?.let { item(strings.showFilesExternally, Res.drawable.ic_folder, it) }
             item(strings.delete, Res.drawable.ic_delete, onDelete)
         }
     }
