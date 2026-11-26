@@ -51,6 +51,7 @@ data class ScorePart(
     val engravedView: ScoreViewState? = null,
     val display: PartDisplay? = null,
     val playback: PlaybackPreferences? = null,
+    val instruments: ShownInstruments? = null,
     val recognition: Recognition? = null,
 ) {
     val displays
@@ -74,6 +75,12 @@ enum class PartDisplay {
     ;
 
     val isEngraved get() = this == MusicXml
+}
+
+@Serializable
+enum class ShownInstruments {
+    All,
+    First,
 }
 
 @Serializable

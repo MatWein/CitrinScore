@@ -13,6 +13,7 @@ import de.citrinscore.score.Normalization
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScorePage
 import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.ShownInstruments
 import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.deviceState
 import de.citrinscore.score.shared
@@ -204,6 +205,11 @@ class LibraryRepository(
     suspend fun savePlayback(part: PartRef, playback: PlaybackPreferences) {
         logger.debug("Saving playback preferences {} of {}", playback, part)
         updatePart(part) { it.copy(playback = playback) }
+    }
+
+    suspend fun saveInstruments(part: PartRef, instruments: ShownInstruments) {
+        logger.debug("Saving shown instruments {} of {}", instruments, part)
+        updatePart(part) { it.copy(instruments = instruments) }
     }
 
     suspend fun attachments(score: PlatformFile, kind: AttachmentKind): List<Attachment> = manifest(score)?.attachments(kind).orEmpty()

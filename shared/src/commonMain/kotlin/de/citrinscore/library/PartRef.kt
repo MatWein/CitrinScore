@@ -17,3 +17,5 @@ data class DisplayRef(val part: PartRef, val display: PartDisplay) {
 
     override fun toString() = "$part as $display"
 }
+
+data class PerformedPart(val part: PartRef, val firstInstrumentOnly: Boolean)

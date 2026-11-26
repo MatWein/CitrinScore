@@ -35,7 +35,10 @@ private const val TICK_TOLERANCE = 1
 private const val MXL_CONTAINER = "META-INF/container.xml"
 private const val MXL_ROOTFILE = "rootfile"
 private const val MXL_ROOTFILE_PATH = "full-path"
+private const val PART_LIST = "part-list"
 private const val SCORE_PART = "score-part"
+private const val PART_GROUP = "part-group"
+private const val ID = "id"
 private const val PRINT_OBJECT = "print-object"
 private const val NO = "no"
 private val PART_LABELS = listOf("part-name", "part-abbreviation")
@@ -58,9 +61,11 @@ private val Utf16Boms = listOf(byteArrayOf(0xFE.toByte(), 0xFF.toByte()), byteAr
 private val TimemapJson = Json { ignoreUnknownKeys = true }
 private val logger = LoggerFactory.getLogger("de.citrinscore.score.musicxml.Verovio")
 
-actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver {
-    logger.debug("Loading MusicXML with {} bytes, compressed: {}", data.size, compressed)
-    val score = withContext(Dispatchers.Default) { (if (compressed) data.uncompressMusicXml() else data).decodeXml().preparedForVerovio() }
+actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean, firstPartOnly: Boolean): MusicXmlEngraver {
+    logger.debug("Loading MusicXML with {} bytes, compressed: {}, first part only: {}", data.size, compressed, firstPartOnly)
+    val (score, partCount) = withContext(Dispatchers.Default) {
+        (if (compressed) data.uncompressMusicXml() else data).decodeXml().preparedForVerovio(firstPartOnly)
+    }
     val resources = verovioResourcePath()
     val (toolkit, duration) = measureTimedValue {
         Verovio.call {
@@ -77,10 +82,10 @@ actual suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): M
         }
     }
     logger.debug("Verovio loaded the score in {}", duration)
-    return VerovioEngraver(GuardedResource(toolkit, Verovio::release))
+    return VerovioEngraver(GuardedResource(toolkit, Verovio::release), partCount)
 }
 
-private class VerovioEngraver(private val toolkit: GuardedResource<Pointer>) : MusicXmlEngraver {
+private class VerovioEngraver(private val toolkit: GuardedResource<Pointer>, override val partCount: Int) : MusicXmlEngraver {
     override suspend fun engrave(layout: EngravingLayout): List<EngravedPage> {
         val (pages, duration) = measureTimedValue {
             toolkit.use { handle ->
@@ -200,18 +205,30 @@ private fun ByteArray.uncompressMusicXml(): ByteArray {
     return entries[path] ?: error("The archive contains no $path")
 }
 
-private fun String.preparedForVerovio(): String {
+private fun String.preparedForVerovio(firstPartOnly: Boolean): Pair<String, Int> {
     val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder().apply { setEntityResolver { _, _ -> InputSource(StringReader("")) } }
     val document = try {
         builder.parse(InputSource(StringReader(this)))
     } catch (e: SAXException) {
         logger.debug("Leaving unparsable MusicXML to Verovio", e)
-        return this
+        return this to 1
     }
+    val partCount = document.getElementsByTagName(SCORE_PART).length
+    val keepsFirstPart = firstPartOnly && document.keepFirstPart()
     val hidesPartName = document.hideSinglePartName()
     val labelsRepeats = document.labelRepeatCounts()
-    if (!hidesPartName && !labelsRepeats) return this
-    return StringWriter().also { TransformerFactory.newInstance().newTransformer().transform(DOMSource(document), StreamResult(it)) }.toString()
+    if (!keepsFirstPart && !hidesPartName && !labelsRepeats) return this to partCount
+    return StringWriter().also { TransformerFactory.newInstance().newTransformer().transform(DOMSource(document), StreamResult(it)) }.toString() to partCount
+}
+
+private fun Document.keepFirstPart(): Boolean {
+    val partList = getElementsByTagName(PART_LIST).item(0) as? Element ?: return false
+    val scoreParts = partList.childElements(SCORE_PART)
+    if (scoreParts.size < 2) return false
+    val first = scoreParts.first().getAttribute(ID)
+    (scoreParts.drop(1) + partList.childElements(PART_GROUP)).forEach(partList::removeChild)
+    documentElement.childElements(PART).filter { it.getAttribute(ID) != first }.forEach(documentElement::removeChild)
+    return true
 }
 
 private fun Document.hideSinglePartName(): Boolean {

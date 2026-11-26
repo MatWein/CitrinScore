@@ -160,6 +160,7 @@ object GermanStrings : Strings {
     override val displayOriginal = "Original"
     override val displayNormalized = "Schwarz-Weiß"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Nur erstes Instrument anzeigen"
     override fun partNumber(number: Int) = "Stimme $number"
     override val partNameLabel = "Name der Stimme (optional)"
     override val partNameExists = "Diesen Namen hat bereits eine andere Stimme."

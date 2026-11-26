@@ -109,6 +109,25 @@ class MusicXmlEngraverTest {
     }
 
     @Test
+    fun `only the first part is engraved when asked`() = runTest {
+        val single = score(measures = 1)
+        val duet = single.replace("</score-part>", "</score-part><score-part id=\"P2\"><part-name>Klavier</part-name></score-part>")
+            .replace("</score-partwise>", single.substringAfter("</part-list>").substringBefore("</score-partwise>").replace("\"P1\"", "\"P2\"") + "</score-partwise>")
+
+        openMusicXmlEngraver(duet.encodeToByteArray(), compressed = false, firstPartOnly = true).use { engraver ->
+            val pages = engraver.engrave(EngravingLayout.Print)
+            assertEquals(2, engraver.partCount)
+            assertEquals(setOf(0), pages.flatMap { page -> page.staves.map { it.staff } }.toSet())
+            assertFalse(pages.any { "Klavier" in it.svg || "Violine" in it.svg })
+        }
+        openMusicXmlEngraver(duet.encodeToByteArray(), compressed = false).use { engraver ->
+            assertEquals(2, engraver.partCount)
+            assertEquals(setOf(0, 1), engraver.engrave(EngravingLayout.Print).flatMap { page -> page.staves.map { it.staff } }.toSet())
+        }
+        openMusicXmlEngraver(single.encodeToByteArray(), compressed = false, firstPartOnly = true).use { assertEquals(1, it.partCount) }
+    }
+
+    @Test
     fun `repeat counts above two are written above the repeat`() = runTest {
         fun withRepeat(times: String, words: String = "") = score(measures = 2).replaceFirst(
             "</measure>",

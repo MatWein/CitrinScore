@@ -6,6 +6,7 @@ import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.ScoreMetadata
 import de.citrinscore.score.ScorePart
 import de.citrinscore.score.ScoreViewState
+import de.citrinscore.score.ShownInstruments
 
 sealed interface ScoreViewerState {
     data object Loading : ScoreViewerState
@@ -19,6 +20,7 @@ sealed interface ScoreViewerState {
         val pageSizes: List<Size>,
         val view: ScoreViewState?,
         val reflowScale: Float?,
+        val instruments: ShownInstruments?,
         val isPlayable: Boolean,
     ) : ScoreViewerState {
         val isReflowable get() = reflowScale != null

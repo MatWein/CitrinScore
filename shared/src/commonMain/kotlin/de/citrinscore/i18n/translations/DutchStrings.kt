@@ -160,6 +160,7 @@ object DutchStrings : Strings {
     override val displayOriginal = "Origineel"
     override val displayNormalized = "Zwart-wit"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Alleen eerste instrument tonen"
     override fun partNumber(number: Int) = "Partij $number"
     override val partNameLabel = "Naam van de partij (optioneel)"
     override val partNameExists = "Een andere partij heeft deze naam al."

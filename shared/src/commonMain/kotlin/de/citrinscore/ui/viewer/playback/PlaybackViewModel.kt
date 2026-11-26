@@ -3,6 +3,7 @@ package de.citrinscore.ui.viewer.playback
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.PartRef
+import de.citrinscore.library.PerformedPart
 import de.citrinscore.score.PlaybackPreferences
 import de.citrinscore.score.audio.isMicrophoneAvailable
 import de.citrinscore.score.audio.microphoneSamples
@@ -36,7 +37,7 @@ const val MIN_TEMPO = 0.25f
 const val MAX_TEMPO = 2f
 
 class PlaybackViewModel(
-    private val part: StateFlow<PartRef?>,
+    private val performed: StateFlow<PerformedPart?>,
     private val loadPerformance: suspend (PartRef) -> ScorePerformance?,
     private val loadWrittenPitches: suspend (PartRef, Collection<String>) -> Map<String, Int>,
     private val loadPreferences: (PartRef) -> PlaybackPreferences?,
@@ -58,7 +59,8 @@ class PlaybackViewModel(
 
     init {
         viewModelScope.launch {
-            part.collectLatest { ref ->
+            performed.collectLatest { shown ->
+                val ref = shown?.part
                 stop()
                 release()
                 _cursor.value = null
@@ -134,7 +136,7 @@ class PlaybackViewModel(
     }
 
     private fun savePreferences() {
-        val ref = part.value ?: return
+        val ref = performed.value?.part ?: return
         val current = _state.value
         storePreferences(ref, PlaybackPreferences(current.tempo, current.instrument))
     }
@@ -163,14 +165,14 @@ class PlaybackViewModel(
     }
 
     private fun open() {
-        logger.info("Opening playback for {}", part.value)
+        logger.info("Opening playback for {}", performed.value?.part)
         _state.update { it.copy(isOpen = true, error = null) }
         if (_state.value.microphoneAvailable == null) {
             viewModelScope.launch { _state.update { it.copy(microphoneAvailable = isMicrophoneAvailable()) } }
         }
         if (performance != null) return showStill()
         if (loading?.isActive == true) return
-        val ref = part.value ?: return
+        val ref = performed.value?.part ?: return
         loading = viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             val loaded = loadPerformance(ref)
@@ -209,7 +211,7 @@ class PlaybackViewModel(
     }
 
     private fun preview(current: ScorePerformance, shown: PerformanceEvent, note: String) {
-        val ref = part.value ?: return
+        val ref = performed.value?.part ?: return
         previewing = viewModelScope.launch {
             val written = if (shown.needsWrittenPitches) loadWrittenPitches(ref, shown.ids()) else emptyMap()
             val pitch = shown.pitchOf(note, written) ?: return@launch

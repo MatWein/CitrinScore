@@ -160,6 +160,7 @@ object EnglishStrings : Strings {
     override val displayOriginal = "Original"
     override val displayNormalized = "Black and white"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Show first instrument only"
     override fun partNumber(number: Int) = "Part $number"
     override val partNameLabel = "Part name (optional)"
     override val partNameExists = "Another part already has this name."

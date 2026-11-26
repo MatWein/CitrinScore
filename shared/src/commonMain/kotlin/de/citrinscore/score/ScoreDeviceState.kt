@@ -12,6 +12,7 @@ data class ScoreDeviceState(
     val engravedViews: Map<String, ScoreViewState> = emptyMap(),
     val displays: Map<String, PartDisplay> = emptyMap(),
     val playback: Map<String, PlaybackPreferences> = emptyMap(),
+    val instruments: Map<String, ShownInstruments> = emptyMap(),
 )
 
 val ScoreManifest.deviceState
@@ -23,10 +24,11 @@ val ScoreManifest.deviceState
         engravedViews = parts.mapNotNull { part -> part.engravedView?.let { part.directory to it } }.toMap(),
         displays = parts.mapNotNull { part -> part.display?.let { part.directory to it } }.toMap(),
         playback = parts.mapNotNull { part -> part.playback?.let { part.directory to it } }.toMap(),
+        instruments = parts.mapNotNull { part -> part.instruments?.let { part.directory to it } }.toMap(),
     )
 
 val ScoreManifest.shared
-    get() = copy(lastOpenedAt = null, currentPart = null, scrollMode = null, parts = parts.map { it.copy(view = null, engravedView = null, display = null, playback = null) })
+    get() = copy(lastOpenedAt = null, currentPart = null, scrollMode = null, parts = parts.map { it.copy(view = null, engravedView = null, display = null, playback = null, instruments = null) })
 
 fun ScoreManifest.withDeviceState(state: ScoreDeviceState) = copy(
     lastOpenedAt = state.lastOpenedAt ?: lastOpenedAt,
@@ -38,6 +40,7 @@ fun ScoreManifest.withDeviceState(state: ScoreDeviceState) = copy(
             engravedView = state.engravedViews[part.directory] ?: part.engravedView,
             display = state.displays[part.directory] ?: part.display,
             playback = state.playback[part.directory] ?: part.playback,
+            instruments = state.instruments[part.directory] ?: part.instruments,
         )
     },
 )

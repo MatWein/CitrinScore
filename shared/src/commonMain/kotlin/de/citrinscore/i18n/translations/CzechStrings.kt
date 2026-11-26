@@ -160,6 +160,7 @@ object CzechStrings : Strings {
     override val displayOriginal = "Originál"
     override val displayNormalized = "Černobíle"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Zobrazit jen první nástroj"
     override fun partNumber(number: Int) = "Part $number"
     override val partNameLabel = "Název partu (nepovinné)"
     override val partNameExists = "Jiný part už má tento název."

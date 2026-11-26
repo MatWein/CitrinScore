@@ -15,6 +15,9 @@ data class NoteBox(val id: String, val measure: Int, val bounds: Rect)
 class EngravedPage(val svg: String, val staves: List<StaffBox>, val notes: List<NoteBox> = emptyList())
 
 interface MusicXmlEngraver : AutoCloseable {
+    /** The number of parts of the source, including those left out when only the first part is engraved. */
+    val partCount: Int
+
     suspend fun engrave(layout: EngravingLayout): List<EngravedPage>
 
     suspend fun perform(): ScorePerformance
@@ -22,4 +25,4 @@ interface MusicXmlEngraver : AutoCloseable {
     suspend fun writtenPitches(notes: Collection<String>): Map<String, Int>
 }
 
-expect suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean): MusicXmlEngraver
+expect suspend fun openMusicXmlEngraver(data: ByteArray, compressed: Boolean, firstPartOnly: Boolean = false): MusicXmlEngraver

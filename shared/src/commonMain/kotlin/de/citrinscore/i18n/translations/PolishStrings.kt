@@ -160,6 +160,7 @@ object PolishStrings : Strings {
     override val displayOriginal = "Oryginał"
     override val displayNormalized = "Czarno-białe"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Pokaż tylko pierwszy instrument"
     override fun partNumber(number: Int) = "Partia $number"
     override val partNameLabel = "Nazwa partii (opcjonalnie)"
     override val partNameExists = "Inna partia ma już tę nazwę."

@@ -150,6 +150,7 @@ interface Strings {
     val displayOriginal: String
     val displayNormalized: String
     val displayMusicXml: String
+    val firstInstrumentOnly: String
     fun partNumber(number: Int): String
     val partNameLabel: String
     val partNameExists: String

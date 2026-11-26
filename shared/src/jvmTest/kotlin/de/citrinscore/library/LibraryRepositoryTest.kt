@@ -27,6 +27,7 @@ import de.citrinscore.score.ScoreAnnotations
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
 import de.citrinscore.score.ScoreDeviceState
+import de.citrinscore.score.ShownInstruments
 import de.citrinscore.score.ScrollMode
 import de.citrinscore.score.shared
 import de.citrinscore.score.ScoreMetadata
@@ -427,6 +428,21 @@ class LibraryRepositoryTest {
         assertFalse("playback" in shared, shared)
         assertEquals(mapOf(part.directory to playback), device.playback)
         assertEquals(playback, repository.load(score).parts.single().playback)
+    }
+
+    @Test
+    fun `shown instruments stay on the device`() = runTest {
+        importAt("Etude", Instant.parse("2026-01-01T00:00:00Z"))
+        val score = PlatformFile(File(root, "Etude.citscore"))
+        val part = repository.open(score).parts.single()
+
+        repository.saveInstruments(PartRef(score, part.directory), ShownInstruments.First)
+
+        val shared = File(root, "Etude.citscore/${CitScore.MANIFEST_FILE}").readText()
+        val device = AppJson.decodeFromString<ScoreDeviceState>(File(root, "Etude.citscore/${CitScore.DEVICE_STATE_FILE}").readText())
+        assertFalse("instruments" in shared, shared)
+        assertEquals(mapOf(part.directory to ShownInstruments.First), device.instruments)
+        assertEquals(ShownInstruments.First, repository.load(score).parts.single().instruments)
     }
 
     @Test

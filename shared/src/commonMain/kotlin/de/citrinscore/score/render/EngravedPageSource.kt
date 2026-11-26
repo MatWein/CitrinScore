@@ -31,7 +31,7 @@ suspend fun List<EngravedPage>.pageSource(): PageSource {
     return EngravedPageSource(pages)
 }
 
-suspend fun openMusicXmlEngraver(file: PlatformFile): MusicXmlEngraver =
-    openMusicXmlEngraver(file.readBytes(), file.extension.equals(CitScore.COMPRESSED_MUSICXML_EXTENSION, ignoreCase = true))
+suspend fun openMusicXmlEngraver(file: PlatformFile, firstPartOnly: Boolean = false): MusicXmlEngraver =
+    openMusicXmlEngraver(file.readBytes(), file.extension.equals(CitScore.COMPRESSED_MUSICXML_EXTENSION, ignoreCase = true), firstPartOnly)
 
 suspend fun openMusicXmlSource(file: PlatformFile): PageSource = openMusicXmlEngraver(file).use { it.engrave(EngravingLayout.Print) }.pageSource()

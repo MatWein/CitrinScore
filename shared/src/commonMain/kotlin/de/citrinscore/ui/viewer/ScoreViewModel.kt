@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import de.citrinscore.library.DisplayRef
 import de.citrinscore.library.LibraryRepository
 import de.citrinscore.library.PartRef
+import de.citrinscore.library.PerformedPart
 import de.citrinscore.score.CitScore
 import de.citrinscore.score.ScoreContent
 import de.citrinscore.score.ScoreManifest
@@ -19,6 +20,7 @@ import de.citrinscore.score.RecognizedMusic
 import de.citrinscore.score.Recognition
 import de.citrinscore.score.ScoreViewState
 import de.citrinscore.score.ScrollMode
+import de.citrinscore.score.ShownInstruments
 import de.citrinscore.score.musicxml.EngravedPage
 import de.citrinscore.score.musicxml.EngravingLayout
 import de.citrinscore.score.musicxml.MeasureAnchors
@@ -70,6 +72,9 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     private val _display = MutableStateFlow<DisplayRef?>(null)
     val display: StateFlow<DisplayRef?> = _display.asStateFlow()
 
+    private val _performed = MutableStateFlow<PerformedPart?>(null)
+    val performed: StateFlow<PerformedPart?> = _performed.asStateFlow()
+
     private val _anchors = MutableStateFlow<MeasureAnchors?>(null)
     val anchors: StateFlow<MeasureAnchors?> = _anchors.asStateFlow()
 
@@ -78,9 +83,9 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
 
     private val viewportSize = MutableStateFlow<Size?>(null)
     private val renderers = mutableMapOf<Pair<String, PartDisplay>, ScoreRenderer>()
-    private val engravers = mutableMapOf<String, MusicXmlEngraver>()
+    private val engravers = mutableMapOf<PerformedPart, MusicXmlEngraver>()
     private val recognitions = mutableMapOf<String, RecognizedMusic>()
-    private val performances = mutableMapOf<String, ScorePerformance>()
+    private val performances = mutableMapOf<PerformedPart, ScorePerformance>()
     private var manifest: ScoreManifest? = null
     private val showing = Mutex()
     private val opening = Mutex()
@@ -136,6 +141,17 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
         }
     }
 
+    fun selectInstruments(part: PartRef, instruments: ShownInstruments) {
+        val current = manifest ?: return
+        if (current.part(part.directory).instruments == instruments) return
+        logger.info("Showing {} instruments of {}", instruments, part)
+        manifest = current.updatePart(part.directory) { it.copy(instruments = instruments) }
+        viewModelScope.launch {
+            show(part.directory)
+            withContext(NonCancellable) { attempt { repository.saveInstruments(part, instruments) } }
+        }
+    }
+
     fun reflow(part: PartRef, zoom: Float, view: ScoreViewState?) {
         val current = manifest ?: return
         val scale = (current.part(part.directory).reflowScale * zoom).coerceIn(ScoreViewport.MIN_ZOOM, ScoreViewport.MAX_ZOOM)
@@ -147,11 +163,12 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
     }
 
     suspend fun performance(part: PartRef): ScorePerformance? = attempt {
-        performances[part.directory] ?: engraver(part, manifest?.part(part.directory) ?: return@attempt null)?.perform()?.also { performances[part.directory] = it }
+        val performed = performed(part) ?: return@attempt null
+        performances[performed] ?: engraver(performed)?.perform()?.also { performances[performed] = it }
     }
 
     suspend fun writtenPitches(part: PartRef, notes: Collection<String>): Map<String, Int> =
-        attempt { manifest?.part(part.directory)?.let { engraver(part, it) }?.writtenPitches(notes) }.orEmpty()
+        attempt { performed(part)?.let { engraver(it) }?.writtenPitches(notes) }.orEmpty()
 
     suspend fun render(part: PartRef, display: PartDisplay, page: Int, region: Rect, size: IntSize): ImageBitmap? =
         attempt { renderers[part.directory to display]?.render(page, region, size) }
@@ -193,14 +210,16 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             _anchors.value = null
             _notes.value = null
         }
+        val performed = PerformedPart(ref, display.isEngraved && part.instruments == ShownInstruments.First)
         _part.value = ref
         _display.value = DisplayRef(ref, display)
+        _performed.value = performed
         logger.info("Showing {} as {}", ref, display)
         val recognized = part.recognition?.let { attempt { recognition(ref, it) } }
         var engraved: List<EngravedPage>? = null
         val renderer = if (display.isEngraved) {
             val size = viewportSize.value ?: return run { _state.value = ScoreViewerState.Loading }
-            attempt { engrave(ref, part, layout(size, part.reflowScale)) }?.let { (renderer, pages) ->
+            attempt { engrave(performed, layout(size, part.reflowScale)) }?.let { (renderer, pages) ->
                 engraved = pages
                 renderer
             }
@@ -219,22 +238,31 @@ class ScoreViewModel(private val score: PlatformFile, private val repository: Li
             pageSizes = renderer.pageSizes,
             view = if (display.isEngraved) part.engravedView?.copy(zoom = DEFAULT_REFLOW_SCALE) else part.view,
             reflowScale = part.reflowScale.takeIf { display.isEngraved },
+            instruments = (part.instruments ?: ShownInstruments.All).takeIf { display.isEngraved && (engravers[performed]?.partCount ?: 0) > 1 },
             isPlayable = engraved != null || _notes.value != null,
         )
     }
 
-    private suspend fun engrave(part: PartRef, scorePart: ScorePart, layout: EngravingLayout): Pair<ScoreRenderer, List<EngravedPage>> {
-        val pages = checkNotNull(engraver(part, scorePart)).engrave(layout)
+    private suspend fun engrave(performed: PerformedPart, layout: EngravingLayout): Pair<ScoreRenderer, List<EngravedPage>> {
+        val pages = checkNotNull(engraver(performed)).engrave(layout)
         val renderer = PageSourceRenderer(pages.pageSource())
-        renderers.put(part.directory to PartDisplay.MusicXml, renderer)?.close()
+        renderers.put(performed.part.directory to PartDisplay.MusicXml, renderer)?.close()
         return renderer to pages
     }
 
-    private suspend fun engraver(part: PartRef, scorePart: ScorePart): MusicXmlEngraver? = opening.withLock {
-        engravers[part.directory] ?: when (val content = scorePart.content) {
-            is ScoreContent.MusicXml -> openMusicXmlEngraver(CitScore.resolve(part.root, content.path))
-            is ScoreContent.Pages -> scorePart.recognition?.let { recognition(part, it) }?.let { openMusicXmlEngraver(it.musicXml.encodeToByteArray(), compressed = false) }
-        }?.also { engravers[part.directory] = it }
+    private fun performed(part: PartRef): PerformedPart? = _performed.value?.takeIf { it.part == part }
+
+    private suspend fun engraver(performed: PerformedPart): MusicXmlEngraver? = opening.withLock {
+        engravers[performed] ?: run {
+            val part = performed.part
+            val scorePart = manifest?.part(part.directory) ?: return@withLock null
+            val firstPartOnly = performed.firstInstrumentOnly
+            when (val content = scorePart.content) {
+                is ScoreContent.MusicXml -> openMusicXmlEngraver(CitScore.resolve(part.root, content.path), firstPartOnly)
+                is ScoreContent.Pages -> scorePart.recognition?.let { recognition(part, it) }
+                    ?.let { openMusicXmlEngraver(it.musicXml.encodeToByteArray(), compressed = false, firstPartOnly = firstPartOnly) }
+            }?.also { engravers[performed] = it }
+        }
     }
 
     private suspend fun recognition(part: PartRef, recognition: Recognition): RecognizedMusic? =

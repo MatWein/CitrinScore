@@ -160,6 +160,7 @@ object FinnishStrings : Strings {
     override val displayOriginal = "Alkuperäinen"
     override val displayNormalized = "Mustavalkoinen"
     override val displayMusicXml = "MusicXML"
+    override val firstInstrumentOnly = "Näytä vain ensimmäinen soitin"
     override fun partNumber(number: Int) = "Stemma $number"
     override val partNameLabel = "Stemman nimi (valinnainen)"
     override val partNameExists = "Toisella stemmalla on jo tämä nimi."

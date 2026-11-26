@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -91,6 +92,7 @@ import de.citrinscore.resources.ic_contrast
 import de.citrinscore.resources.ic_image
 import de.citrinscore.resources.ic_library_music
 import de.citrinscore.resources.ic_piano
+import de.citrinscore.resources.ic_filter_1
 import de.citrinscore.resources.ic_edit
 import de.citrinscore.resources.ic_height
 import de.citrinscore.resources.ic_open_with
@@ -98,6 +100,7 @@ import de.citrinscore.resources.ic_width
 import de.citrinscore.resources.ic_music_note
 import de.citrinscore.score.PartDisplay
 import de.citrinscore.score.ScrollMode
+import de.citrinscore.score.ShownInstruments
 import de.citrinscore.score.musicxml.NotePositions
 import de.citrinscore.ui.WindowTitle
 import de.citrinscore.ui.viewer.playback.PlaybackCursor
@@ -408,6 +411,7 @@ private fun TopToolbar(toolbar: ToolbarState) {
         navigationIcon = { BackAction(toolbar) },
         actions = {
             PartAction(toolbar)
+            InstrumentsAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
@@ -429,6 +433,7 @@ private fun SideToolbar(toolbar: ToolbarState) {
         ) {
             BackAction(toolbar)
             PartAction(toolbar)
+            InstrumentsAction(toolbar)
             PlaybackAction(toolbar)
             AnnotationAction(toolbar)
             AttachmentsMenu(toolbar.audio, toolbar.files, onOpenBar = toolbar.playback::close)
@@ -476,6 +481,21 @@ private fun PartAction(toolbar: ToolbarState) {
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun InstrumentsAction(toolbar: ToolbarState) {
+    val ready = toolbar.ready ?: return
+    val instruments = ready.instruments ?: return
+    val label = LocalStrings.current.firstInstrumentOnly
+    LabelTooltip(label) {
+        IconToggleButton(
+            checked = instruments == ShownInstruments.First,
+            onCheckedChange = { first -> toolbar.score.selectInstruments(ready.part, if (first) ShownInstruments.First else ShownInstruments.All) },
+        ) {
+            Icon(painterResource(Res.drawable.ic_filter_1), contentDescription = label)
         }
     }
 }
